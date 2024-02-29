@@ -3,6 +3,7 @@ use crate::data::DataClient;
 use crate::logistics_planner::{
     self, Action, LogisticShip, PlannerConstraints, ShipSchedule, Task, TaskActions,
 };
+use crate::models::MarketActivity::*;
 use crate::models::MarketSupply::*;
 use crate::models::MarketType::*;
 use crate::models::{Agent, WaypointSymbol};
@@ -178,15 +179,15 @@ impl LogisticTaskManager {
                     .filter(|(_, trade)| match trade._type {
                         Import => false,
                         Export => {
-                            // !! disable this since unsure if this is just causing weird fluctuations
+                            // unsure if this is just causing weird fluctuations
                             // Strong markets are where we'll make the most consistent profit
                             // ?? what about RESTRICTED markets?
-                            // if trade.activity == Some(Strong) {
-                            //     trade.supply >= High
-                            // } else {
-                            //     trade.supply >= Moderate
-                            // }
-                            trade.supply >= Moderate
+                            if trade.activity == Some(Strong) {
+                                trade.supply >= High
+                            } else {
+                                trade.supply >= Moderate
+                            }
+                            // trade.supply >= Moderate
                         }
                         Exchange => true,
                     })
@@ -280,15 +281,15 @@ impl LogisticTaskManager {
                 .filter(|(_, trade)| match trade._type {
                     Import => false,
                     Export => {
-                        // !! disable this since unsure if this is just causing weird fluctuations
+                        // !! unsure if this is just causing weird fluctuations
                         // Strong markets are where we'll make the most consistent profit
                         // ?? what about RESTRICTED markets?
-                        // if trade.activity == Some(Strong) {
-                        //     trade.supply >= High
-                        // } else {
-                        //     trade.supply >= Moderate
-                        // }
-                        trade.supply >= Moderate
+                        if trade.activity == Some(Strong) {
+                            trade.supply >= High
+                        } else {
+                            trade.supply >= Moderate
+                        }
+                        // trade.supply >= Moderate
                     }
                     Exchange => true,
                 })

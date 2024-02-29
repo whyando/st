@@ -1,4 +1,3 @@
-use log::*;
 use st::{
     agent_controller::AgentController, api_client::ApiClient, data::DataClient, universe::Universe,
 };
