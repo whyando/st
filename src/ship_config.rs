@@ -18,7 +18,7 @@ pub fn ship_config(waypoints: &Vec<Waypoint>) -> Vec<ShipConfig> {
         });
     }
 
-    const NUM_LHAULERS: usize = 4;
+    const NUM_LHAULERS: usize = 6;
     for i in 1..=NUM_LHAULERS {
         ships.push(ShipConfig {
             id: format!("logistics_lhauler/{}", i),
@@ -30,7 +30,7 @@ pub fn ship_config(waypoints: &Vec<Waypoint>) -> Vec<ShipConfig> {
 
     // Era 5: Siphon drones
     const NUM_SIPHON_DRONES: usize = 10;
-    const NUM_SIPHON_SHUTTLES: usize = 2;
+    const NUM_SIPHON_SHUTTLES: usize = 4;
     for i in 1..=NUM_SIPHON_DRONES {
         ships.push(ShipConfig {
             id: format!("siphon_drone/{}", i),
@@ -51,7 +51,7 @@ pub fn ship_config(waypoints: &Vec<Waypoint>) -> Vec<ShipConfig> {
     // Era 6: Mining surveyors, drones, and shuttles
     const NUM_SURVEYORS: usize = 1;
     const NUM_MINING_DRONES: usize = 8;
-    const NUM_MINING_SHUTTLES: usize = 3;
+    const NUM_MINING_SHUTTLES: usize = 4;
     for i in 1..=NUM_SURVEYORS {
         ships.push(ShipConfig {
             id: format!("surveyor/{}", i),
