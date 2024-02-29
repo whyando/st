@@ -5,7 +5,7 @@ use log::*;
 use std::ops::Add as _;
 
 lazy_static! {
-    static ref MARKET_REFRESH_INTERVAL: Duration = Duration::minutes(15);
+    static ref MARKET_REFRESH_INTERVAL: Duration = Duration::minutes(6);
     static ref SHIPYARD_REFRESH_INTERVAL: Duration = Duration::minutes(60);
 }
 
