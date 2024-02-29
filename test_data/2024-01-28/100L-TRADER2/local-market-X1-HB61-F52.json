@@ -1,0 +1,311 @@
+{
+  "symbol": "X1-HB61-F52",
+  "imports": [
+    {
+      "symbol": "COPPER",
+      "name": "Copper",
+      "description": "Copper is an essential component in the production of electronic components and wiring."
+    },
+    {
+      "symbol": "QUARTZ_SAND",
+      "name": "Quartz Sand",
+      "description": "High-purity quartz sand used in the production of glass and ceramics."
+    },
+    {
+      "symbol": "SILICON_CRYSTALS",
+      "name": "Silicon Crystals",
+      "description": "High-quality silicon crystals used in the production of advanced electronic components and solar panels."
+    },
+    {
+      "symbol": "IRON",
+      "name": "Iron",
+      "description": "A common and valuable metal often used in the construction of ship hulls and other structural components."
+    }
+  ],
+  "exports": [
+    {
+      "symbol": "FAB_MATS",
+      "name": "Fabrication Materials",
+      "description": "Industrial materials essential in the construction of planetary habitats, space stations, and interstellar infrastructure."
+    },
+    {
+      "symbol": "ELECTRONICS",
+      "name": "Electronic Components",
+      "description": "Advanced electronic components used in the construction of advanced technologies."
+    }
+  ],
+  "exchange": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ],
+  "transactions": [
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-05T04:35:06.715Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-05T01:18:53.625Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T22:06:23.660Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T18:46:56.776Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T15:23:20.681Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T12:21:41.195Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T09:00:14.765Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T05:43:42.264Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T02:29:49.274Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T23:20:17.910Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T20:08:10.649Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-03T16:54:13.729Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-03T13:34:02.411Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-03T10:11:48.937Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T06:39:54.387Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-03T03:31:37.081Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-03T00:19:01.525Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-02T20:57:24.114Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-02T17:28:30.763Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F52",
+      "shipSymbol": "FLEX-DRIVE-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-02T16:33:24.943Z"
+    }
+  ],
+  "tradeGoods": [
+    {
+      "symbol": "FAB_MATS",
+      "tradeVolume": 20,
+      "type": "EXPORT",
+      "supply": "ABUNDANT",
+      "activity": "RESTRICTED",
+      "purchasePrice": 1261,
+      "sellPrice": 625
+    },
+    {
+      "symbol": "COPPER",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 628,
+      "sellPrice": 311
+    },
+    {
+      "symbol": "FUEL",
+      "tradeVolume": 180,
+      "type": "EXCHANGE",
+      "supply": "MODERATE",
+      "purchasePrice": 72,
+      "sellPrice": 68
+    },
+    {
+      "symbol": "ELECTRONICS",
+      "tradeVolume": 20,
+      "type": "EXPORT",
+      "supply": "ABUNDANT",
+      "activity": "RESTRICTED",
+      "purchasePrice": 1453,
+      "sellPrice": 714
+    },
+    {
+      "symbol": "QUARTZ_SAND",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 54,
+      "sellPrice": 27
+    },
+    {
+      "symbol": "SILICON_CRYSTALS",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 92,
+      "sellPrice": 45
+    },
+    {
+      "symbol": "IRON",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 324,
+      "sellPrice": 161
+    }
+  ],
+  "timestamp": 1707118631028
+}

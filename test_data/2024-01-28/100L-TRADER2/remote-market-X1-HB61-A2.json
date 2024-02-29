@@ -1,0 +1,23 @@
+{
+  "symbol": "X1-HB61-A2",
+  "imports": [
+    {
+      "symbol": "SHIP_PLATING",
+      "name": "Ship Plating",
+      "description": "High-quality metal plating used in the construction of ship hulls and other structural components."
+    },
+    {
+      "symbol": "SHIP_PARTS",
+      "name": "Ship Parts",
+      "description": "Various components and hardware required for spacecraft maintenance, upgrades, and construction."
+    }
+  ],
+  "exports": [],
+  "exchange": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ]
+}

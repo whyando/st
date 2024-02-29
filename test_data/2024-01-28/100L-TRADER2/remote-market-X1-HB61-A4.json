@@ -1,0 +1,34 @@
+{
+  "symbol": "X1-HB61-A4",
+  "imports": [
+    {
+      "symbol": "ADVANCED_CIRCUITRY",
+      "name": "Advanced Circuitry",
+      "description": "Highly advanced and complex electronic components used in advanced technologies and systems."
+    },
+    {
+      "symbol": "PLATINUM",
+      "name": "Platinum",
+      "description": "Platinum is often used in the production of catalysts and other industrial applications."
+    },
+    {
+      "symbol": "DIAMONDS",
+      "name": "Diamonds",
+      "description": "Rare and valuable crystals used in the production of high-end jewelry and other luxury goods."
+    }
+  ],
+  "exports": [
+    {
+      "symbol": "MICRO_FUSION_GENERATORS",
+      "name": "Micro Fusion Generators",
+      "description": "Compact fusion reactors that provide a clean, reliable, and virtually unlimited source of energy."
+    }
+  ],
+  "exchange": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ]
+}

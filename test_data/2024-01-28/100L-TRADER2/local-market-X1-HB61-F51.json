@@ -1,0 +1,297 @@
+{
+  "symbol": "X1-HB61-F51",
+  "imports": [
+    {
+      "symbol": "LIQUID_NITROGEN",
+      "name": "Liquid Nitrogen",
+      "description": "A cryogenic fluid used in a variety of applications, including refrigeration and cryogenic freezing."
+    },
+    {
+      "symbol": "IRON",
+      "name": "Iron",
+      "description": "A common and valuable metal often used in the construction of ship hulls and other structural components."
+    },
+    {
+      "symbol": "LIQUID_HYDROGEN",
+      "name": "Liquid Hydrogen",
+      "description": "A highly efficient and lightweight fuel used in advanced propulsion systems."
+    }
+  ],
+  "exports": [
+    {
+      "symbol": "AMMUNITION",
+      "name": "Ammunition",
+      "description": "A wide range of ammunition for various firearms, including bullets, shells, and other projectiles."
+    },
+    {
+      "symbol": "EXPLOSIVES",
+      "name": "Explosives",
+      "description": "High-powered explosives used for mining, construction, and military operations."
+    }
+  ],
+  "exchange": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ],
+  "transactions": [
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 2,
+      "pricePerUnit": 72,
+      "totalPrice": 144,
+      "timestamp": "2024-02-05T04:34:48.463Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-05T01:18:35.632Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T22:06:05.407Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T18:46:38.850Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T15:23:02.079Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T12:21:22.685Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T08:59:56.775Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T05:43:23.984Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-04T02:29:30.459Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T23:19:59.635Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T20:07:52.287Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T16:54:31.675Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T13:49:01.289Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T10:44:48.435Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 2,
+      "pricePerUnit": 72,
+      "totalPrice": 144,
+      "timestamp": "2024-02-03T07:31:41.633Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 2,
+      "pricePerUnit": 72,
+      "totalPrice": 144,
+      "timestamp": "2024-02-03T04:19:37.021Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T00:53:35.649Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 2,
+      "pricePerUnit": 72,
+      "totalPrice": 144,
+      "timestamp": "2024-02-02T21:34:56.975Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 2,
+      "pricePerUnit": 72,
+      "totalPrice": 144,
+      "timestamp": "2024-02-02T18:27:04.112Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-F51",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 2,
+      "pricePerUnit": 72,
+      "totalPrice": 144,
+      "timestamp": "2024-02-02T15:24:57.343Z"
+    }
+  ],
+  "tradeGoods": [
+    {
+      "symbol": "AMMUNITION",
+      "tradeVolume": 20,
+      "type": "EXPORT",
+      "supply": "ABUNDANT",
+      "activity": "RESTRICTED",
+      "purchasePrice": 984,
+      "sellPrice": 485
+    },
+    {
+      "symbol": "LIQUID_NITROGEN",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 82,
+      "sellPrice": 40
+    },
+    {
+      "symbol": "EXPLOSIVES",
+      "tradeVolume": 20,
+      "type": "EXPORT",
+      "supply": "ABUNDANT",
+      "activity": "RESTRICTED",
+      "purchasePrice": 98,
+      "sellPrice": 49
+    },
+    {
+      "symbol": "FUEL",
+      "tradeVolume": 180,
+      "type": "EXCHANGE",
+      "supply": "MODERATE",
+      "purchasePrice": 72,
+      "sellPrice": 68
+    },
+    {
+      "symbol": "IRON",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 346,
+      "sellPrice": 171
+    },
+    {
+      "symbol": "LIQUID_HYDROGEN",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 64,
+      "sellPrice": 31
+    }
+  ],
+  "timestamp": 1707118613053
+}

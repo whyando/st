@@ -1,0 +1,254 @@
+{
+  "symbol": "X1-HB61-H55",
+  "imports": [
+    {
+      "symbol": "SHIP_PLATING",
+      "name": "Ship Plating",
+      "description": "High-quality metal plating used in the construction of ship hulls and other structural components."
+    },
+    {
+      "symbol": "SHIP_PARTS",
+      "name": "Ship Parts",
+      "description": "Various components and hardware required for spacecraft maintenance, upgrades, and construction."
+    }
+  ],
+  "exports": [],
+  "exchange": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ],
+  "transactions": [
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-05T04:33:01.437Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-05T01:12:00.010Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T22:04:00.061Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T18:44:15.646Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T15:20:57.008Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T12:19:17.780Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T08:57:51.096Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T05:41:17.548Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-04T02:22:56.018Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-03T23:17:53.660Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T20:05:47.254Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T16:56:36.664Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T13:42:57.232Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T10:41:52.691Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T07:29:54.666Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T04:17:49.701Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-03T00:51:29.620Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-02T21:31:25.220Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-02T18:25:16.885Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H55",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 72,
+      "totalPrice": 72,
+      "timestamp": "2024-02-02T15:23:10.384Z"
+    }
+  ],
+  "tradeGoods": [
+    {
+      "symbol": "SHIP_PLATING",
+      "tradeVolume": 6,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "WEAK",
+      "purchasePrice": 14960,
+      "sellPrice": 7406
+    },
+    {
+      "symbol": "FUEL",
+      "tradeVolume": 180,
+      "type": "EXCHANGE",
+      "supply": "MODERATE",
+      "purchasePrice": 72,
+      "sellPrice": 68
+    },
+    {
+      "symbol": "SHIP_PARTS",
+      "tradeVolume": 6,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "GROWING",
+      "purchasePrice": 16034,
+      "sellPrice": 7935
+    }
+  ],
+  "timestamp": 1707118487623
+}

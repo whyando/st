@@ -1,0 +1,17 @@
+[Unit]
+Description=SpaceTraders RS
+After=network.target
+
+[Service]
+User=root
+Group=root
+ExecStart=/opt/st/main 2>&1
+Environment=RUST_LOG=info,st=debug
+Environment=RUST_BACKTRACE=1
+WorkingDirectory=/opt/st
+Restart=always
+RestartSec=15
+StandardOutput=append:/opt/st/run.log
+
+[Install]
+WantedBy=multi-user.target

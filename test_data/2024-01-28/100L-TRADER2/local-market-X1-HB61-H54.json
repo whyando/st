@@ -1,0 +1,325 @@
+{
+  "symbol": "X1-HB61-H54",
+  "imports": [
+    {
+      "symbol": "DRUGS",
+      "name": "Pharmaceuticals",
+      "description": "A wide range of drugs and other medical treatments used to treat various conditions and illnesses."
+    },
+    {
+      "symbol": "COPPER_ORE",
+      "name": "Copper Ore",
+      "description": "A valuable ore used in the production of copper and other alloys. Copper ore is an essential component in the production of electronic components and wiring."
+    },
+    {
+      "symbol": "IRON_ORE",
+      "name": "Iron Ore",
+      "description": "A common and valuable ore used in the production of steel and other alloys."
+    },
+    {
+      "symbol": "ALUMINUM_ORE",
+      "name": "Aluminum Ore",
+      "description": "A valuable ore used in the production of aluminum and other alloys. Aluminum ore is an essential component in the construction of ship hulls and other structural components."
+    }
+  ],
+  "exports": [
+    {
+      "symbol": "ALUMINUM",
+      "name": "Aluminum",
+      "description": "Aluminum is an essential component in the construction of ship hulls and other structural components."
+    },
+    {
+      "symbol": "COPPER",
+      "name": "Copper",
+      "description": "Copper is an essential component in the production of electronic components and wiring."
+    },
+    {
+      "symbol": "IRON",
+      "name": "Iron",
+      "description": "A common and valuable metal often used in the construction of ship hulls and other structural components."
+    }
+  ],
+  "exchange": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ],
+  "transactions": [
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "DRUGS",
+      "type": "SELL",
+      "units": 20,
+      "pricePerUnit": 5643,
+      "totalPrice": 112860,
+      "timestamp": "2024-02-05T08:47:49.114Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-05T07:34:30.021Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "DRUGS",
+      "type": "SELL",
+      "units": 20,
+      "pricePerUnit": 5638,
+      "totalPrice": 112760,
+      "timestamp": "2024-02-05T07:34:29.616Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-05T07:10:16.122Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-05T03:47:16.361Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "DRUGS",
+      "type": "SELL",
+      "units": 20,
+      "pricePerUnit": 5631,
+      "totalPrice": 112620,
+      "timestamp": "2024-02-05T03:47:15.584Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-05T03:23:03.440Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-05T00:10:50.097Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "DRUGS",
+      "type": "SELL",
+      "units": 20,
+      "pricePerUnit": 5633,
+      "totalPrice": 112660,
+      "timestamp": "2024-02-05T00:10:49.325Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-04T21:40:35.551Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "DRUGS",
+      "type": "SELL",
+      "units": 20,
+      "pricePerUnit": 5651,
+      "totalPrice": 113020,
+      "timestamp": "2024-02-04T21:40:34.616Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-04T19:26:50.947Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "DRUGS",
+      "type": "SELL",
+      "units": 20,
+      "pricePerUnit": 5636,
+      "totalPrice": 112720,
+      "timestamp": "2024-02-04T19:26:50.241Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-04T16:21:46.392Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "DRUGS",
+      "type": "SELL",
+      "units": 20,
+      "pricePerUnit": 5631,
+      "totalPrice": 112620,
+      "timestamp": "2024-02-04T16:21:45.420Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-04T13:21:06.345Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "DRUGS",
+      "type": "SELL",
+      "units": 20,
+      "pricePerUnit": 5648,
+      "totalPrice": 112960,
+      "timestamp": "2024-02-04T13:21:05.951Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-04T12:58:11.515Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 3,
+      "pricePerUnit": 72,
+      "totalPrice": 216,
+      "timestamp": "2024-02-04T09:40:27.203Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-H54",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "DRUGS",
+      "type": "SELL",
+      "units": 20,
+      "pricePerUnit": 5643,
+      "totalPrice": 112860,
+      "timestamp": "2024-02-04T09:40:26.761Z"
+    }
+  ],
+  "tradeGoods": [
+    {
+      "symbol": "DRUGS",
+      "tradeVolume": 20,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "GROWING",
+      "purchasePrice": 11286,
+      "sellPrice": 5589
+    },
+    {
+      "symbol": "ALUMINUM",
+      "tradeVolume": 60,
+      "type": "EXPORT",
+      "supply": "ABUNDANT",
+      "activity": "RESTRICTED",
+      "purchasePrice": 131,
+      "sellPrice": 64
+    },
+    {
+      "symbol": "COPPER",
+      "tradeVolume": 60,
+      "type": "EXPORT",
+      "supply": "ABUNDANT",
+      "activity": "RESTRICTED",
+      "purchasePrice": 175,
+      "sellPrice": 86
+    },
+    {
+      "symbol": "COPPER_ORE",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 158,
+      "sellPrice": 78
+    },
+    {
+      "symbol": "FUEL",
+      "tradeVolume": 180,
+      "type": "EXCHANGE",
+      "supply": "MODERATE",
+      "purchasePrice": 72,
+      "sellPrice": 68
+    },
+    {
+      "symbol": "IRON_ORE",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 140,
+      "sellPrice": 69
+    },
+    {
+      "symbol": "ALUMINUM_ORE",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 162,
+      "sellPrice": 80
+    },
+    {
+      "symbol": "IRON",
+      "tradeVolume": 60,
+      "type": "EXPORT",
+      "supply": "ABUNDANT",
+      "activity": "RESTRICTED",
+      "purchasePrice": 89,
+      "sellPrice": 44
+    }
+  ],
+  "timestamp": 1707122869383
+}

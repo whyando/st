@@ -1,0 +1,38 @@
+{
+  "symbol": "X1-HB61-G53",
+  "imports": [
+    {
+      "symbol": "HYDROCARBON",
+      "name": "Hydrocarbons",
+      "description": "A highly-valued substance used in the production of fuels, plastics, and other industrial products."
+    },
+    {
+      "symbol": "LIQUID_HYDROGEN",
+      "name": "Liquid Hydrogen",
+      "description": "A highly efficient and lightweight fuel used in advanced propulsion systems."
+    },
+    {
+      "symbol": "LIQUID_NITROGEN",
+      "name": "Liquid Nitrogen",
+      "description": "A cryogenic fluid used in a variety of applications, including refrigeration and cryogenic freezing."
+    }
+  ],
+  "exports": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    },
+    {
+      "symbol": "PLASTICS",
+      "name": "Plastics",
+      "description": "A wide range of plastic materials used in various applications, including packaging, construction, and manufacturing."
+    },
+    {
+      "symbol": "FERTILIZERS",
+      "name": "Fertilizers",
+      "description": "Specialized chemicals used to enrich the soil and promote plant growth on newly-colonized planets."
+    }
+  ],
+  "exchange": []
+}

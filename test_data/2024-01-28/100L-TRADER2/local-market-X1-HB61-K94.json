@@ -1,0 +1,325 @@
+{
+  "symbol": "X1-HB61-K94",
+  "imports": [
+    {
+      "symbol": "FABRICS",
+      "name": "Synthetic Fabrics",
+      "description": "High-tech fabrics used in the production of clothing and other products for everyday use."
+    },
+    {
+      "symbol": "PLASTICS",
+      "name": "Plastics",
+      "description": "A wide range of plastic materials used in various applications, including packaging, construction, and manufacturing."
+    },
+    {
+      "symbol": "ALUMINUM",
+      "name": "Aluminum",
+      "description": "Aluminum is an essential component in the construction of ship hulls and other structural components."
+    },
+    {
+      "symbol": "FERTILIZERS",
+      "name": "Fertilizers",
+      "description": "Specialized chemicals used to enrich the soil and promote plant growth on newly-colonized planets."
+    }
+  ],
+  "exports": [
+    {
+      "symbol": "EQUIPMENT",
+      "name": "Equipment",
+      "description": "Tools and equipment used in various industries and applications."
+    },
+    {
+      "symbol": "CLOTHING",
+      "name": "Clothing",
+      "description": "A wide range of clothing and fashion items, including garments, accessories, and textiles."
+    },
+    {
+      "symbol": "FOOD",
+      "name": "Galactic Cuisine",
+      "description": "A diverse range of foods from different planets, including fresh produce, meats, and prepared meals."
+    }
+  ],
+  "exchange": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ],
+  "transactions": [
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "EQUIPMENT",
+      "type": "PURCHASE",
+      "units": 20,
+      "pricePerUnit": 1909,
+      "totalPrice": 38180,
+      "timestamp": "2024-02-05T09:49:08.857Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 2,
+      "pricePerUnit": 86,
+      "totalPrice": 172,
+      "timestamp": "2024-02-05T09:06:56.555Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FOOD",
+      "type": "PURCHASE",
+      "units": 40,
+      "pricePerUnit": 1548,
+      "totalPrice": 61920,
+      "timestamp": "2024-02-05T09:06:56.170Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 2,
+      "pricePerUnit": 86,
+      "totalPrice": 172,
+      "timestamp": "2024-02-05T09:03:07.974Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "EQUIPMENT",
+      "type": "PURCHASE",
+      "units": 20,
+      "pricePerUnit": 1893,
+      "totalPrice": 37860,
+      "timestamp": "2024-02-05T09:03:07.589Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 86,
+      "totalPrice": 86,
+      "timestamp": "2024-02-05T08:57:53.086Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FABRICS",
+      "type": "SELL",
+      "units": 40,
+      "pricePerUnit": 2744,
+      "totalPrice": 109760,
+      "timestamp": "2024-02-05T08:57:52.471Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 86,
+      "totalPrice": 86,
+      "timestamp": "2024-02-05T08:51:21.545Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FABRICS",
+      "type": "SELL",
+      "units": 40,
+      "pricePerUnit": 2765,
+      "totalPrice": 110600,
+      "timestamp": "2024-02-05T08:51:20.983Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 4,
+      "pricePerUnit": 86,
+      "totalPrice": 344,
+      "timestamp": "2024-02-05T08:27:12.224Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "CLOTHING",
+      "type": "PURCHASE",
+      "units": 20,
+      "pricePerUnit": 3569,
+      "totalPrice": 71380,
+      "timestamp": "2024-02-05T08:27:11.775Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 2,
+      "pricePerUnit": 86,
+      "totalPrice": 172,
+      "timestamp": "2024-02-05T08:08:53.682Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "EQUIPMENT",
+      "type": "PURCHASE",
+      "units": 20,
+      "pricePerUnit": 1882,
+      "totalPrice": 37640,
+      "timestamp": "2024-02-05T08:08:53.294Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 4,
+      "pricePerUnit": 85,
+      "totalPrice": 340,
+      "timestamp": "2024-02-05T07:59:27.003Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FOOD",
+      "type": "PURCHASE",
+      "units": 40,
+      "pricePerUnit": 1523,
+      "totalPrice": 60920,
+      "timestamp": "2024-02-05T07:59:26.575Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 2,
+      "pricePerUnit": 85,
+      "totalPrice": 170,
+      "timestamp": "2024-02-05T07:47:46.482Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "CLOTHING",
+      "type": "PURCHASE",
+      "units": 20,
+      "pricePerUnit": 3488,
+      "totalPrice": 69760,
+      "timestamp": "2024-02-05T07:47:46.090Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 2,
+      "pricePerUnit": 85,
+      "totalPrice": 170,
+      "timestamp": "2024-02-05T07:43:57.454Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "EQUIPMENT",
+      "type": "PURCHASE",
+      "units": 20,
+      "pricePerUnit": 1868,
+      "totalPrice": 37360,
+      "timestamp": "2024-02-05T07:43:57.052Z"
+    },
+    {
+      "waypointSymbol": "X1-HB61-K94",
+      "shipSymbol": "100L-TRADER2-1",
+      "tradeSymbol": "FUEL",
+      "type": "PURCHASE",
+      "units": 1,
+      "pricePerUnit": 85,
+      "totalPrice": 85,
+      "timestamp": "2024-02-05T06:49:38.807Z"
+    }
+  ],
+  "tradeGoods": [
+    {
+      "symbol": "EQUIPMENT",
+      "tradeVolume": 43,
+      "type": "EXPORT",
+      "supply": "ABUNDANT",
+      "activity": "RESTRICTED",
+      "purchasePrice": 1932,
+      "sellPrice": 943
+    },
+    {
+      "symbol": "CLOTHING",
+      "tradeVolume": 43,
+      "type": "EXPORT",
+      "supply": "MODERATE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 3585,
+      "sellPrice": 1644
+    },
+    {
+      "symbol": "FABRICS",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "WEAK",
+      "purchasePrice": 5524,
+      "sellPrice": 2730
+    },
+    {
+      "symbol": "FUEL",
+      "tradeVolume": 180,
+      "type": "EXCHANGE",
+      "supply": "SCARCE",
+      "purchasePrice": 86,
+      "sellPrice": 74
+    },
+    {
+      "symbol": "PLASTICS",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 418,
+      "sellPrice": 208
+    },
+    {
+      "symbol": "ALUMINUM",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 524,
+      "sellPrice": 260
+    },
+    {
+      "symbol": "FERTILIZERS",
+      "tradeVolume": 60,
+      "type": "IMPORT",
+      "supply": "SCARCE",
+      "activity": "WEAK",
+      "purchasePrice": 486,
+      "sellPrice": 241
+    },
+    {
+      "symbol": "FOOD",
+      "tradeVolume": 60,
+      "type": "EXPORT",
+      "supply": "MODERATE",
+      "activity": "RESTRICTED",
+      "purchasePrice": 1596,
+      "sellPrice": 750
+    }
+  ],
+  "timestamp": 1707126549176
+}

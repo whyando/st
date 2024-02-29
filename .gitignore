@@ -1,0 +1,6 @@
+/target
+/data
+/output
+/.env
+/.env.remote
+*.log

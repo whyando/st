@@ -1,0 +1,39 @@
+{
+  "symbol": "X1-HB61-E47",
+  "imports": [
+    {
+      "symbol": "ALUMINUM",
+      "name": "Aluminum",
+      "description": "Aluminum is an essential component in the construction of ship hulls and other structural components."
+    },
+    {
+      "symbol": "AMMUNITION",
+      "name": "Ammunition",
+      "description": "A wide range of ammunition for various firearms, including bullets, shells, and other projectiles."
+    },
+    {
+      "symbol": "IRON",
+      "name": "Iron",
+      "description": "A common and valuable metal often used in the construction of ship hulls and other structural components."
+    }
+  ],
+  "exports": [
+    {
+      "symbol": "ASSAULT_RIFLES",
+      "name": "Assault Rifles",
+      "description": "High-powered rifles designed for rapid-fire combat and used by military forces and other trained personnel."
+    },
+    {
+      "symbol": "FIREARMS",
+      "name": "Galactic Arms",
+      "description": "A wide range of weapons, including pistols, rifles, and shotguns, used for self-defense and military purposes."
+    }
+  ],
+  "exchange": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ]
+}

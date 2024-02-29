@@ -1,0 +1,84 @@
+{
+  "symbol": "X1-HB61-J61",
+  "imports": [
+    {
+      "symbol": "FOOD",
+      "name": "Galactic Cuisine",
+      "description": "A diverse range of foods from different planets, including fresh produce, meats, and prepared meals."
+    },
+    {
+      "symbol": "MEDICINE",
+      "name": "Medicine",
+      "description": "Medical products, including drugs, treatments, and medical equipment."
+    },
+    {
+      "symbol": "CLOTHING",
+      "name": "Clothing",
+      "description": "A wide range of clothing and fashion items, including garments, accessories, and textiles."
+    },
+    {
+      "symbol": "EQUIPMENT",
+      "name": "Equipment",
+      "description": "Tools and equipment used in various industries and applications."
+    },
+    {
+      "symbol": "EXPLOSIVES",
+      "name": "Explosives",
+      "description": "High-powered explosives used for mining, construction, and military operations."
+    },
+    {
+      "symbol": "AMMONIA_ICE",
+      "name": "Ammonia Ice",
+      "description": "A valuable substance used in the production of fertilizers and other chemical products."
+    },
+    {
+      "symbol": "POLYNUCLEOTIDES",
+      "name": "Polynucleotides",
+      "description": "A complex and highly valuable substance used in advanced medical treatments and biotechnology."
+    },
+    {
+      "symbol": "FIREARMS",
+      "name": "Galactic Arms",
+      "description": "A wide range of weapons, including pistols, rifles, and shotguns, used for self-defense and military purposes."
+    },
+    {
+      "symbol": "ASSAULT_RIFLES",
+      "name": "Assault Rifles",
+      "description": "High-powered rifles designed for rapid-fire combat and used by military forces and other trained personnel."
+    }
+  ],
+  "exports": [
+    {
+      "symbol": "IRON_ORE",
+      "name": "Iron Ore",
+      "description": "A common and valuable ore used in the production of steel and other alloys."
+    },
+    {
+      "symbol": "COPPER_ORE",
+      "name": "Copper Ore",
+      "description": "A valuable ore used in the production of copper and other alloys. Copper ore is an essential component in the production of electronic components and wiring."
+    },
+    {
+      "symbol": "ALUMINUM_ORE",
+      "name": "Aluminum Ore",
+      "description": "A valuable ore used in the production of aluminum and other alloys. Aluminum ore is an essential component in the construction of ship hulls and other structural components."
+    },
+    {
+      "symbol": "PRECIOUS_STONES",
+      "name": "Precious Stones",
+      "description": "A collection of valuable gems and diamonds, often used in jewelry and other decorative objects."
+    },
+    {
+      "symbol": "DRUGS",
+      "name": "Pharmaceuticals",
+      "description": "A wide range of drugs and other medical treatments used to treat various conditions and illnesses."
+    }
+  ],
+  "exchange": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ]
+}

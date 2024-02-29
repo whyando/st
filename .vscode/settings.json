@@ -1,0 +1,9 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "./Cargo.toml"
+    ],
+    // until https://github.com/rust-lang/rust-analyzer/issues/16614 is fully resolved
+    "rust-analyzer.cargo.buildScripts.rebuildOnSave": false,
+    // disable proc macro
+    "rust-analyzer.procMacro.enable": false,    
+}

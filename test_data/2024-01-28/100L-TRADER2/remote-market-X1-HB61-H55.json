@@ -1,0 +1,52 @@
+{
+  "symbol": "X1-HB61-H55",
+  "imports": [
+    {
+      "symbol": "SHIP_PLATING",
+      "name": "Ship Plating",
+      "description": "High-quality metal plating used in the construction of ship hulls and other structural components."
+    },
+    {
+      "symbol": "SHIP_PARTS",
+      "name": "Ship Parts",
+      "description": "Various components and hardware required for spacecraft maintenance, upgrades, and construction."
+    }
+  ],
+  "exports": [],
+  "exchange": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ],
+  "transactions": [],
+  "tradeGoods": [
+    {
+      "symbol": "SHIP_PLATING",
+      "tradeVolume": 6,
+      "type": "IMPORT",
+      "supply": "LIMITED",
+      "activity": "WEAK",
+      "purchasePrice": 13790,
+      "sellPrice": 6685
+    },
+    {
+      "symbol": "SHIP_PARTS",
+      "tradeVolume": 6,
+      "type": "IMPORT",
+      "supply": "MODERATE",
+      "activity": "WEAK",
+      "purchasePrice": 12744,
+      "sellPrice": 5910
+    },
+    {
+      "symbol": "FUEL",
+      "tradeVolume": 180,
+      "type": "EXCHANGE",
+      "supply": "MODERATE",
+      "purchasePrice": 72,
+      "sellPrice": 68
+    }
+  ]
+}

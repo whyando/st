@@ -1,0 +1,49 @@
+{
+  "symbol": "X1-HB61-E48",
+  "imports": [
+    {
+      "symbol": "IRON",
+      "name": "Iron",
+      "description": "A common and valuable metal often used in the construction of ship hulls and other structural components."
+    },
+    {
+      "symbol": "LIQUID_HYDROGEN",
+      "name": "Liquid Hydrogen",
+      "description": "A highly efficient and lightweight fuel used in advanced propulsion systems."
+    },
+    {
+      "symbol": "LIQUID_NITROGEN",
+      "name": "Liquid Nitrogen",
+      "description": "A cryogenic fluid used in a variety of applications, including refrigeration and cryogenic freezing."
+    },
+    {
+      "symbol": "FERTILIZERS",
+      "name": "Fertilizers",
+      "description": "Specialized chemicals used to enrich the soil and promote plant growth on newly-colonized planets."
+    }
+  ],
+  "exports": [
+    {
+      "symbol": "MACHINERY",
+      "name": "Machinery",
+      "description": "A variety of mechanical devices and equipment, used for industrial, construction, and other practical purposes."
+    },
+    {
+      "symbol": "POLYNUCLEOTIDES",
+      "name": "Polynucleotides",
+      "description": "A complex and highly valuable substance used in advanced medical treatments and biotechnology."
+    },
+    {
+      "symbol": "FABRICS",
+      "name": "Synthetic Fabrics",
+      "description": "High-tech fabrics used in the production of clothing and other products for everyday use."
+    }
+  ],
+  "exchange": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ]
+}

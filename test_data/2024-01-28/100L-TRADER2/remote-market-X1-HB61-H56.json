@@ -1,0 +1,32 @@
+{
+  "symbol": "X1-HB61-H56",
+  "imports": [],
+  "exports": [],
+  "exchange": [
+    {
+      "symbol": "ICE_WATER",
+      "name": "Fresh Water",
+      "description": "High-quality fresh water, essential for life support and hydroponic agriculture."
+    },
+    {
+      "symbol": "AMMONIA_ICE",
+      "name": "Ammonia Ice",
+      "description": "A valuable substance used in the production of fertilizers and other chemical products."
+    },
+    {
+      "symbol": "QUARTZ_SAND",
+      "name": "Quartz Sand",
+      "description": "High-purity quartz sand used in the production of glass and ceramics."
+    },
+    {
+      "symbol": "SILICON_CRYSTALS",
+      "name": "Silicon Crystals",
+      "description": "High-quality silicon crystals used in the production of advanced electronic components and solar panels."
+    },
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ]
+}

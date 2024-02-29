@@ -1,0 +1,44 @@
+{
+  "symbol": "X1-HB61-D44",
+  "imports": [
+    {
+      "symbol": "EQUIPMENT",
+      "name": "Equipment",
+      "description": "Tools and equipment used in various industries and applications."
+    },
+    {
+      "symbol": "ELECTRONICS",
+      "name": "Electronic Components",
+      "description": "Advanced electronic components used in the construction of advanced technologies."
+    },
+    {
+      "symbol": "FABRICS",
+      "name": "Synthetic Fabrics",
+      "description": "High-tech fabrics used in the production of clothing and other products for everyday use."
+    },
+    {
+      "symbol": "POLYNUCLEOTIDES",
+      "name": "Polynucleotides",
+      "description": "A complex and highly valuable substance used in advanced medical treatments and biotechnology."
+    }
+  ],
+  "exports": [
+    {
+      "symbol": "SHIP_PARTS",
+      "name": "Ship Parts",
+      "description": "Various components and hardware required for spacecraft maintenance, upgrades, and construction."
+    },
+    {
+      "symbol": "MEDICINE",
+      "name": "Medicine",
+      "description": "Medical products, including drugs, treatments, and medical equipment."
+    }
+  ],
+  "exchange": [
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "symbol": "X1-HB61-I58",
+  "imports": [],
+  "exports": [],
+  "exchange": [
+    {
+      "symbol": "ANTIMATTER",
+      "name": "Antimatter",
+      "description": "A highly valuable and dangerous substance used for advanced propulsion and weapons systems."
+    },
+    {
+      "symbol": "FUEL",
+      "name": "Fuel",
+      "description": "High-energy fuel used in spacecraft propulsion systems to enable long-distance space travel."
+    }
+  ]
+}
