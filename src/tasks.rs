@@ -39,6 +39,7 @@ impl LogisticTaskManager {
             .load_task_manager_state(system_symbol)
             .await
             .unwrap_or_default();
+        dbg!(&in_progress_tasks);
         Self {
             agent: agent.clone(),
             system_symbol: system_symbol.clone(),
@@ -81,7 +82,7 @@ impl LogisticTaskManager {
 
     // add trading tasks to the task list, if they don't already exist
     // (this function is not without side effects: it may buy ships)
-    pub async fn generate_task_list(&self, capacity_cap: i64) -> Vec<Task> {
+    pub async fn generate_task_list(&self, capacity_cap: i64, buy_ships: bool) -> Vec<Task> {
         let now = chrono::Utc::now();
         let waypoints: Vec<Waypoint> = self
             .universe
@@ -91,7 +92,10 @@ impl LogisticTaskManager {
         let mut tasks = Vec::new();
 
         // start by buying any ships + compiling a list of ships we still need to buy
-        let (bought, shipyard_waypoints) = self.agent_controller().try_buy_ships(None).await;
+        let (bought, shipyard_waypoints) = match buy_ships {
+            true => self.agent_controller().try_buy_ships(None).await,
+            false => (Vec::new(), BTreeSet::new()),
+        };
         info!(
             "Task Controller buy phase resulted in {} ships bought",
             bought.len()
@@ -174,13 +178,15 @@ impl LogisticTaskManager {
                     .filter(|(_, trade)| match trade._type {
                         Import => false,
                         Export => {
+                            // !! disable this since unsure if this is just causing weird fluctuations
                             // Strong markets are where we'll make the most consistent profit
                             // ?? what about RESTRICTED markets?
-                            if trade.activity == Some(Strong) {
-                                trade.supply >= High
-                            } else {
-                                trade.supply >= Moderate
-                            }
+                            // if trade.activity == Some(Strong) {
+                            //     trade.supply >= High
+                            // } else {
+                            //     trade.supply >= Moderate
+                            // }
+                            trade.supply >= Moderate
                         }
                         Exchange => true,
                     })
@@ -274,13 +280,15 @@ impl LogisticTaskManager {
                 .filter(|(_, trade)| match trade._type {
                     Import => false,
                     Export => {
+                        // !! disable this since unsure if this is just causing weird fluctuations
                         // Strong markets are where we'll make the most consistent profit
                         // ?? what about RESTRICTED markets?
-                        if trade.activity == Some(Strong) {
-                            trade.supply >= High
-                        } else {
-                            trade.supply >= Moderate
-                        }
+                        // if trade.activity == Some(Strong) {
+                        //     trade.supply >= High
+                        // } else {
+                        //     trade.supply >= Moderate
+                        // }
+                        trade.supply >= Moderate
                     }
                     Exchange => true,
                 })
@@ -372,7 +380,7 @@ impl LogisticTaskManager {
 
         // cleanup in_progress_tasks for this ship
         self.in_progress_tasks.retain(|_k, v| v.1 != ship_symbol);
-        let all_tasks = self.generate_task_list(cargo_capacity).await;
+        let all_tasks = self.generate_task_list(cargo_capacity, true).await;
         // filter out tasks that are already in progress
         let available_tasks = all_tasks
             .into_iter()
