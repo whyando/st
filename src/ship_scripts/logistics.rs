@@ -68,12 +68,13 @@ pub async fn run(
             }
         }
         expected_cargo.retain(|_, &mut v| v != 0);
-
         let cargo_correct = expected_cargo == ship_controller.cargo_map();
+
         let next_action = schedule.actions.get(progress).unwrap();
         if let Some((good, amount)) = next_action.action.net_cargo() {
             *expected_cargo.entry(good).or_insert(0) += amount;
         }
+        expected_cargo.retain(|_, &mut v| v != 0);
         let cargo_correct1 = expected_cargo == ship_controller.cargo_map();
 
         let mut actions_to_skip = 0usize;
