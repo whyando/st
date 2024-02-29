@@ -54,8 +54,8 @@ impl SurveyManager {
         for deposit in &survey.deposits {
             score += match deposit.symbol.as_str() {
                 // FAB_MATS:
-                "IRON_ORE" => 2.0,
-                "QUARTZ_SAND" => 2.0,
+                "IRON_ORE" => 1.5,
+                "QUARTZ_SAND" => 1.5,
                 // ADVANCED CIRCUITS
                 "COPPER_ORE" => 1.5,
                 "SILICON_CRYSTALS" => 1.5,
