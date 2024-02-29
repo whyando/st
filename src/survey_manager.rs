@@ -1,7 +1,7 @@
 use crate::data::DataClient;
 use crate::models::{KeyedSurvey, Survey, WaypointSymbol};
 use chrono::Duration;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, Vec};
 use std::sync::Mutex;
 
 pub struct SurveyManager {
@@ -10,7 +10,7 @@ pub struct SurveyManager {
 }
 
 struct SurveyManagerInner {
-    surveys: BTreeMap<WaypointSymbol, VecDeque<KeyedSurvey>>,
+    surveys: BTreeMap<WaypointSymbol, Vec<KeyedSurvey>>,
 }
 
 impl SurveyManager {
@@ -20,7 +20,7 @@ impl SurveyManager {
             .into_iter()
             .fold(BTreeMap::new(), |mut map, survey| {
                 map.entry(survey.survey.symbol.clone())
-                    .or_insert_with(VecDeque::new)
+                    .or_insert_with(Vec::new)
                     .push_back(survey);
                 map
             });
@@ -44,24 +44,46 @@ impl SurveyManager {
             inner
                 .surveys
                 .entry(survey.survey.symbol.clone())
-                .or_insert_with(VecDeque::new)
+                .or_insert_with(Vec::new)
                 .push_back(survey);
         }
     }
 
-    pub async fn get_survey(&self, waypoint: &WaypointSymbol) -> Option<KeyedSurvey> {
-        // todo: better selection of a survey for specific resources
+    fn survey_score(&self, survey: &Survey) -> f64 {
+        let mut score = 0.0;
+        for deposit in &survey.deposits {
+            score += match deposit.symbol.as_str() {
+                // FAB_MATS:
+                "IRON_ORE" => 2.0,
+                "QUARTZ_SAND" => 2.0,
+                // ADVANCED CIRCUITS
+                "COPPER_ORE" => 1.5,
+                "SILICON_CRYSTALS" => 1.5,
+                // USELESS?
+                "ALUMINUM_ORE" => 0.1,
+                "ICE_WATER" => 0.0,
+                _ => panic!("Unexpected deposit symbol: {}", deposit.symbol),
+            };
+        }
+        score / survey.deposits.len() as f64
+    }
 
+    pub async fn get_survey(&self, waypoint: &WaypointSymbol) -> Option<KeyedSurvey> {
         let now = chrono::Utc::now();
         loop {
             // grab front
-            let front = {
+            let best = {
                 let mut inner = self.inner.lock().unwrap();
                 let surveys = inner.surveys.entry(waypoint.clone()).or_default();
-                surveys.front().cloned()
+                surveys.sort_by(|a, b| {
+                    self.survey_score(&a.survey)
+                        .partial_cmp(&self.survey_score(&b.survey))
+                        .unwrap()
+                });
+                surveys.back().cloned()
             };
             // delete or return
-            if let Some(survey) = front {
+            if let Some(survey) = best {
                 if survey.survey.expiration + Duration::minutes(5) < now {
                     self.remove_survey(&survey).await;
                 } else {

@@ -578,7 +578,7 @@ impl ShipController {
                 self.update_cooldown(cooldown);
                 self.update_cargo(cargo);
             }
-            StatusCode::BAD_REQUEST => {
+            StatusCode::BAD_REQUEST | StatusCode::CONFLICT => {
                 let response: Value = serde_json::from_str(&resp_body.unwrap_err()).unwrap();
                 // variety of responses we might get here: exhausted, expired, asteroid overmined
                 let code = response["error"]["code"].as_i64().unwrap();
@@ -587,6 +587,13 @@ impl ShipController {
                     self.debug(
                         "Extraction failed: Target signature is no longer in range or valid",
                     );
+                    self.agent_controller
+                        .survey_manager
+                        .remove_survey(&survey)
+                        .await;
+                } else if code == 4224 {
+                    // Request failed: 409 Err("{\"error\":{\"message\":\"Ship extract failed. Survey X1-FM95-CD5Z-BEC3E1 has been exhausted.\",\"code\":4224}}")
+                    self.debug("Extraction failed: Survey has been exhausted");
                     self.agent_controller
                         .survey_manager
                         .remove_survey(&survey)
