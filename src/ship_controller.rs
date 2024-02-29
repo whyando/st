@@ -455,7 +455,14 @@ impl ShipController {
             }
             Action::SellGoods(good, units) => {
                 // We need to handle falling trade volume
-                let mut remaining_to_sell = min(*units, self.cargo_good_count(good));
+                let good_count = self.cargo_good_count(good);
+                if good_count != *units {
+                    warn!(
+                        "Trying to sell {} units of {} but only have {}",
+                        units, good, good_count
+                    );
+                }
+                let mut remaining_to_sell = min(*units, good_count);
                 self.refresh_market().await;
                 while remaining_to_sell > 0 {
                     let market = self.universe.get_market(&self.waypoint()).await.unwrap();
@@ -465,7 +472,7 @@ impl ShipController {
                         .iter()
                         .find(|g| g.symbol == *good)
                         .unwrap();
-                    let sell_units = min(trade.trade_volume, *units);
+                    let sell_units = min(trade.trade_volume, remaining_to_sell);
                     self.sell_goods(good, sell_units).await;
                     self.refresh_market().await;
                     remaining_to_sell -= sell_units;

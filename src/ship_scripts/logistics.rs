@@ -92,6 +92,7 @@ pub async fn run(
                 );
                 actions_to_skip = 1;
             } else {
+                // ship_controller.sell_goods("FABRICS", 4).await; // manual fix
                 panic!("Couldn't recover cargo state");
             }
         }
