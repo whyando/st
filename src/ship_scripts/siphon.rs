@@ -28,7 +28,7 @@ async fn siphon_location(ship: &ShipController) -> WaypointSymbol {
 async fn sell_location(ship: &ShipController) -> WaypointSymbol {
     let filters = SIPHON_YIELDS
         .iter()
-        .map(|good| WaypointFilter::Imports(good.to_string()))
+        .map(|good| WaypointFilter::Exchanges(good.to_string()))
         .collect();
     let waypoints = ship
         .universe

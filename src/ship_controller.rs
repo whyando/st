@@ -255,6 +255,20 @@ impl ShipController {
             let new_units = self.cargo_good_count(&cargo_item.symbol);
             assert!(new_units == cargo_item.units - units);
         }
+        self.refresh_market().await;
+    }
+
+    pub async fn jettison_cargo(&self, good: &str, units: i64) {
+        assert!(!self.is_in_transit(), "Ship is in transit");
+        self.debug(format!("Jettisoning {} {}", units, good).as_str());
+        let uri = format!("/my/ships/{}/jettison", self.ship_symbol);
+        let body = json!({
+            "symbol": good,
+            "units": units,
+        });
+        let mut response: Value = self.api_client.post(&uri, &body).await;
+        let cargo: ShipCargo = serde_json::from_value(response["data"]["cargo"].take()).unwrap();
+        self.update_cargo(cargo);
     }
 
     // Fuel is bought in multiples of 100, so refuel as the highest multiple of 100

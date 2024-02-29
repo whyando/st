@@ -1,9 +1,47 @@
+use std::cmp::min;
+
+use crate::models::MarketType::*;
 use crate::ship_controller::ShipController;
 use crate::universe::WaypointFilter;
 use crate::{data::DataClient, models::*};
+use lazy_static::lazy_static;
 use log::*;
 use serde::{Deserialize, Serialize};
 use MiningShuttleState::*;
+
+async fn sell_location(ship: &ShipController, cargo_symbol: &str) -> Option<WaypointSymbol> {
+    let mut markets = Vec::new();
+    let waypoints: Vec<Waypoint> = ship.universe.get_system_waypoints(&ship.system()).await;
+    for waypoint in &waypoints {
+        if waypoint.is_market() {
+            let market_remote = ship.universe.get_market_remote(&waypoint.symbol).await;
+            let market_opt = ship.universe.get_market(&waypoint.symbol).await;
+            markets.push((market_remote, market_opt));
+        }
+    }
+    let sell_trade_good = markets
+        .iter()
+        .filter_map(|(_, market_opt)| match market_opt {
+            Some(market) => {
+                let market_symbol = market.data.symbol.clone();
+                let trade = market
+                    .data
+                    .trade_goods
+                    .iter()
+                    .find(|g| g.symbol == cargo_symbol);
+                trade.map(|trade| (market_symbol, trade))
+            }
+            None => None,
+        })
+        // sell filters
+        .filter(|(_, trade)| match trade._type {
+            Export => false,
+            Import => true,
+            Exchange => true,
+        })
+        .max_by_key(|(_, trade)| trade.sell_price);
+    sell_trade_good.map(|(market_symbol, _)| market_symbol)
+}
 
 async fn engineered_asteroid_location(ship: &ShipController) -> WaypointSymbol {
     let waypoints = ship
@@ -51,7 +89,13 @@ pub async fn run_mining_drone(ship: ShipController) {
                 }
             };
             ship.extract_survey(&survey).await;
-            // !! jettison some resources?
+
+            // jettison
+            for (cargo, units) in ship.cargo_map() {
+                if JETTISON_GOODS.contains(&cargo.as_str()) {
+                    ship.jettison_cargo(&cargo, units).await;
+                }
+            }
         } else {
             // transfer goods to shuttle, and wait till completed
             debug!("Mining drone transfer initiated");
@@ -65,6 +109,17 @@ pub async fn run_mining_drone(ship: ShipController) {
 enum MiningShuttleState {
     Loading,
     Selling,
+}
+
+lazy_static! {
+    static ref SELL_GOODS: Vec<&'static str> = vec![
+        "SILICON_CRYSTALS",
+        "COPPER_ORE",
+        "IRON_ORE",
+        "QUARTZ_SAND",
+        "ALUMINUM_ORE"
+    ];
+    static ref JETTISON_GOODS: Vec<&'static str> = vec!["ICE_WATER"];
 }
 
 pub async fn run_shuttle(ship: ShipController, db: DataClient) {
@@ -94,10 +149,45 @@ pub async fn run_shuttle(ship: ShipController, db: DataClient) {
                     db.set_value(&key, &state).await;
                     continue;
                 }
-                dbg!(ship.cargo_map());
-                panic!("Not implemented");
-                // ship.goto_waypoint(&sell_location).await;
-                // ship.sell_all_cargo().await;
+                while let Some(cargo) = ship.cargo_first_item() {
+                    if SELL_GOODS.contains(&cargo.symbol.as_str()) {
+                        let sell_location = sell_location(&ship, &cargo.symbol).await;
+                        match sell_location {
+                            Some(sell_location) => {
+                                ship.goto_waypoint(&sell_location).await;
+                                ship.refresh_market().await;
+                                while ship.cargo_good_count(&cargo.symbol) != 0 {
+                                    let market =
+                                        ship.universe.get_market(&sell_location).await.unwrap();
+                                    let market_good = market
+                                        .data
+                                        .trade_goods
+                                        .iter()
+                                        .find(|g| g.symbol == cargo.symbol)
+                                        .unwrap();
+                                    let units = min(market_good.trade_volume, cargo.units);
+                                    assert!(units > 0);
+                                    ship.sell_goods(&cargo.symbol, units).await;
+                                    let new_units = ship.cargo_good_count(&cargo.symbol);
+                                    assert!(new_units == cargo.units - units);
+                                    ship.refresh_market().await;
+                                }
+                            }
+                            None => {
+                                warn!(
+                                    "No sell location found for {}. Retry in 60 seconds.",
+                                    cargo.symbol
+                                );
+                                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+                                continue;
+                            }
+                        }
+                    } else if JETTISON_GOODS.contains(&cargo.symbol.as_str()) {
+                        ship.jettison_cargo(&cargo.symbol, cargo.units).await;
+                    } else {
+                        panic!("Unexpected cargo: {}", cargo.symbol);
+                    }
+                }
             }
         }
     }
