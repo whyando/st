@@ -454,9 +454,22 @@ impl ShipController {
                 self.refresh_market().await;
             }
             Action::SellGoods(good, units) => {
-                // todo, check market price + trade volume before issuing api request to buy
-                self.sell_goods(good, *units).await;
+                // We need to handle falling trade volume
+                let mut remaining_to_sell = min(*units, self.cargo_good_count(good));
                 self.refresh_market().await;
+                while remaining_to_sell > 0 {
+                    let market = self.universe.get_market(&self.waypoint()).await.unwrap();
+                    let trade = market
+                        .data
+                        .trade_goods
+                        .iter()
+                        .find(|g| g.symbol == *good)
+                        .unwrap();
+                    let sell_units = min(trade.trade_volume, *units);
+                    self.sell_goods(good, sell_units).await;
+                    self.refresh_market().await;
+                    remaining_to_sell -= sell_units;
+                }
             }
             Action::TryBuyShips => {
                 assert!(!self.is_in_transit());
