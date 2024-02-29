@@ -5,7 +5,7 @@ use crate::logistics_planner::{
 };
 use crate::models::MarketSupply::*;
 use crate::models::MarketType::*;
-use crate::models::{Agent, MarketActivity::*, WaypointSymbol};
+use crate::models::{Agent, WaypointSymbol};
 use crate::models::{SystemSymbol, Waypoint};
 use crate::universe::Universe;
 use chrono::{DateTime, Duration, Utc};
