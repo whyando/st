@@ -75,6 +75,8 @@ pub async fn run_mining_drone(ship: ShipController) {
     loop {
         let should_extract = ship.cargo_space_available() > 0;
         if should_extract {
+            // wait for cooldown before taking survey, helps to get a non-exhausted one
+            ship.wait_for_cooldown().await;
             // get survey + extract
             let survey = ship
                 .agent_controller
