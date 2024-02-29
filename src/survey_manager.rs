@@ -1,7 +1,7 @@
 use crate::data::DataClient;
 use crate::models::{KeyedSurvey, Survey, WaypointSymbol};
 use chrono::Duration;
-use std::collections::{BTreeMap, Vec};
+use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 pub struct SurveyManager {
@@ -21,7 +21,7 @@ impl SurveyManager {
             .fold(BTreeMap::new(), |mut map, survey| {
                 map.entry(survey.survey.symbol.clone())
                     .or_insert_with(Vec::new)
-                    .push_back(survey);
+                    .push(survey);
                 map
             });
         Self {
@@ -45,7 +45,7 @@ impl SurveyManager {
                 .surveys
                 .entry(survey.survey.symbol.clone())
                 .or_insert_with(Vec::new)
-                .push_back(survey);
+                .push(survey);
         }
     }
 
@@ -80,7 +80,7 @@ impl SurveyManager {
                         .partial_cmp(&self.survey_score(&b.survey))
                         .unwrap()
                 });
-                surveys.back().cloned()
+                surveys.last().cloned()
             };
             // delete or return
             if let Some(survey) = best {
