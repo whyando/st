@@ -18,7 +18,7 @@ pub fn ship_config(waypoints: &Vec<Waypoint>) -> Vec<ShipConfig> {
         });
     }
 
-    const NUM_LHAULERS: usize = 6;
+    const NUM_LHAULERS: usize = 7;
     for i in 1..=NUM_LHAULERS {
         ships.push(ShipConfig {
             id: format!("logistics_lhauler/{}", i),
