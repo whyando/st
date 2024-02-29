@@ -422,7 +422,7 @@ impl LogisticTaskManager {
         let mut schedule = schedules.into_iter().next().unwrap();
 
         // If 0 tasks were assigned, instead force assign the highest value task
-        if task_assignments.len() == 0 && schedule.actions.len() == 0 {
+        if schedule.actions.len() == 0 {
             let mut highest_value_task = None;
             let mut highest_value = 0;
             for task in available_tasks {
