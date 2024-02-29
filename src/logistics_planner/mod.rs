@@ -1,6 +1,5 @@
-mod plan;
+pub mod plan;
 use crate::models::WaypointSymbol;
-pub use plan::run_planner;
 use serde::{Deserialize, Serialize};
 
 // An action that can be taken at a waypoint

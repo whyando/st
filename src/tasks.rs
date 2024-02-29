@@ -1,5 +1,6 @@
 use crate::agent_controller::AgentController;
 use crate::data::DataClient;
+use crate::logistics_planner::plan::task_to_scheduled_action;
 use crate::logistics_planner::{
     self, Action, LogisticShip, PlannerConstraints, ShipSchedule, Task, TaskActions,
 };
@@ -40,7 +41,6 @@ impl LogisticTaskManager {
             .load_task_manager_state(system_symbol)
             .await
             .unwrap_or_default();
-        dbg!(&in_progress_tasks);
         Self {
             agent: agent.clone(),
             system_symbol: system_symbol.clone(),
@@ -50,6 +50,10 @@ impl LogisticTaskManager {
             in_progress_tasks: Arc::new(in_progress_tasks),
             take_tasks_mutex_guard: Arc::new(tokio::sync::Mutex::new(())),
         }
+    }
+
+    pub fn in_progress_tasks(&self) -> Arc<DashMap<String, (Task, String, DateTime<Utc>)>> {
+        self.in_progress_tasks.clone()
     }
 
     pub fn get_assigned_task_status(&self, task_id: &str) -> Option<(Task, String, DateTime<Utc>)> {
@@ -403,16 +407,55 @@ impl LogisticTaskManager {
             plan_length,
             max_compute_time: Duration::seconds(5),
         };
-        let (task_assignments, schedules) = tokio::task::spawn_blocking(move || {
-            logistics_planner::run_planner(
+        let available_tasks_clone = available_tasks.clone();
+        let (mut task_assignments, schedules) = tokio::task::spawn_blocking(move || {
+            logistics_planner::plan::run_planner(
                 &[logistics_ship],
-                &available_tasks,
+                &available_tasks_clone,
                 &matrix,
                 &contraints,
             )
         })
         .await
         .unwrap();
+        assert_eq!(schedules.len(), 1);
+        let mut schedule = schedules.into_iter().next().unwrap();
+
+        // If 0 tasks were assigned, instead force assign the highest value task
+        if task_assignments.len() == 0 && schedule.actions.len() == 0 {
+            let mut highest_value_task = None;
+            let mut highest_value = 0;
+            for task in available_tasks {
+                if task.value > highest_value {
+                    highest_value = task.value;
+                    highest_value_task = Some(task);
+                }
+            }
+            if let Some(task) = highest_value_task {
+                info!(
+                    "Forcing assignment of task {} value: {}",
+                    task.id, task.value
+                );
+                // add actions for the task
+                match &task.actions {
+                    TaskActions::VisitLocation { .. } => {
+                        schedule
+                            .actions
+                            .push(task_to_scheduled_action(&task, "", None));
+                    }
+                    TaskActions::TransportCargo { .. } => {
+                        schedule
+                            .actions
+                            .push(task_to_scheduled_action(&task, "pickup", None));
+                        schedule
+                            .actions
+                            .push(task_to_scheduled_action(&task, "delivery", None));
+                    }
+                };
+                task_assignments.insert(task, Some(ship_symbol.to_string()));
+            }
+        }
+
         for (task, ship) in task_assignments {
             if let Some(ship) = &ship {
                 debug!("Assigned task {} to ship {}", task.id, ship);
@@ -424,8 +467,7 @@ impl LogisticTaskManager {
             .save_task_manager_state(&self.system_symbol, &self.in_progress_tasks)
             .await;
 
-        assert_eq!(schedules.len(), 1);
-        schedules.into_iter().next().unwrap()
+        schedule
     }
 
     pub async fn set_task_completed(&self, task: &Task) {

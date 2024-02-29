@@ -27,6 +27,7 @@ async fn main() {
     api_client.set_agent_token(&agent_token);
 
     let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
+    dbg!(agent_controller.task_manager.in_progress_tasks());
     let task_list = agent_controller
         .task_manager
         .generate_task_list(10000, false)

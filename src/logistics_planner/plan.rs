@@ -301,28 +301,12 @@ pub fn run_planner(
                         .get(&activity.job_id)
                         .expect("cannot find task for job id");
                     task_result.insert(task.clone(), Some(ship.symbol.clone()));
-                    let (waypoint, action, task_completed) = match &task.actions {
-                        TaskActions::VisitLocation { waypoint, action } => {
-                            (waypoint, action, Some(task.clone()))
-                        }
-                        TaskActions::TransportCargo {
-                            src,
-                            dest,
-                            src_action,
-                            dest_action,
-                        } => match activity.activity_type.as_str() {
-                            "pickup" => (src, src_action, None),
-                            "delivery" => (dest, dest_action, Some(task.clone())),
-                            _ => panic!("unexpected activity type"),
-                        },
-                    };
-                    assert_eq!(waypoint, &waypoint_symbol);
-                    let sa = ScheduledAction {
-                        waypoint: waypoint.clone(),
-                        action: action.clone(),
-                        timestamp: arrival,
-                        task_completed,
-                    };
+                    let sa = task_to_scheduled_action(
+                        task,
+                        activity.activity_type.as_str(),
+                        Some(arrival),
+                    );
+                    assert_eq!(sa.waypoint, waypoint_symbol);
                     actions.push(sa);
                 }
             }
@@ -345,6 +329,32 @@ pub fn run_planner(
         assert!(task_result.contains_key(task));
     }
     (task_result, ship_schedules)
+}
+
+pub fn task_to_scheduled_action(
+    task: &Task,
+    activity_type: &str,
+    arrival: Option<i64>,
+) -> ScheduledAction {
+    let (waypoint, action, task_completed) = match &task.actions {
+        TaskActions::VisitLocation { waypoint, action } => (waypoint, action, Some(task.clone())),
+        TaskActions::TransportCargo {
+            src,
+            dest,
+            src_action,
+            dest_action,
+        } => match activity_type {
+            "pickup" => (src, src_action, None),
+            "delivery" => (dest, dest_action, Some(task.clone())),
+            _ => panic!("unexpected activity type"),
+        },
+    };
+    ScheduledAction {
+        waypoint: waypoint.clone(),
+        action: action.clone(),
+        timestamp: arrival.unwrap_or_default(),
+        task_completed,
+    }
 }
 
 fn get_pragmatic_solution(problem: &CoreProblem, solution: &CoreSolution) -> Solution {
