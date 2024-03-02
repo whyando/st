@@ -19,7 +19,14 @@ use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::ops::Deref;
 use std::pin::Pin;
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
+
+#[derive(Clone, Debug)]
+pub enum Event {
+    ShipUpdate(Ship),
+    AgentUpdate(Agent),
+}
 
 #[derive(Clone)]
 pub struct AgentController {
@@ -27,6 +34,7 @@ pub struct AgentController {
     api_client: ApiClient,
     db: DataClient,
 
+    listeners: Arc<Mutex<Vec<Sender<Event>>>>,
     callsign: String,
     agent: Arc<Mutex<Agent>>,
     ships: Arc<DashMap<String, Arc<Mutex<Ship>>>>,
@@ -61,6 +69,31 @@ impl TransferActor for AgentController {
 }
 
 impl AgentController {
+    pub fn agent(&self) -> Agent {
+        self.agent.lock().unwrap().clone()
+    }
+    pub fn ships(&self) -> Vec<Ship> {
+        self.ships
+            .iter()
+            .map(|x| x.value().lock().unwrap().clone())
+            .collect()
+    }
+
+    pub fn add_event_listener(&self, listener: Sender<Event>) {
+        let mut listeners = self.listeners.lock().unwrap();
+        listeners.push(listener);
+        info!("Added event listener");
+        // web api should only require one listener, although we could support multiple
+        assert!(listeners.len() <= 1);
+    }
+
+    pub fn emit_event(&self, event: &Event) {
+        let listeners = self.listeners.lock().unwrap();
+        for listener in listeners.iter() {
+            let _ = listener.send(event.clone());
+        }
+    }
+
     pub async fn transfer_cargo(
         &self,
         src_ship_symbol: String,
@@ -147,6 +180,7 @@ impl AgentController {
             api_client: api_client.clone(),
             db: db.clone(),
             universe: universe.clone(),
+            listeners: Arc::new(Mutex::new(Vec::new())),
             // ship_futs: Arc::new(Mutex::new(VecDeque::new())),
             hdls: Arc::new(JoinHandles::new()),
             ship_config: Arc::new(ship_config),
@@ -177,8 +211,10 @@ impl AgentController {
     pub fn num_ships(&self) -> usize {
         self.ships.len()
     }
-    pub fn update_agent(&self, agent: Agent) {
-        *self.agent.lock().unwrap() = agent;
+    pub fn update_agent(&self, agent_upd: Agent) {
+        let mut agent = self.agent.lock().unwrap();
+        *agent = agent_upd;
+        self.emit_event(&Event::AgentUpdate(agent.clone()));
     }
     fn debug(&self, msg: &str) {
         debug!("[{}] {}", self.callsign, msg);

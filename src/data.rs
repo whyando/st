@@ -70,6 +70,10 @@ impl DataClient {
         }
     }
 
+    pub fn reset_date(&self) -> &str {
+        self.reset_id.as_str()
+    }
+
     pub async fn conn(&self) -> Object<AsyncPgConnection> {
         self.db
             .get()

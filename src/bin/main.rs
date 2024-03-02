@@ -2,7 +2,9 @@ use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
 use st::data::DataClient;
 use st::universe::Universe;
+use st::web_api_server::WebApiServer;
 use std::env;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
@@ -33,5 +35,6 @@ async fn main() {
     api_client.set_agent_token(&agent_token);
 
     let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
-    agent_controller.run_ships().await;
+    let api_server = WebApiServer::new(&Arc::new(agent_controller.clone()), &Arc::new(db));
+    tokio::join!(agent_controller.run_ships(), api_server.run());
 }

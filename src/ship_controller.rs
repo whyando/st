@@ -1,3 +1,4 @@
+use crate::agent_controller::Event;
 use crate::models::{ShipCargoItem, ShipCooldown, Survey};
 use crate::ship_controller::ShipNavStatus::*;
 use crate::{
@@ -81,22 +82,32 @@ impl ShipController {
     pub fn set_orbit_status(&self) {
         let mut ship = self.ship.lock().unwrap();
         ship.nav.status = InOrbit;
+        self.agent_controller
+            .emit_event(&Event::ShipUpdate(ship.clone()));
     }
     pub fn update_nav(&self, nav: ShipNav) {
         let mut ship = self.ship.lock().unwrap();
         ship.nav = nav;
+        self.agent_controller
+            .emit_event(&Event::ShipUpdate(ship.clone()));
     }
     pub fn update_fuel(&self, fuel: ShipFuel) {
         let mut ship = self.ship.lock().unwrap();
         ship.fuel = fuel;
+        self.agent_controller
+            .emit_event(&Event::ShipUpdate(ship.clone()));
     }
     pub fn update_cargo(&self, cargo: ShipCargo) {
         let mut ship = self.ship.lock().unwrap();
         ship.cargo = cargo;
+        self.agent_controller
+            .emit_event(&Event::ShipUpdate(ship.clone()));
     }
     pub fn update_cooldown(&self, cooldown: ShipCooldown) {
         let mut ship = self.ship.lock().unwrap();
         ship.cooldown = cooldown;
+        self.agent_controller
+            .emit_event(&Event::ShipUpdate(ship.clone()));
     }
     pub fn cargo_first_item(&self) -> Option<ShipCargoItem> {
         let ship = self.ship.lock().unwrap();
