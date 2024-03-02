@@ -1,21 +1,57 @@
 use crate::{
     agent_controller::{AgentController, Event},
     data::DataClient,
+    models::{Agent, Ship},
 };
+use axum::debug_handler;
+use axum::{extract::State, routing::get};
 use log::*;
-use socketioxide::{extract::SocketRef, SocketIo};
-use std::sync::Arc;
-use tower::ServiceBuilder;
-use tower_http::{cors::CorsLayer, services::ServeDir};
+use socketioxide::{extract::SocketRef, SocketIo, TransportType};
+use std::{sync::Arc, time::Duration};
+use tower_http::cors::CorsLayer;
 
 pub struct WebApiServer {
-    agent_controller: Arc<AgentController>,
+    agent_controller: AgentController,
     #[allow(dead_code)]
-    db_client: Arc<DataClient>,
+    db_client: DataClient,
+}
+
+struct AppState {
+    agent_controller: AgentController,
+    #[allow(dead_code)]
+    db_client: DataClient,
+}
+
+#[debug_handler]
+async fn agent_handler(State(state): State<Arc<AppState>>) -> axum::Json<Agent> {
+    let agent = state.agent_controller.agent();
+    axum::Json(agent)
+}
+
+#[debug_handler]
+async fn ships_handler(State(state): State<Arc<AppState>>) -> axum::Json<Vec<Ship>> {
+    let ships = state.agent_controller.ships();
+    axum::Json(ships)
+}
+
+#[debug_handler]
+async fn handler() -> () {}
+
+async fn background_task(io: SocketIo, mut rx: tokio::sync::mpsc::Receiver<Event>) {
+    while let Some(event) = rx.recv().await {
+        match event {
+            Event::ShipUpdate(ship) => {
+                io.of("/").unwrap().emit("ship_upd", ship).unwrap();
+            }
+            Event::AgentUpdate(agent) => {
+                io.of("/").unwrap().emit("agent_upd", agent).unwrap();
+            }
+        }
+    }
 }
 
 impl WebApiServer {
-    pub fn new(agent_controller: &Arc<AgentController>, db_client: &Arc<DataClient>) -> Self {
+    pub fn new(agent_controller: &AgentController, db_client: &DataClient) -> Self {
         Self {
             agent_controller: agent_controller.clone(),
             db_client: db_client.clone(),
@@ -25,49 +61,53 @@ impl WebApiServer {
     pub async fn run(&self) {
         info!("Starting server");
 
-        let (layer, io) = SocketIo::builder().build_layer();
+        let (socketio_layer, io) = SocketIo::builder()
+            .req_path("/")
+            .transports([TransportType::Websocket])
+            .ping_interval(Duration::from_secs(1))
+            .ping_timeout(Duration::from_secs(1))
+            .build_layer();
 
         io.ns("/", |s: SocketRef| {
-            // s.on("new message", |s: SocketRef, Data::<String>(msg)| {
-            //     let username = s.extensions.get::<Username>().unwrap().clone();
-            //     let msg = Res::Message {
-            //         username,
-            //         message: msg,
-            //     };
-            //     s.broadcast().emit("new message", msg).ok();
-            // });
             info!("socket connected");
+
+            s.emit("hello", "world").ok();
+
+            s.on("ping", |s: SocketRef| {
+                info!("ping received");
+                s.emit("pong", "pong").unwrap();
+            });
 
             s.on_disconnect(|_s: SocketRef| {
                 info!("socket disconnected");
             });
         });
 
-        let (tx, rx) = std::sync::mpsc::channel();
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+
+        let hdl = {
+            let io = io.clone();
+            tokio::spawn(background_task(io, rx))
+        };
         self.agent_controller.add_event_listener(tx);
 
-        tokio::spawn(async move {
-            while let Ok(event) = rx.recv() {
-                match event {
-                    Event::ShipUpdate(ship) => {
-                        io.emit("ship_upd", ship).ok();
-                    }
-                    Event::AgentUpdate(agent) => {
-                        io.emit("agent_upd", agent).ok();
-                    }
-                }
-            }
+        let shared_state = Arc::new(AppState {
+            agent_controller: self.agent_controller.clone(),
+            db_client: self.db_client.clone(),
         });
 
         let app = axum::Router::new()
-            .nest_service("/", ServeDir::new("dist"))
-            .layer(
-                ServiceBuilder::new()
-                    .layer(CorsLayer::permissive()) // Enable CORS policy
-                    .layer(layer),
-            );
+            .route("/api/agent", get(agent_handler))
+            .route("/api/ships", get(ships_handler))
+            .route("/api/events", get(handler).layer(socketio_layer))
+            .with_state(shared_state)
+            .layer(CorsLayer::permissive());
 
         let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
-        axum::serve(listener, app).await.unwrap();
+        let server = async {
+            axum::serve(listener, app).await.unwrap();
+        };
+
+        let _ = tokio::join!(hdl, server);
     }
 }

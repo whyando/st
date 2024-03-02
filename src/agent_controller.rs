@@ -19,8 +19,8 @@ use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::ops::Deref;
 use std::pin::Pin;
-use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc::Sender;
 
 #[derive(Clone, Debug)]
 pub enum Event {
@@ -87,10 +87,10 @@ impl AgentController {
         assert!(listeners.len() <= 1);
     }
 
-    pub fn emit_event(&self, event: &Event) {
-        let listeners = self.listeners.lock().unwrap();
+    pub async fn emit_event(&self, event: &Event) {
+        let listeners = { self.listeners.lock().unwrap().clone() };
         for listener in listeners.iter() {
-            let _ = listener.send(event.clone());
+            listener.send(event.clone()).await.unwrap();
         }
     }
 
@@ -211,10 +211,13 @@ impl AgentController {
     pub fn num_ships(&self) -> usize {
         self.ships.len()
     }
-    pub fn update_agent(&self, agent_upd: Agent) {
-        let mut agent = self.agent.lock().unwrap();
-        *agent = agent_upd;
-        self.emit_event(&Event::AgentUpdate(agent.clone()));
+    pub async fn update_agent(&self, agent_upd: Agent) {
+        let agent = {
+            let mut agent = self.agent.lock().unwrap();
+            *agent = agent_upd;
+            agent.clone()
+        };
+        self.emit_event(&Event::AgentUpdate(agent.clone())).await;
     }
     fn debug(&self, msg: &str) {
         debug!("[{}] {}", self.callsign, msg);
@@ -253,7 +256,7 @@ impl AgentController {
         // let transaction = response["data"]["transaction"].take();
         let ship_symbol = ship.symbol.clone();
         self.debug(&format!("Successfully bought ship {}", ship_symbol));
-        self.update_agent(agent);
+        self.update_agent(agent).await;
         self.ships
             .insert(ship_symbol.clone(), Arc::new(Mutex::new(ship)));
         ship_symbol

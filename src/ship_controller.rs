@@ -39,7 +39,9 @@ impl ShipController {
             agent_controller: agent_controller.clone(),
         }
     }
-
+    pub fn ship(&self) -> Ship {
+        self.ship.lock().unwrap().clone()
+    }
     pub fn symbol(&self) -> String {
         self.ship_symbol.clone()
     }
@@ -79,35 +81,46 @@ impl ShipController {
         let ship = self.ship.lock().unwrap();
         ship.cargo.units == 0
     }
-    pub fn set_orbit_status(&self) {
-        let mut ship = self.ship.lock().unwrap();
-        ship.nav.status = InOrbit;
+    pub async fn emit_ship(&self) {
+        let ship = self.ship();
         self.agent_controller
-            .emit_event(&Event::ShipUpdate(ship.clone()));
+            .emit_event(&Event::ShipUpdate(ship))
+            .await;
     }
-    pub fn update_nav(&self, nav: ShipNav) {
-        let mut ship = self.ship.lock().unwrap();
-        ship.nav = nav;
-        self.agent_controller
-            .emit_event(&Event::ShipUpdate(ship.clone()));
+    pub async fn set_orbit_status(&self) {
+        {
+            let mut ship = self.ship.lock().unwrap();
+            ship.nav.status = InOrbit;
+        }
+        self.emit_ship().await;
     }
-    pub fn update_fuel(&self, fuel: ShipFuel) {
-        let mut ship = self.ship.lock().unwrap();
-        ship.fuel = fuel;
-        self.agent_controller
-            .emit_event(&Event::ShipUpdate(ship.clone()));
+    pub async fn update_nav(&self, nav: ShipNav) {
+        {
+            let mut ship = self.ship.lock().unwrap();
+            ship.nav = nav;
+        }
+        self.emit_ship().await;
     }
-    pub fn update_cargo(&self, cargo: ShipCargo) {
-        let mut ship = self.ship.lock().unwrap();
-        ship.cargo = cargo;
-        self.agent_controller
-            .emit_event(&Event::ShipUpdate(ship.clone()));
+    pub async fn update_fuel(&self, fuel: ShipFuel) {
+        {
+            let mut ship = self.ship.lock().unwrap();
+            ship.fuel = fuel;
+        }
+        self.emit_ship().await;
     }
-    pub fn update_cooldown(&self, cooldown: ShipCooldown) {
-        let mut ship = self.ship.lock().unwrap();
-        ship.cooldown = cooldown;
-        self.agent_controller
-            .emit_event(&Event::ShipUpdate(ship.clone()));
+    pub async fn update_cargo(&self, cargo: ShipCargo) {
+        {
+            let mut ship = self.ship.lock().unwrap();
+            ship.cargo = cargo;
+        }
+        self.emit_ship().await;
+    }
+    pub async fn update_cooldown(&self, cooldown: ShipCooldown) {
+        {
+            let mut ship = self.ship.lock().unwrap();
+            ship.cooldown = cooldown;
+        }
+        self.emit_ship().await;
     }
     pub fn cargo_first_item(&self) -> Option<ShipCargoItem> {
         let ship = self.ship.lock().unwrap();
@@ -146,7 +159,7 @@ impl ShipController {
         let uri = format!("/my/ships/{}/orbit", self.ship_symbol);
         let mut response: Value = self.api_client.post(&uri, &json!({})).await;
         let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
-        self.update_nav(nav);
+        self.update_nav(nav).await;
     }
 
     pub async fn dock(&self) {
@@ -156,7 +169,7 @@ impl ShipController {
         let uri = format!("/my/ships/{}/dock", self.ship_symbol);
         let mut response: Value = self.api_client.post(&uri, &json!({})).await;
         let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
-        self.update_nav(nav);
+        self.update_nav(nav).await;
     }
 
     pub fn is_in_transit(&self) -> bool {
@@ -215,8 +228,8 @@ impl ShipController {
         let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
         let transaction: MarketTransaction =
             serde_json::from_value(response["data"]["transaction"].take()).unwrap();
-        self.update_cargo(cargo);
-        self.agent_controller.update_agent(agent);
+        self.update_cargo(cargo).await;
+        self.agent_controller.update_agent(agent).await;
         self.debug(&format!(
             "BOUGHT {} {} for ${} (total ${})",
             transaction.units,
@@ -240,8 +253,8 @@ impl ShipController {
         let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
         let transaction: MarketTransaction =
             serde_json::from_value(response["data"]["transaction"].take()).unwrap();
-        self.update_cargo(cargo);
-        self.agent_controller.update_agent(agent);
+        self.update_cargo(cargo).await;
+        self.agent_controller.update_agent(agent).await;
         self.debug(&format!(
             "SOLD {} {} for ${} (total ${})",
             transaction.units,
@@ -279,7 +292,7 @@ impl ShipController {
         });
         let mut response: Value = self.api_client.post(&uri, &body).await;
         let cargo: ShipCargo = serde_json::from_value(response["data"]["cargo"].take()).unwrap();
-        self.update_cargo(cargo);
+        self.update_cargo(cargo).await;
     }
 
     // Fuel is bought in multiples of 100, so refuel as the highest multiple of 100
@@ -323,8 +336,8 @@ impl ShipController {
         let fuel = serde_json::from_value(response["data"]["fuel"].take()).unwrap();
         let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
         // let transaction: Transaction = serde_json::from_value(response["data"]["transaction"].take()).unwrap();
-        self.update_fuel(fuel);
-        self.agent_controller.update_agent(agent);
+        self.update_fuel(fuel).await;
+        self.agent_controller.update_agent(agent).await;
     }
 
     pub async fn navigate(&self, waypoint: &WaypointSymbol) {
@@ -341,10 +354,10 @@ impl ShipController {
             .await;
         let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
         let fuel = serde_json::from_value(response["data"]["fuel"].take()).unwrap();
-        self.update_nav(nav);
-        self.update_fuel(fuel);
+        self.update_nav(nav).await;
+        self.update_fuel(fuel).await;
         self.wait_for_transit().await;
-        self.set_orbit_status();
+        self.set_orbit_status().await;
     }
 
     // Navigation between two market waypoints
@@ -395,7 +408,7 @@ impl ShipController {
         let cargo: ShipCargo = serde_json::from_value(response["data"]["cargo"].take()).unwrap();
         let construction: Construction =
             serde_json::from_value(response["data"]["construction"].take()).unwrap();
-        self.update_cargo(cargo);
+        self.update_cargo(cargo).await;
         self.universe.update_construction(&construction).await;
     }
 
@@ -448,7 +461,7 @@ impl ShipController {
                 .join(", ");
             self.debug(&format!("Surveyed {} {}", survey.size, deposits));
         }
-        self.update_cooldown(cooldown);
+        self.update_cooldown(cooldown).await;
         self.agent_controller
             .survey_manager
             .insert_surveys(surveys)
@@ -557,8 +570,8 @@ impl ShipController {
         let good = siphon["yield"]["symbol"].as_str().unwrap();
         let units = siphon["yield"]["units"].as_i64().unwrap();
         self.debug(&format!("Siphoned {} units of {}", units, good));
-        self.update_cooldown(cooldown);
-        self.update_cargo(cargo);
+        self.update_cooldown(cooldown).await;
+        self.update_cargo(cargo).await;
     }
 
     pub async fn extract_survey(&self, survey: &KeyedSurvey) {
@@ -586,8 +599,8 @@ impl ShipController {
                 let good = extraction["yield"]["symbol"].as_str().unwrap();
                 let units = extraction["yield"]["units"].as_i64().unwrap();
                 self.debug(&format!("Extracted {} units of {}", units, good));
-                self.update_cooldown(cooldown);
-                self.update_cargo(cargo);
+                self.update_cooldown(cooldown).await;
+                self.update_cargo(cargo).await;
             }
             StatusCode::BAD_REQUEST | StatusCode::CONFLICT => {
                 let response: Value = serde_json::from_str(&resp_body.unwrap_err()).unwrap();
