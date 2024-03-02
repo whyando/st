@@ -72,7 +72,6 @@ impl WebApiServer {
             info!("socket connected");
 
             s.emit("hello", "world").ok();
-
             s.on("ping", |s: SocketRef| {
                 info!("ping received");
                 s.emit("pong", "pong").unwrap();
