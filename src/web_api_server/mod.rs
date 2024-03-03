@@ -6,7 +6,10 @@ use crate::{
 use axum::debug_handler;
 use axum::{extract::State, routing::get};
 use log::*;
-use socketioxide::{extract::SocketRef, SocketIo, TransportType};
+use socketioxide::{
+    extract::{Data, SocketRef},
+    SocketIo, TransportType,
+};
 use std::{sync::Arc, time::Duration};
 use tower_http::cors::CorsLayer;
 
@@ -72,9 +75,9 @@ impl WebApiServer {
             info!("socket connected");
 
             s.emit("hello", "world").ok();
-            s.on("ping", |s: SocketRef| {
-                info!("ping received");
-                s.emit("pong", "pong").unwrap();
+            s.on("ping", |s: SocketRef, Data::<i64>(data)| {
+                info!("ping received {}", data);
+                s.emit("pong", data).unwrap();
             });
 
             s.on_disconnect(|_s: SocketRef| {
