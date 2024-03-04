@@ -122,6 +122,15 @@ impl Universe {
         }
     }
 
+    // get waypoints, but don't use api
+    pub async fn get_system_waypoints_no_fetch(
+        &self,
+        symbol: &SystemSymbol,
+    ) -> Option<Vec<Waypoint>> {
+        // needs caching layer
+        self.db.get_system_waypoints(symbol).await
+    }
+
     pub async fn get_waypoint(&self, symbol: &WaypointSymbol) -> Waypoint {
         let system_waypoints = self.get_system_waypoints(&symbol.system()).await;
         system_waypoints

@@ -1,9 +1,10 @@
 use crate::{
     agent_controller::{AgentController, Event},
     data::DataClient,
-    models::{Agent, Ship},
+    models::{Agent, Ship, Waypoint},
+    universe::Universe,
 };
-use axum::debug_handler;
+use axum::{debug_handler, http::StatusCode};
 use axum::{extract::State, routing::get};
 use log::*;
 use socketioxide::{
@@ -15,14 +16,15 @@ use tower_http::cors::CorsLayer;
 
 pub struct WebApiServer {
     agent_controller: AgentController,
-    #[allow(dead_code)]
     db_client: DataClient,
+    universe: Universe,
 }
 
 struct AppState {
     agent_controller: AgentController,
     #[allow(dead_code)]
     db_client: DataClient,
+    universe: Universe,
 }
 
 #[debug_handler]
@@ -35,6 +37,21 @@ async fn agent_handler(State(state): State<Arc<AppState>>) -> axum::Json<Agent> 
 async fn ships_handler(State(state): State<Arc<AppState>>) -> axum::Json<Vec<Ship>> {
     let ships = state.agent_controller.ships();
     axum::Json(ships)
+}
+
+#[debug_handler]
+async fn waypoints_handler(
+    State(state): State<Arc<AppState>>,
+) -> Result<axum::Json<Vec<Waypoint>>, StatusCode> {
+    let system_symbol = state.agent_controller.starting_system(); // todo: make this a parameter
+    let waypoints_opt = state
+        .universe
+        .get_system_waypoints_no_fetch(&system_symbol)
+        .await;
+    match waypoints_opt {
+        Some(waypoints) => Ok(axum::Json(waypoints)),
+        None => Err(StatusCode::NOT_FOUND),
+    }
 }
 
 #[debug_handler]
@@ -54,10 +71,15 @@ async fn background_task(io: SocketIo, mut rx: tokio::sync::mpsc::Receiver<Event
 }
 
 impl WebApiServer {
-    pub fn new(agent_controller: &AgentController, db_client: &DataClient) -> Self {
+    pub fn new(
+        agent_controller: &AgentController,
+        db_client: &DataClient,
+        universe: &Universe,
+    ) -> Self {
         Self {
             agent_controller: agent_controller.clone(),
             db_client: db_client.clone(),
+            universe: universe.clone(),
         }
     }
 
@@ -96,11 +118,13 @@ impl WebApiServer {
         let shared_state = Arc::new(AppState {
             agent_controller: self.agent_controller.clone(),
             db_client: self.db_client.clone(),
+            universe: self.universe.clone(),
         });
 
         let app = axum::Router::new()
             .route("/api/agent", get(agent_handler))
             .route("/api/ships", get(ships_handler))
+            .route("/api/waypoints", get(waypoints_handler))
             .route("/api/events", get(handler).layer(socketio_layer))
             .with_state(shared_state)
             .layer(CorsLayer::permissive());
