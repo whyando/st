@@ -169,7 +169,7 @@ pub async fn run_shuttle(ship: ShipController, db: DataClient) {
                                         .unwrap();
                                     let units = min(market_good.trade_volume, cargo.units);
                                     assert!(units > 0);
-                                    ship.sell_goods(&cargo.symbol, units).await;
+                                    ship.sell_goods(&cargo.symbol, units, false).await;
                                     let new_units = ship.cargo_good_count(&cargo.symbol);
                                     assert!(new_units == cargo.units - units);
                                     ship.refresh_market().await;

@@ -59,8 +59,7 @@ pub struct AgentController {
     pub task_manager: Arc<LogisticTaskManager>,
     pub survey_manager: Arc<SurveyManager>,
     pub cargo_broker: Arc<CargoBroker>,
-
-    ledger: Arc<Ledger>,
+    pub ledger: Arc<Ledger>,
 
     try_buy_ships_mutex_guard: Arc<tokio::sync::Mutex<()>>,
 }
@@ -206,7 +205,7 @@ impl AgentController {
                 (v.clone(), k.clone())
             })
             .collect();
-        let task_manager = LogisticTaskManager::new(universe, db, &agent, &system_symbol).await;
+        let task_manager = LogisticTaskManager::new(universe, db, &system_symbol).await;
         let survey_manager = SurveyManager::new(db).await;
 
         let initial_credits = {
@@ -399,7 +398,6 @@ impl AgentController {
         let static_probes = self.statically_probed_waypoints();
         for (shipyard, cost) in &shipyards {
             if current_credits < cost + job_credit_reservation {
-                // @@ sort out this limit based on trading ships
                 break; // no point looking at more expensive shipyards
             }
             // look for a purchaser

@@ -202,7 +202,7 @@ impl ShipController {
         }
     }
 
-    pub async fn buy_goods(&self, good: &str, units: i64) {
+    pub async fn buy_goods(&self, good: &str, units: i64, adjust_reserved_credits: bool) {
         assert!(!self.is_in_transit(), "Ship is in transit");
         assert!(
             units <= self.cargo_capacity(),
@@ -222,6 +222,12 @@ impl ShipController {
             serde_json::from_value(response["data"]["transaction"].take()).unwrap();
         self.update_cargo(cargo);
         self.agent_controller.update_agent(agent);
+        if adjust_reserved_credits {
+            self.agent_controller
+                .ledger
+                .reserve_credits_delta(&self.ship_symbol, -transaction.total_price);
+        }
+
         self.debug(&format!(
             "BOUGHT {} {} for ${} (total ${})",
             transaction.units,
@@ -231,7 +237,7 @@ impl ShipController {
         ));
     }
 
-    pub async fn sell_goods(&self, good: &str, units: i64) {
+    pub async fn sell_goods(&self, good: &str, units: i64, adjust_reserved_credits: bool) {
         assert!(!self.is_in_transit(), "Ship is in transit");
         self.dock().await;
         self.debug(&format!("Selling {} units of {}", units, good));
@@ -247,6 +253,11 @@ impl ShipController {
             serde_json::from_value(response["data"]["transaction"].take()).unwrap();
         self.update_cargo(cargo);
         self.agent_controller.update_agent(agent);
+        if adjust_reserved_credits {
+            self.agent_controller
+                .ledger
+                .reserve_credits_delta(&self.ship_symbol, transaction.total_price);
+        }
         self.debug(&format!(
             "SOLD {} {} for ${} (total ${})",
             transaction.units,
@@ -267,7 +278,7 @@ impl ShipController {
                 .unwrap();
             let units = min(market_good.trade_volume, cargo_item.units);
             assert!(units > 0);
-            self.sell_goods(&cargo_item.symbol, units).await;
+            self.sell_goods(&cargo_item.symbol, units, false).await;
             let new_units = self.cargo_good_count(&cargo_item.symbol);
             assert!(new_units == cargo_item.units - units);
         }
@@ -367,7 +378,7 @@ impl ShipController {
         for (waypoint, edge, a_market, b_market) in route.hops {
             // calculate fuel required before leaving
             let required_fuel = if b_market {
-                edge.fuel_cost
+                edge.fuel_cost // @@ won't be true once we use BURN
             } else {
                 assert!(waypoint == *target);
                 edge.fuel_cost + route.req_terminal_fuel
@@ -466,7 +477,7 @@ impl ShipController {
             Action::RefreshShipyard => self.refresh_shipyard().await,
             Action::BuyGoods(good, units) => {
                 // todo, check market price + trade volume before issuing api request to buy
-                self.buy_goods(good, *units).await;
+                self.buy_goods(good, *units, true).await;
                 self.refresh_market().await;
             }
             Action::SellGoods(good, units) => {
@@ -489,7 +500,7 @@ impl ShipController {
                         .find(|g| g.symbol == *good)
                         .unwrap();
                     let sell_units = min(trade.trade_volume, remaining_to_sell);
-                    self.sell_goods(good, sell_units).await;
+                    self.sell_goods(good, sell_units, true).await;
                     self.refresh_market().await;
                     remaining_to_sell -= sell_units;
                 }

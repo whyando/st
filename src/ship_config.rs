@@ -73,7 +73,7 @@ pub fn ship_config(waypoints: &Vec<Waypoint>) -> Vec<ShipConfig> {
 
     // Mining operation
     const NUM_SURVEYORS: i64 = 1;
-    const NUM_MINING_DRONES: i64 = 7;
+    const NUM_MINING_DRONES: i64 = 8;
     const NUM_MINING_SHUTTLES: i64 = 2;
     const ERA_WIDTH: i64 = 8;
     for i in 0..NUM_SURVEYORS {
@@ -104,9 +104,9 @@ pub fn ship_config(waypoints: &Vec<Waypoint>) -> Vec<ShipConfig> {
         });
     }
 
-    // Dedicated hauler for building jump gate
+    // todo: Dedicated hauler for building jump gate
 
-    // (Later)
+    // todo: (Later)
     // switch to static probes everywhere
     // 3 logistic haulers
     // 5 siphons + 1 hauler

@@ -6,16 +6,15 @@ use crate::logistics_planner::{
 };
 use crate::models::MarketSupply::*;
 use crate::models::MarketType::*;
-use crate::models::{Agent, WaypointSymbol};
+use crate::models::*;
 use crate::models::{LogisticsScriptConfig, MarketActivity::*};
-use crate::models::{SystemSymbol, Waypoint};
 use crate::universe::Universe;
 use chrono::{DateTime, Duration, Utc};
 use dashmap::DashMap;
 use log::*;
 use std::cmp::min;
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 
 fn is_task_allowed(task: &Task, config: &LogisticsScriptConfig) -> bool {
     if let Some(waypoint_allowlist) = &config.waypoint_allowlist {
@@ -50,7 +49,6 @@ fn is_task_allowed(task: &Task, config: &LogisticsScriptConfig) -> bool {
 pub struct LogisticTaskManager {
     pub system_symbol: SystemSymbol,
     agent_controller: Arc<RwLock<Option<AgentController>>>,
-    agent: Arc<Mutex<Agent>>,
     universe: Universe,
     db_client: DataClient,
 
@@ -63,7 +61,6 @@ impl LogisticTaskManager {
     pub async fn new(
         universe: &Universe,
         db_client: &DataClient,
-        agent: &Arc<Mutex<Agent>>,
         system_symbol: &SystemSymbol,
     ) -> Self {
         let in_progress_tasks = db_client
@@ -71,7 +68,6 @@ impl LogisticTaskManager {
             .await
             .unwrap_or_default();
         Self {
-            agent: agent.clone(),
             system_symbol: system_symbol.clone(),
             universe: universe.clone(),
             db_client: db_client.clone(),
@@ -173,10 +169,6 @@ impl LogisticTaskManager {
                 }
             }
         }
-        let current_credits = {
-            let agent = self.agent.lock().unwrap();
-            agent.credits
-        };
 
         // Construction tasks
         let jump_gate = waypoints
@@ -228,29 +220,29 @@ impl LogisticTaskManager {
                 if let Some(buy_trade_good) = buy_trade_good {
                     let units = min(min(remaining, capacity_cap), buy_trade_good.1.trade_volume);
                     let cost = units * buy_trade_good.1.purchase_price;
-                    if cost + 2000000 <= current_credits {
-                        debug!(
-                            "Construction: buy {} @ {} for ${}, progress: {}/{}",
-                            material.trade_symbol,
-                            buy_trade_good.1.purchase_price,
-                            cost,
-                            material.fulfilled,
-                            material.required
-                        );
-                        tasks.push(Task {
-                            id: format!("construction_{}", material.trade_symbol),
-                            actions: TaskActions::TransportCargo {
-                                src: buy_trade_good.0.clone(),
-                                dest: jump_gate.symbol.clone(),
-                                src_action: Action::BuyGoods(material.trade_symbol.clone(), units),
-                                dest_action: Action::DeliverConstruction(
-                                    material.trade_symbol.clone(),
-                                    units,
-                                ),
-                            },
-                            value: 100000,
-                        });
-                    }
+                    // if cost + 2000000 <= available_credits {
+                    debug!(
+                        "Construction: buy {} @ {} for ${}, progress: {}/{}",
+                        material.trade_symbol,
+                        buy_trade_good.1.purchase_price,
+                        cost,
+                        material.fulfilled,
+                        material.required
+                    );
+                    tasks.push(Task {
+                        id: format!("construction_{}", material.trade_symbol),
+                        actions: TaskActions::TransportCargo {
+                            src: buy_trade_good.0.clone(),
+                            dest: jump_gate.symbol.clone(),
+                            src_action: Action::BuyGoods(material.trade_symbol.clone(), units),
+                            dest_action: Action::DeliverConstruction(
+                                material.trade_symbol.clone(),
+                                units,
+                            ),
+                        },
+                        value: 100000,
+                    });
+                    // }
                 }
             }
         }
@@ -350,10 +342,7 @@ impl LogisticTaskManager {
             );
             let profit =
                 (sell_trade_good.1.sell_price - buy_trade_good.1.purchase_price) * (units as i64);
-            // we might not be buying a full cargo load, but we might be buying multiple goods at once
-            // !! this logic does not extend well to multiple ships
-            let can_afford =
-                capacity_cap * buy_trade_good.1.purchase_price + 10000 <= current_credits;
+            let can_afford = true; // logistic ships reserve their credits beforehand
             if profit > 0 && can_afford {
                 debug!(
                     "{}: buy {} @ {} for ${}, sell @ {} for ${}, profit: ${}",
@@ -417,6 +406,9 @@ impl LogisticTaskManager {
         // Cleanup in_progress_tasks for this ship
         self.in_progress_tasks.retain(|_k, v| v.1 != ship_symbol);
         let all_tasks = self.generate_task_list(cargo_capacity, true).await;
+        self.agent_controller()
+            .ledger
+            .reserve_credits(ship_symbol, 5000 * cargo_capacity);
 
         // Filter out tasks that are already in progress
         // Also filter tasks outlawed by the config for this ship

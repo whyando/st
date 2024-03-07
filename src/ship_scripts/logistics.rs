@@ -35,6 +35,7 @@ pub async fn run(
             (schedule_opt.unwrap(), progress_opt.unwrap())
         } else {
             assert!(ship_controller.cargo_empty());
+
             // Generate new schedule
             let plan_length = Duration::try_minutes(15).unwrap();
             let schedule = taskmanager

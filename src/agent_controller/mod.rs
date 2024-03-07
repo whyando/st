@@ -1,3 +1,3 @@
 mod agent_controller;
-mod ledger;
+pub mod ledger;
 pub use agent_controller::*;

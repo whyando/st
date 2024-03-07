@@ -1,10 +1,10 @@
-use log::*;
 /// Track the allocations of current credits of the agent
+use log::*;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 #[derive(Debug)]
-pub(in crate::agent_controller) struct Ledger {
+pub struct Ledger {
     total_credits: Mutex<i64>,
     reserved_credits: Mutex<BTreeMap<String, i64>>,
 }
@@ -26,9 +26,20 @@ impl Ledger {
     }
 
     pub fn reserve_credits(&self, ship_symbol: &str, amount: i64) {
-        debug!("Reserving {} credits for {}", amount, ship_symbol);
+        debug!("Setting {} credits reserved for {}", amount, ship_symbol);
         let mut reserved_credits = self.reserved_credits.lock().unwrap();
         reserved_credits.insert(ship_symbol.to_string(), amount);
+    }
+
+    pub fn reserve_credits_delta(&self, ship_symbol: &str, delta: i64) {
+        debug!(
+            "Adjusting reserved credits for {} by {}",
+            ship_symbol, delta
+        );
+        let mut reserved_credits = self.reserved_credits.lock().unwrap();
+        reserved_credits
+            .entry(ship_symbol.to_string())
+            .and_modify(|e| *e += delta);
     }
 
     pub fn available_credits(&self) -> i64 {
