@@ -1,12 +1,15 @@
+use log::info;
 use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
 use st::data::DataClient;
 use st::models::Waypoint;
 use st::universe::Universe;
 use std::env;
+use std::fs::File;
+use std::io;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> io::Result<()> {
     dotenvy::dotenv().ok();
     pretty_env_logger::init_timed();
 
@@ -33,40 +36,56 @@ async fn main() {
             }
         }
     }
+
+    // output to ./shipyards.txt
+    let mut f = File::options()
+        .write(true)
+        .create(true)
+        .open("shipyards.txt")
+        .unwrap();
+    use std::io::Write as _;
+
     for shipyard in shipyards {
-        println!("Shipyard: {}", shipyard.data.symbol);
+        writeln!(&mut f, "Shipyard: {}", shipyard.data.symbol)?;
         for ship in &shipyard.data.ships {
-            println!("{} ${}", ship.ship_type, ship.purchase_price);
-            println!("supply: {}", ship.supply);
-            println!(
+            writeln!(&mut f, "{} ${}", ship.ship_type, ship.purchase_price)?;
+            writeln!(&mut f, "supply: {}", ship.supply)?;
+            writeln!(
+                &mut f,
                 "frame: {} ({} fuel)",
                 ship.frame.symbol, ship.frame.fuel_capacity
-            );
-            println!("reactor: {}", ship.reactor.symbol);
-            println!("engine: {} ({})", ship.engine.symbol, ship.engine.speed);
+            )?;
+            writeln!(&mut f, "reactor: {}", ship.reactor.symbol)?;
+            writeln!(
+                &mut f,
+                "engine: {} ({})",
+                ship.engine.symbol, ship.engine.speed
+            )?;
             let modules = ship
                 .modules
                 .iter()
                 .map(|m| m.symbol.clone())
                 .collect::<Vec<String>>()
                 .join(", ");
-            println!("modules: {}", modules);
+            writeln!(&mut f, "modules: {}", modules)?;
             let mounts = ship
                 .mounts
                 .iter()
                 .map(|m| m.symbol.clone())
                 .collect::<Vec<String>>()
                 .join(", ");
-            println!("mounts: {}", mounts);
+            writeln!(&mut f, "mounts: {}", mounts)?;
             let cargo_capacity = ship
                 .modules
                 .iter()
                 .filter(|m| m.symbol.starts_with("MODULE_CARGO_HOLD_"))
                 .map(|m| m.capacity.unwrap_or(0))
                 .sum::<i64>();
-            println!("cargo capacity: {}", cargo_capacity);
+            writeln!(&mut f, "cargo capacity: {}", cargo_capacity)?;
 
-            println!();
+            writeln!(&mut f,)?;
         }
     }
+    info!("Wrote shipyards to shipyards.txt");
+    Ok(())
 }

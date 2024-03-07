@@ -73,9 +73,23 @@ pub struct WithTimestamp<T> {
 }
 
 #[derive(Debug, Clone)]
+pub struct LogisticsScriptConfig {
+    pub use_planner: bool,
+    pub allow_shipbuying: bool,
+    pub allow_construction: bool,
+    pub allow_market_refresh: bool,
+    pub waypoint_allowlist: Option<Vec<WaypointSymbol>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProbeScriptConfig {
+    pub waypoints: Vec<WaypointSymbol>,
+}
+
+#[derive(Debug, Clone)]
 pub enum ShipBehaviour {
-    FixedProbe(WaypointSymbol),
-    Logistics,
+    Probe(ProbeScriptConfig),
+    Logistics(LogisticsScriptConfig),
     SiphonDrone,
     SiphonShuttle,
     MiningSurveyor,
@@ -84,9 +98,35 @@ pub enum ShipBehaviour {
 }
 
 #[derive(Debug, Clone)]
+pub struct PurchaseCriteria {
+    // this ship is never purchased
+    pub never_purchase: bool,
+    // require the ship to be bought from a specific system
+    pub system_symbol: Option<SystemSymbol>,
+    // allow a logistic task to be created to go to a waypoint
+    pub allow_logistic_task: bool,
+    // require the ship to be bought from the cheapest shipyard in the system
+    // (only relevant when we have multiple shipyards with the same ship
+    //  and a purchaser at only a subset)
+    pub require_cheapest: bool,
+}
+
+impl Default for PurchaseCriteria {
+    fn default() -> Self {
+        Self {
+            never_purchase: false,
+            system_symbol: None,
+            allow_logistic_task: false,
+            require_cheapest: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ShipConfig {
     pub id: String,
     pub ship_model: String,
+    pub purchase_criteria: PurchaseCriteria,
     pub behaviour: ShipBehaviour,
     pub era: i64, // purchase/assignment priority
 }

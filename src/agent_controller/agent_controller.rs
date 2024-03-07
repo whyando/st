@@ -1,3 +1,4 @@
+use super::ledger::Ledger;
 use crate::broker::{CargoBroker, TransferActor};
 use crate::models::{ShipNavStatus::*, *};
 use crate::ship_config::ship_config;
@@ -16,7 +17,6 @@ use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use log::*;
 use serde_json::{json, Value};
-use std::collections::BTreeSet;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -26,6 +26,18 @@ use tokio::sync::mpsc::Sender;
 pub enum Event {
     ShipUpdate(Ship),
     AgentUpdate(Agent),
+}
+
+#[derive(Clone, Debug)]
+enum BuyShipResult {
+    Bought(String),
+    FailedNeverPurchase,
+    FailedLowCredits,
+    FailedNoShipyards,
+    // if we failed because there was no purchaser available,
+    // we can return a waypoint symbol to indicate a task should be created
+    // to go there
+    FailedNoPurchaser(Option<WaypointSymbol>),
 }
 
 #[derive(Clone)]
@@ -46,7 +58,9 @@ pub struct AgentController {
     hdls: Arc<JoinHandles>,
     pub task_manager: Arc<LogisticTaskManager>,
     pub survey_manager: Arc<SurveyManager>,
-    pub siphon_cargo_broker: Arc<CargoBroker>,
+    pub cargo_broker: Arc<CargoBroker>,
+
+    ledger: Arc<Ledger>,
 
     try_buy_ships_mutex_guard: Arc<tokio::sync::Mutex<()>>,
 }
@@ -87,6 +101,12 @@ impl AgentController {
         assert!(listeners.len() <= 1);
     }
 
+    pub fn emit_event_blocking(&self, event: &Event) {
+        let listeners = { self.listeners.lock().unwrap().clone() };
+        for listener in listeners.iter() {
+            listener.blocking_send(event.clone()).unwrap();
+        }
+    }
     pub async fn emit_event(&self, event: &Event) {
         let listeners = { self.listeners.lock().unwrap().clone() };
         for listener in listeners.iter() {
@@ -158,6 +178,21 @@ impl AgentController {
         };
         let system_symbol = agent.lock().unwrap().headquarters.system();
         let waypoints: Vec<Waypoint> = universe.get_system_waypoints(&system_symbol).await;
+
+        // (Debugging system market waypoints)
+        let mut sorted_waypoints = waypoints
+            .iter()
+            .filter(|w| w.is_market())
+            .collect::<Vec<_>>();
+        sorted_waypoints.sort_by_cached_key(|w| w.x * w.x + w.y * w.y);
+        for waypoint in &sorted_waypoints {
+            let dist = ((waypoint.x * waypoint.x + waypoint.y * waypoint.y) as f64).sqrt() as i64;
+            debug!(
+                "{}, {}, ({},{}) ({})",
+                waypoint.symbol, waypoint.waypoint_type, waypoint.x, waypoint.y, dist
+            );
+        }
+
         // static ship config - later we may allow limited modifications
         let ship_config: Vec<ShipConfig> = ship_config(&waypoints);
         let job_assignments: DashMap<String, String> = db
@@ -173,6 +208,12 @@ impl AgentController {
             .collect();
         let task_manager = LogisticTaskManager::new(universe, db, &agent, &system_symbol).await;
         let survey_manager = SurveyManager::new(db).await;
+
+        let initial_credits = {
+            let agent = agent.lock().unwrap();
+            agent.credits
+        };
+        let ledger = Ledger::new(initial_credits);
         let agent_controller = Self {
             callsign: callsign.to_string(),
             agent,
@@ -187,47 +228,72 @@ impl AgentController {
             job_assignments: Arc::new(job_assignments),
             job_assignments_rev: Arc::new(job_assignments_rev),
             task_manager: Arc::new(task_manager),
-            siphon_cargo_broker: Arc::new(CargoBroker::new()),
+            cargo_broker: Arc::new(CargoBroker::new()),
             survey_manager: Arc::new(survey_manager),
             try_buy_ships_mutex_guard: Arc::new(tokio::sync::Mutex::new(())),
+            ledger: Arc::new(ledger),
         };
         agent_controller
             .task_manager
             .set_agent_controller(&agent_controller);
-        let credits = agent_controller.credits();
+        let credits = agent_controller.ledger.credits();
         let num_ships = agent_controller.num_ships();
         info!(
             "Loaded agent {} ${} with {} ships",
             callsign, credits, num_ships
         );
+        info!(
+            "{} reserved credits, {} available",
+            agent_controller.ledger.reserved_credits(),
+            agent_controller.ledger.available_credits()
+        );
         agent_controller
     }
-    pub fn credits(&self) -> i64 {
-        self.agent.lock().unwrap().credits
-    }
+    // pub fn credits(&self) -> i64 {
+    //     self.agent.lock().unwrap().credits
+    // }
     pub fn starting_system(&self) -> SystemSymbol {
         self.agent.lock().unwrap().headquarters.system()
     }
     pub fn num_ships(&self) -> usize {
         self.ships.len()
     }
-    pub async fn update_agent(&self, agent_upd: Agent) {
-        let agent = {
-            let mut agent = self.agent.lock().unwrap();
-            *agent = agent_upd;
-            agent.clone()
-        };
-        self.emit_event(&Event::AgentUpdate(agent.clone())).await;
+    pub fn update_agent(&self, agent_upd: Agent) {
+        let mut agent = self.agent.lock().unwrap();
+        *agent = agent_upd;
+        self.ledger.set_credits(agent.credits);
+        self.emit_event_blocking(&Event::AgentUpdate(agent.clone()));
     }
     fn debug(&self, msg: &str) {
         debug!("[{}] {}", self.callsign, msg);
     }
 
-    pub fn probed_waypoints(&self) -> Vec<(String, WaypointSymbol)> {
+    pub fn probed_waypoints(&self) -> Vec<(String, Vec<WaypointSymbol>)> {
         self.ship_config
             .iter()
             .filter_map(|job| {
-                if let ShipBehaviour::FixedProbe(waypoint_symbol) = &job.behaviour {
+                if let ShipBehaviour::Probe(config) = &job.behaviour {
+                    if let Some(assignment) = self.job_assignments.get(&job.id) {
+                        let ship_symbol = assignment.value().clone();
+                        return Some((ship_symbol, config.waypoints.clone()));
+                    }
+                }
+                None
+            })
+            .collect()
+    }
+
+    // Waypoints that are probed, and the probe never leaves that single waypoint
+    pub fn statically_probed_waypoints(&self) -> Vec<(String, WaypointSymbol)> {
+        self.ship_config
+            .iter()
+            .filter_map(|job| {
+                if let ShipBehaviour::Probe(config) = &job.behaviour {
+                    let waypoints = &config.waypoints;
+                    if waypoints.len() != 1 {
+                        return None;
+                    }
+                    let waypoint_symbol = &waypoints[0];
                     if let Some(assignment) = self.job_assignments.get(&job.id) {
                         let ship = self.ships.get(assignment.value()).unwrap();
                         let ship = ship.lock().unwrap();
@@ -256,7 +322,7 @@ impl AgentController {
         // let transaction = response["data"]["transaction"].take();
         let ship_symbol = ship.symbol.clone();
         self.debug(&format!("Successfully bought ship {}", ship_symbol));
-        self.update_agent(agent).await;
+        self.update_agent(agent);
         self.ships
             .insert(ship_symbol.clone(), Arc::new(Mutex::new(ship)));
         ship_symbol
@@ -298,51 +364,45 @@ impl AgentController {
         }
     }
 
-    pub async fn try_buy_ships(
-        &self,
-        purchaser: Option<String>,
-    ) -> (Vec<String>, BTreeSet<WaypointSymbol>) {
-        let _guard = self.try_buy_ships_lock().await;
-        let mut shipyard_task_locs = BTreeSet::new();
-        let mut purchased_ships = vec![];
+    // An attempt to buy a single specific ship
+    async fn try_buy_ship(&self, purchaser: &Option<String>, job: &ShipConfig) -> BuyShipResult {
+        let purchase_criteria = &job.purchase_criteria;
+        if purchase_criteria.never_purchase {
+            return BuyShipResult::FailedNeverPurchase;
+        }
+        if let Some(system_symbol) = &purchase_criteria.system_symbol {
+            assert_eq!(system_symbol, &self.starting_system());
+        }
 
-        let mut failed_era = None;
-        let probes = self.probed_waypoints();
-        for job in self
-            .ship_config
-            .iter()
-            .filter(|job| !self.job_assigned(&job.id))
-        {
-            // Make sure we've bought all ships for a specific era before moving on to the next
-            if let Some(failed_era) = &failed_era {
-                if &job.era > failed_era {
-                    break;
-                }
+        // if ship docked at shipyard + credits available, buy ship immediately
+        // otherwise, register as a (potential) task
+        let system = self.starting_system();
+        let mut shipyards = self
+            .universe
+            .search_shipyards(&system, &job.ship_model)
+            .await;
+        shipyards.sort_by_key(|x| x.1);
+
+        if shipyards.len() == 0 {
+            return BuyShipResult::FailedNoShipyards;
+        }
+        let job_credit_reservation = match &job.behaviour {
+            ShipBehaviour::Logistics(_) => {
+                SHIP_MODELS[job.ship_model.as_str()].cargo_capacity * 5000
             }
+            _ => 0,
+        };
+        let current_credits = self.ledger.available_credits();
+        let cheapest_shipard = shipyards[0].0.clone();
+        let can_afford_cheapest = current_credits >= shipyards[0].1 + job_credit_reservation;
 
-            // if ship docked at shipyard + credits available, buy ship immediately
-            // otherwise, register as a (potential) task
-            let system = self.starting_system();
-            let mut shipyards = self
-                .universe
-                .search_shipyards(&system, &job.ship_model)
-                .await;
-            shipyards.sort_by_key(|x| x.1);
-            let (shipyard, cost) = match shipyards.first() {
-                Some((shipyard, cost)) => (shipyard, cost),
-                None => {
-                    debug!("Not buying ship {}: no shipyards", job.ship_model);
-                    failed_era = Some(job.era);
-                    continue;
-                }
-            };
-            let current_credits = self.credits();
-            if current_credits < cost + 500000 {
+        let static_probes = self.statically_probed_waypoints();
+        for (shipyard, cost) in &shipyards {
+            if current_credits < cost + job_credit_reservation {
                 // @@ sort out this limit based on trading ships
-                debug!("Not buying ship {}: low credits", job.ship_model);
-                failed_era = Some(job.era);
-                continue;
+                break; // no point looking at more expensive shipyards
             }
+            // look for a purchaser
             let ship_symbol: Option<String> = self
                 .ships
                 .iter()
@@ -351,40 +411,98 @@ impl AgentController {
                     if ship.nav.waypoint_symbol != *shipyard || ship.nav.status == InTransit {
                         return false;
                     }
-                    let is_probe = probes.iter().any(|(s, _w)| s == &ship.symbol);
+                    let is_static_probe = static_probes.iter().any(|(s, _w)| s == &ship.symbol);
                     let is_purchaser = match &purchaser {
                         Some(purchaser) => ship.symbol == *purchaser,
                         None => false,
                     };
-                    is_probe || is_purchaser
+                    is_static_probe || is_purchaser
                 })
                 .map(|ship| ship.key().clone());
             let ship_controller = match &ship_symbol {
                 Some(ship_symbol) => self.ship_controller(ship_symbol),
                 None => {
-                    debug!(
-                        "Not buying ship {}: no ship at {}",
-                        job.ship_model, shipyard
-                    );
-                    shipyard_task_locs.insert(shipyard.clone());
-                    failed_era = Some(job.era);
-                    continue;
+                    // this 'no purchaser' case is the only one where we iterate through the other shipyards
+                    if purchase_criteria.require_cheapest {
+                        break;
+                    } else {
+                        continue;
+                    }
                 }
             };
             let bought_ship_symbol = self.buy_ship(shipyard, &job.ship_model).await;
             ship_controller.refresh_shipyard().await;
             let assigned = self.try_assign_ship(&bought_ship_symbol).await;
             assert!(assigned);
-            purchased_ships.push(bought_ship_symbol);
+            return BuyShipResult::Bought(bought_ship_symbol);
         }
-        (purchased_ships, shipyard_task_locs)
+        if !can_afford_cheapest {
+            return BuyShipResult::FailedLowCredits;
+        }
+        if purchase_criteria.allow_logistic_task {
+            BuyShipResult::FailedNoPurchaser(Some(cheapest_shipard))
+        } else {
+            BuyShipResult::FailedNoPurchaser(None)
+        }
+    }
+
+    pub async fn try_buy_ships(
+        &self,
+        purchaser: Option<String>,
+    ) -> (Vec<String>, Option<WaypointSymbol>) {
+        let _guard = self.try_buy_ships_lock().await;
+        let mut purchased_ships = vec![];
+
+        for job in self
+            .ship_config
+            .iter()
+            .filter(|job| !self.job_assigned(&job.id))
+        {
+            let result = self.try_buy_ship(&purchaser, &job).await;
+            match result {
+                BuyShipResult::Bought(ship_symbol) => {
+                    purchased_ships.push(ship_symbol);
+                }
+                BuyShipResult::FailedNeverPurchase => {
+                    debug!("Not buying ship {}: never_purchase", job.ship_model);
+                    return (purchased_ships, None);
+                }
+                BuyShipResult::FailedLowCredits => {
+                    debug!("Not buying ship {}: low credits", job.ship_model);
+                    return (purchased_ships, None);
+                }
+                BuyShipResult::FailedNoShipyards => {
+                    debug!("Not buying ship {}: no shipyards", job.ship_model);
+                    return (purchased_ships, None);
+                }
+                BuyShipResult::FailedNoPurchaser(waypoint) => {
+                    if let Some(waypoint) = waypoint {
+                        return (purchased_ships, Some(waypoint));
+                    }
+                    return (purchased_ships, None);
+                }
+            }
+        }
+        (purchased_ships, None)
+    }
+
+    pub fn reserve_credits_for_job(&self, job: &ShipConfig, ship_symbol: &str) {
+        // Only reserve credits for logistics jobs
+        match &job.behaviour {
+            ShipBehaviour::Logistics(_) => {}
+            _ => return,
+        }
+        let ship = self.ships.get(ship_symbol).unwrap();
+        let ship = ship.lock().unwrap();
+        self.ledger
+            .reserve_credits(ship_symbol, ship.cargo.capacity * 5000);
     }
 
     pub async fn run_ships(&self) {
         let self_clone = self.clone();
         {
             let join_hdl = tokio::spawn(async move {
-                let broker = self_clone.siphon_cargo_broker.clone();
+                let broker = self_clone.cargo_broker.clone();
                 broker.run(Box::new(self_clone)).await;
             });
             debug!("spawn_broker try push join_hdl");
@@ -397,6 +515,15 @@ impl AgentController {
                 self.try_assign_ship(&ship_symbol).await;
             }
         }
+        // setup ledger - important to do this before starting ship scripts or buying more ships
+        self.ledger.reserve_credits("FUEL", 10000);
+        for ship_config in self.ship_config.iter() {
+            if let Some(ship_symbol) = &self.job_assignments.get(&ship_config.id) {
+                let ship_symbol: &String = ship_symbol.value();
+                self.reserve_credits_for_job(&ship_config, ship_symbol);
+            }
+        }
+
         let (_bought, _tasks) = self.try_buy_ships(None).await;
         dbg!(&self.job_assignments);
         dbg!(&self.job_assignments_rev);
@@ -435,6 +562,7 @@ impl AgentController {
                         self.job_assignments.deref(),
                     )
                     .await;
+                self.reserve_credits_for_job(job, ship_symbol);
                 true
             }
             None => {
@@ -462,19 +590,21 @@ impl AgentController {
                     .expect("job_id not found in ship_config_spec");
                 // run script for assigned job
                 let join_hdl = match &job_spec.behaviour {
-                    ShipBehaviour::FixedProbe(waypoint_symbol) => {
+                    ShipBehaviour::Probe(config) => {
                         let ship_controller = self.ship_controller(&ship_symbol);
-                        let waypoint_symbol = waypoint_symbol.clone();
+                        let config = config.clone();
                         tokio::spawn(async move {
-                            ship_scripts::probe::run(ship_controller, &waypoint_symbol).await;
+                            ship_scripts::probe::run(ship_controller, &config).await;
                         })
                     }
-                    ShipBehaviour::Logistics => {
+                    ShipBehaviour::Logistics(config) => {
                         let ship_controller = self.ship_controller(&ship_symbol);
                         let db = self.db.clone();
                         let task_manager = self.task_manager.clone();
+                        let config = config.clone();
                         tokio::spawn(async move {
-                            ship_scripts::logistics::run(ship_controller, db, task_manager).await;
+                            ship_scripts::logistics::run(ship_controller, db, task_manager, config)
+                                .await;
                         })
                     }
                     ShipBehaviour::SiphonDrone => {

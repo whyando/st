@@ -1,6 +1,9 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use crate::{data::DataClient, ship_controller::ShipController, tasks::LogisticTaskManager};
+use crate::{
+    data::DataClient, models::LogisticsScriptConfig, ship_controller::ShipController,
+    tasks::LogisticTaskManager,
+};
 use chrono::Duration;
 use log::*;
 
@@ -8,6 +11,7 @@ pub async fn run(
     ship_controller: ShipController,
     db: DataClient,
     taskmanager: Arc<LogisticTaskManager>,
+    config: LogisticsScriptConfig,
 ) {
     info!("Starting script logistics for {}", ship_controller.symbol());
     ship_controller.wait_for_transit().await;
@@ -32,10 +36,11 @@ pub async fn run(
         } else {
             assert!(ship_controller.cargo_empty());
             // Generate new schedule
-            let plan_length = Duration::minutes(15);
+            let plan_length = Duration::try_minutes(15).unwrap();
             let schedule = taskmanager
                 .take_tasks(
                     &ship_symbol,
+                    &config,
                     ship_controller.cargo_capacity(),
                     ship_controller.engine_speed(),
                     ship_controller.fuel_capacity(),

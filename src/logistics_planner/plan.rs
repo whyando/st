@@ -1,11 +1,9 @@
-use std::collections::BTreeMap;
-use std::sync::Arc;
-
 use super::*;
 use chrono::DateTime;
-use chrono::NaiveDateTime;
 use chrono::Utc;
 use log::*;
+use std::collections::BTreeMap;
+use std::sync::Arc;
 use vrp_pragmatic::core::models::{Problem as CoreProblem, Solution as CoreSolution};
 use vrp_pragmatic::core::solver::create_default_config_builder;
 use vrp_pragmatic::core::solver::get_default_telemetry_mode;
@@ -29,11 +27,7 @@ fn location_index(locations: &mut Vec<WaypointSymbol>, location: &WaypointSymbol
 
 // return timestamp in RFC3339 format of seconds since 0000-01-01T00:00:00Z
 fn get_timestamp(seconds: i64) -> String {
-    let dt: DateTime<Utc> = DateTime::from_naive_utc_and_offset(
-        NaiveDateTime::from_timestamp_opt(seconds, 0).unwrap(),
-        Utc,
-    );
-    // rfc3339
+    let dt: DateTime<Utc> = DateTime::from_timestamp(seconds, 0).unwrap();
     dt.to_rfc3339()
 }
 
@@ -376,7 +370,11 @@ mod test {
 
     #[test]
     fn test_run_planner() {
-        pretty_env_logger::init();
+        pretty_env_logger::formatted_timed_builder()
+            .is_test(true)
+            .filter_level(log::LevelFilter::Debug)
+            .try_init()
+            .ok();
         let ships = vec![
             LogisticShip {
                 symbol: "SHIP1".to_string(),
@@ -420,8 +418,8 @@ mod test {
             },
         ];
         let constraints = PlannerConstraints {
-            plan_length: Duration::hours(24),
-            max_compute_time: Duration::seconds(1),
+            plan_length: Duration::try_hours(24).unwrap(),
+            max_compute_time: Duration::try_seconds(1).unwrap(),
         };
         let matrix = {
             let mut duration_matrix: BTreeMap<WaypointSymbol, BTreeMap<WaypointSymbol, i64>> =

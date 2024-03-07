@@ -12,7 +12,7 @@ use std::cmp::min;
 use std::sync::{Arc, Mutex};
 
 pub struct ShipController {
-    ship_symbol: String,
+    pub ship_symbol: String,
     ship: Arc<Mutex<Ship>>,
 
     api_client: ApiClient,
@@ -81,46 +81,38 @@ impl ShipController {
         let ship = self.ship.lock().unwrap();
         ship.cargo.units == 0
     }
-    pub async fn emit_ship(&self) {
+    pub fn emit_ship(&self) {
         let ship = self.ship();
         self.agent_controller
-            .emit_event(&Event::ShipUpdate(ship))
-            .await;
+            .emit_event_blocking(&Event::ShipUpdate(ship));
     }
-    pub async fn set_orbit_status(&self) {
-        {
-            let mut ship = self.ship.lock().unwrap();
-            ship.nav.status = InOrbit;
-        }
-        self.emit_ship().await;
+    pub fn set_orbit_status(&self) {
+        let mut ship = self.ship.lock().unwrap();
+        ship.nav.status = InOrbit;
+        self.emit_ship();
     }
-    pub async fn update_nav(&self, nav: ShipNav) {
-        {
-            let mut ship = self.ship.lock().unwrap();
-            ship.nav = nav;
-        }
-        self.emit_ship().await;
+    pub fn update_nav(&self, nav: ShipNav) {
+        let mut ship = self.ship.lock().unwrap();
+        ship.nav = nav;
+        self.emit_ship();
     }
-    pub async fn update_fuel(&self, fuel: ShipFuel) {
-        {
-            let mut ship = self.ship.lock().unwrap();
-            ship.fuel = fuel;
-        }
-        self.emit_ship().await;
+    pub fn update_fuel(&self, fuel: ShipFuel) {
+        let mut ship = self.ship.lock().unwrap();
+        ship.fuel = fuel;
+
+        self.emit_ship();
     }
-    pub async fn update_cargo(&self, cargo: ShipCargo) {
-        {
-            let mut ship = self.ship.lock().unwrap();
-            ship.cargo = cargo;
-        }
-        self.emit_ship().await;
+    pub fn update_cargo(&self, cargo: ShipCargo) {
+        let mut ship = self.ship.lock().unwrap();
+        ship.cargo = cargo;
+
+        self.emit_ship();
     }
-    pub async fn update_cooldown(&self, cooldown: ShipCooldown) {
-        {
-            let mut ship = self.ship.lock().unwrap();
-            ship.cooldown = cooldown;
-        }
-        self.emit_ship().await;
+    pub fn update_cooldown(&self, cooldown: ShipCooldown) {
+        let mut ship = self.ship.lock().unwrap();
+        ship.cooldown = cooldown;
+
+        self.emit_ship();
     }
     pub fn cargo_first_item(&self) -> Option<ShipCargoItem> {
         let ship = self.ship.lock().unwrap();
@@ -159,7 +151,7 @@ impl ShipController {
         let uri = format!("/my/ships/{}/orbit", self.ship_symbol);
         let mut response: Value = self.api_client.post(&uri, &json!({})).await;
         let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
-        self.update_nav(nav).await;
+        self.update_nav(nav);
     }
 
     pub async fn dock(&self) {
@@ -169,7 +161,7 @@ impl ShipController {
         let uri = format!("/my/ships/{}/dock", self.ship_symbol);
         let mut response: Value = self.api_client.post(&uri, &json!({})).await;
         let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
-        self.update_nav(nav).await;
+        self.update_nav(nav);
     }
 
     pub fn is_in_transit(&self) -> bool {
@@ -186,8 +178,8 @@ impl ShipController {
     pub async fn wait_for_transit(&self) {
         let arrival_time = { self.ship.lock().unwrap().nav.route.arrival };
         let now = chrono::Utc::now();
-        let wait_time = arrival_time - now + chrono::Duration::seconds(1);
-        if wait_time > chrono::Duration::seconds(0) {
+        let wait_time = arrival_time - now + chrono::Duration::try_seconds(1).unwrap();
+        if wait_time > chrono::Duration::try_seconds(0).unwrap() {
             self.debug(&format!(
                 "Waiting for transit: {} seconds",
                 wait_time.num_seconds()
@@ -199,8 +191,8 @@ impl ShipController {
         let cooldown = { self.ship.lock().unwrap().cooldown.clone() };
         if let Some(expiration) = cooldown.expiration {
             let now = chrono::Utc::now();
-            let wait_time = expiration - now + chrono::Duration::seconds(1);
-            if wait_time > chrono::Duration::seconds(0) {
+            let wait_time = expiration - now + chrono::Duration::try_seconds(1).unwrap();
+            if wait_time > chrono::Duration::try_seconds(0).unwrap() {
                 self.debug(&format!(
                     "Waiting for cooldown: {} seconds",
                     wait_time.num_seconds()
@@ -228,8 +220,8 @@ impl ShipController {
         let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
         let transaction: MarketTransaction =
             serde_json::from_value(response["data"]["transaction"].take()).unwrap();
-        self.update_cargo(cargo).await;
-        self.agent_controller.update_agent(agent).await;
+        self.update_cargo(cargo);
+        self.agent_controller.update_agent(agent);
         self.debug(&format!(
             "BOUGHT {} {} for ${} (total ${})",
             transaction.units,
@@ -253,8 +245,8 @@ impl ShipController {
         let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
         let transaction: MarketTransaction =
             serde_json::from_value(response["data"]["transaction"].take()).unwrap();
-        self.update_cargo(cargo).await;
-        self.agent_controller.update_agent(agent).await;
+        self.update_cargo(cargo);
+        self.agent_controller.update_agent(agent);
         self.debug(&format!(
             "SOLD {} {} for ${} (total ${})",
             transaction.units,
@@ -292,7 +284,7 @@ impl ShipController {
         });
         let mut response: Value = self.api_client.post(&uri, &body).await;
         let cargo: ShipCargo = serde_json::from_value(response["data"]["cargo"].take()).unwrap();
-        self.update_cargo(cargo).await;
+        self.update_cargo(cargo);
     }
 
     // Fuel is bought in multiples of 100, so refuel as the highest multiple of 100
@@ -336,8 +328,8 @@ impl ShipController {
         let fuel = serde_json::from_value(response["data"]["fuel"].take()).unwrap();
         let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
         // let transaction: Transaction = serde_json::from_value(response["data"]["transaction"].take()).unwrap();
-        self.update_fuel(fuel).await;
-        self.agent_controller.update_agent(agent).await;
+        self.update_fuel(fuel);
+        self.agent_controller.update_agent(agent);
     }
 
     pub async fn navigate(&self, waypoint: &WaypointSymbol) {
@@ -354,10 +346,10 @@ impl ShipController {
             .await;
         let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
         let fuel = serde_json::from_value(response["data"]["fuel"].take()).unwrap();
-        self.update_nav(nav).await;
-        self.update_fuel(fuel).await;
+        self.update_nav(nav);
+        self.update_fuel(fuel);
         self.wait_for_transit().await;
-        self.set_orbit_status().await;
+        self.set_orbit_status();
     }
 
     // Navigation between two market waypoints
@@ -408,7 +400,7 @@ impl ShipController {
         let cargo: ShipCargo = serde_json::from_value(response["data"]["cargo"].take()).unwrap();
         let construction: Construction =
             serde_json::from_value(response["data"]["construction"].take()).unwrap();
-        self.update_cargo(cargo).await;
+        self.update_cargo(cargo);
         self.universe.update_construction(&construction).await;
     }
 
@@ -461,7 +453,7 @@ impl ShipController {
                 .join(", ");
             self.debug(&format!("Surveyed {} {}", survey.size, deposits));
         }
-        self.update_cooldown(cooldown).await;
+        self.update_cooldown(cooldown);
         self.agent_controller
             .survey_manager
             .insert_surveys(surveys)
@@ -529,7 +521,6 @@ impl ShipController {
     pub async fn transfer_cargo(&self) {
         assert!(!self.is_in_transit(), "Ship is in transit");
         self.orbit().await;
-        // !! assumes siphon broker, specific cargo items, specific location,
         let cargo = {
             let ship = self.ship.lock().unwrap();
             ship.cargo
@@ -539,7 +530,7 @@ impl ShipController {
                 .collect()
         };
         self.agent_controller
-            .siphon_cargo_broker
+            .cargo_broker
             .transfer_cargo(&self.ship_symbol, &self.waypoint(), cargo)
             .await;
     }
@@ -547,10 +538,9 @@ impl ShipController {
     pub async fn receive_cargo(&self) {
         self.orbit().await;
         assert!(!self.is_in_transit(), "Ship is in transit");
-        // !! assumes siphon broker, specific cargo items, specific location
         let space = self.cargo_space_available();
         self.agent_controller
-            .siphon_cargo_broker
+            .cargo_broker
             .receive_cargo(&self.ship_symbol, &self.waypoint(), space)
             .await;
     }
@@ -570,8 +560,8 @@ impl ShipController {
         let good = siphon["yield"]["symbol"].as_str().unwrap();
         let units = siphon["yield"]["units"].as_i64().unwrap();
         self.debug(&format!("Siphoned {} units of {}", units, good));
-        self.update_cooldown(cooldown).await;
-        self.update_cargo(cargo).await;
+        self.update_cooldown(cooldown);
+        self.update_cargo(cargo);
     }
 
     pub async fn extract_survey(&self, survey: &KeyedSurvey) {
@@ -599,8 +589,8 @@ impl ShipController {
                 let good = extraction["yield"]["symbol"].as_str().unwrap();
                 let units = extraction["yield"]["units"].as_i64().unwrap();
                 self.debug(&format!("Extracted {} units of {}", units, good));
-                self.update_cooldown(cooldown).await;
-                self.update_cargo(cargo).await;
+                self.update_cooldown(cooldown);
+                self.update_cargo(cargo);
             }
             StatusCode::BAD_REQUEST | StatusCode::CONFLICT => {
                 let response: Value = serde_json::from_str(&resp_body.unwrap_err()).unwrap();

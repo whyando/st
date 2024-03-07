@@ -1,77 +1,22 @@
 
 
-CURRENT FEATURE STATUS:
+- fix credit threshold for buying a new ship
+- better era configuration
+- burn fuel profiles
+- tests for building gate faster
 
-right now we're mostly functional as a effective single ship trader, augmented by a few probes.
-
-feature - ship buying (50%)
-- ship buying occurs at startup
-- ships have a task that allows them to buy + launch new ships: currently untested since we aren't scheduling the task
-
-feature - multiple logistic ships (50%)
-- ships can run in parallel, and share the task manager, and can execute in parallel,
-- just needs some state in task manager so it can be smart enough not to schedule overlapping tasks
-- need to actually add some cargo ships to the ship_config
-
-feature - probing markets/shipyards (90%)
-- probes are bought as described in ship buying feature
-- polling their target seems to works well
-- to finish this we need to stop scheduling refresh logistic tasks, when a probe has arrived at its destination
-
-feature - intra system analysis
-
-feature - inter system analysis
-
-feature - contracts
-
-feature - construction
-
-feature - mineral extraction
-
-feature - gas extraction
+- accounting (net worth etc)
+- api stats
+- segment market db tables by reset_date
 
 
+- expand to multiple systems
+- explorers, ore hounds
+- charting
+- multi system pathfinding
+- better universe caching
+- make the task manager distances more accurate
 
-future todos rough ideas:
 
-hardening
-- task with buy good conditionally (price, supply, don't go below a specific level of agent credits)
-- (cancel the sell task if the buy task was not taken)
-- buy + sell tasks can handle changing trade volumes
-- api rate limiting (2 /sec)
-- mostly fault torerant due to the schedule progress saving, but it is possible to break in a place where goods have been bought but the step is not saved
-  this needs fixing
-- currently ship travel duration calc used in planning is an (under)estimate, so may get behind on schedule
-
-eras
-- progress to different eras based on conditions like credits
-   different eras see different amounts of ships
-- enabling construction tasks
-- enabling contract tasks
-- maybe command ship switches to mining
-- autobuying ships
-- autobuying probes for market prices (+ running probe logic)
-- planning window might need to be longer or overlapping with the slower ships
-
-eras+
-- when we constructed the jump gate
-- explorer ships
-- trading within other systems (capital)
-- multi-system trading
-- more ships available
-- api rate limit becomes the main bottleneck for credits/hour
-
-analysis
-- postgres+timescaledb+grafana graphs
-- market prices/supply/activity over time
-- market transactions over time
-- agent credits over time
-- agent worth over time (counting ships + goods at book cost)
-- rate limit usage
-- ship 'lateness' compared to schedule
-
-super analysis
-- mapping market prices to a more accurate supply
-- nailing down market formulas for production/consumption per hour
-- nailing down conditions for activity changes, and evolutions
-- estimated credits per hour cap for a full system
+how to handle when approaching rate limit?
+can I better centralise the app state?

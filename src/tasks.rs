@@ -4,18 +4,47 @@ use crate::logistics_planner::plan::task_to_scheduled_action;
 use crate::logistics_planner::{
     self, Action, LogisticShip, PlannerConstraints, ShipSchedule, Task, TaskActions,
 };
-use crate::models::MarketActivity::*;
 use crate::models::MarketSupply::*;
 use crate::models::MarketType::*;
 use crate::models::{Agent, WaypointSymbol};
+use crate::models::{LogisticsScriptConfig, MarketActivity::*};
 use crate::models::{SystemSymbol, Waypoint};
 use crate::universe::Universe;
 use chrono::{DateTime, Duration, Utc};
 use dashmap::DashMap;
 use log::*;
 use std::cmp::min;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, RwLock};
+
+fn is_task_allowed(task: &Task, config: &LogisticsScriptConfig) -> bool {
+    if let Some(waypoint_allowlist) = &config.waypoint_allowlist {
+        match &task.actions {
+            TaskActions::VisitLocation { waypoint, .. } => {
+                if !waypoint_allowlist.contains(&waypoint) {
+                    return false;
+                }
+            }
+            TaskActions::TransportCargo { src, dest, .. } => {
+                if !waypoint_allowlist.contains(&src) || !waypoint_allowlist.contains(&dest) {
+                    return false;
+                }
+            }
+        }
+    }
+    match &task.actions {
+        TaskActions::VisitLocation { action, .. } => match action {
+            Action::RefreshMarket => config.allow_market_refresh,
+            Action::RefreshShipyard => config.allow_market_refresh,
+            Action::TryBuyShips => config.allow_shipbuying,
+            _ => true,
+        },
+        TaskActions::TransportCargo { dest_action, .. } => match dest_action {
+            Action::DeliverConstruction(_, _) => config.allow_construction,
+            _ => true,
+        },
+    }
+}
 
 #[derive(Clone)]
 pub struct LogisticTaskManager {
@@ -67,13 +96,10 @@ impl LogisticTaskManager {
     }
 
     fn probe_locations(&self) -> Vec<WaypointSymbol> {
-        let agent_controller = self.agent_controller.read().unwrap();
-        agent_controller
-            .as_ref()
-            .unwrap()
+        self.agent_controller()
             .probed_waypoints()
             .into_iter()
-            .map(|w| w.1)
+            .flat_map(|w| w.1)
             .collect()
     }
     fn agent_controller(&self) -> AgentController {
@@ -96,10 +122,13 @@ impl LogisticTaskManager {
 
         let mut tasks = Vec::new();
 
-        // start by buying any ships + compiling a list of ships we still need to buy
-        let (bought, shipyard_waypoints) = match buy_ships {
+        // execute contract actions + generate tasks
+        // (todo)
+
+        // execute ship_buy actions + generate tasks
+        let (bought, shipyard_task_waypoint) = match buy_ships {
             true => self.agent_controller().try_buy_ships(None).await,
-            false => (Vec::new(), BTreeSet::new()),
+            false => (Vec::new(), None),
         };
         info!(
             "Task Controller buy phase resulted in {} ships bought",
@@ -109,7 +138,7 @@ impl LogisticTaskManager {
             debug!("Task controller bought ship {}", ship_symbol);
             self.agent_controller()._spawn_run_ship(ship_symbol).await;
         }
-        for waypoint in shipyard_waypoints {
+        if let Some(waypoint) = shipyard_task_waypoint {
             tasks.push(Task {
                 id: format!("buyships_{}", waypoint),
                 actions: TaskActions::VisitLocation {
@@ -229,7 +258,9 @@ impl LogisticTaskManager {
         let probe_locations = self.probe_locations();
         for (market_remote, market_opt) in &markets {
             let requires_visit = match market_opt {
-                Some(market) => now.signed_duration_since(market.timestamp) >= Duration::hours(1),
+                Some(market) => {
+                    now.signed_duration_since(market.timestamp) >= Duration::try_hours(1).unwrap()
+                }
                 None => true,
             };
             let is_probed = probe_locations.contains(&market_remote.symbol);
@@ -370,10 +401,10 @@ impl LogisticTaskManager {
     }
 
     // Provide a set of tasks for a single ship
-    // needs to be debounced
     pub async fn take_tasks(
         &self,
         ship_symbol: &str,
+        config: &LogisticsScriptConfig,
         cargo_capacity: i64,
         engine_speed: i64,
         fuel_capacity: i64,
@@ -383,13 +414,16 @@ impl LogisticTaskManager {
         let _guard = self.take_tasks_lock().await;
         assert_eq!(start_waypoint.system(), self.system_symbol);
 
-        // cleanup in_progress_tasks for this ship
+        // Cleanup in_progress_tasks for this ship
         self.in_progress_tasks.retain(|_k, v| v.1 != ship_symbol);
         let all_tasks = self.generate_task_list(cargo_capacity, true).await;
-        // filter out tasks that are already in progress
+
+        // Filter out tasks that are already in progress
+        // Also filter tasks outlawed by the config for this ship
         let available_tasks = all_tasks
             .into_iter()
             .filter(|task| !self.in_progress_tasks.contains_key(&task.id))
+            .filter(|task| is_task_allowed(&task, config))
             .collect::<Vec<_>>();
 
         let matrix = self
@@ -405,19 +439,27 @@ impl LogisticTaskManager {
         };
         let contraints = PlannerConstraints {
             plan_length,
-            max_compute_time: Duration::seconds(5),
+            max_compute_time: Duration::try_seconds(5).unwrap(),
         };
         let available_tasks_clone = available_tasks.clone();
-        let (mut task_assignments, schedules) = tokio::task::spawn_blocking(move || {
-            logistics_planner::plan::run_planner(
-                &[logistics_ship],
-                &available_tasks_clone,
-                &matrix,
-                &contraints,
-            )
-        })
-        .await
-        .unwrap();
+        let (mut task_assignments, schedules) = if config.use_planner {
+            tokio::task::spawn_blocking(move || {
+                logistics_planner::plan::run_planner(
+                    &[logistics_ship],
+                    &available_tasks_clone,
+                    &matrix,
+                    &contraints,
+                )
+            })
+            .await
+            .unwrap()
+        } else {
+            let ship_schedule = ShipSchedule {
+                ship: logistics_ship,
+                actions: vec![],
+            };
+            (BTreeMap::new(), vec![ship_schedule])
+        };
         assert_eq!(schedules.len(), 1);
         let mut schedule = schedules.into_iter().next().unwrap();
 

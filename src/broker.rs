@@ -216,7 +216,8 @@ mod tests {
         pretty_env_logger::formatted_timed_builder()
             .is_test(true)
             .filter_level(log::LevelFilter::Debug)
-            .init();
+            .try_init()
+            .ok();
         debug!("test_cargo_broker");
 
         let mock = MockTransferActor::new();

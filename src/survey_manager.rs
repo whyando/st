@@ -84,7 +84,7 @@ impl SurveyManager {
             };
             // delete or return
             if let Some(survey) = best {
-                if survey.survey.expiration + Duration::minutes(5) < now {
+                if survey.survey.expiration + Duration::try_minutes(5).unwrap() < now {
                     self.remove_survey(&survey).await;
                 } else {
                     return Some(survey.clone());

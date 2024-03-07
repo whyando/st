@@ -196,17 +196,19 @@ pub struct ShipModel {
     pub engine: String,
     pub req_modules: Vec<String>,
     pub req_mounts: Vec<String>,
+    pub cargo_capacity: i64,
 }
 
 // ship models
 lazy_static::lazy_static! {
-    static ref SHIP_MODELS: HashMap<&'static str, ShipModel> = hashmap!{
+    pub static ref SHIP_MODELS: HashMap<&'static str, ShipModel> = hashmap!{
         "SHIP_COMMAND_FRIGATE" => ShipModel {
             frame: "FRAME_FRIGATE".to_string(),
             reactor: "REACTOR_FISSION_I".to_string(),
             engine: "ENGINE_ION_DRIVE_II".to_string(),
             req_modules: vec![],
             req_mounts: vec![],
+            cargo_capacity: 40,
         },
         "SHIP_PROBE" => ShipModel {
             frame: "FRAME_PROBE".to_string(),
@@ -214,6 +216,7 @@ lazy_static::lazy_static! {
             engine: "ENGINE_IMPULSE_DRIVE_I".to_string(),
             req_modules: vec![],
             req_mounts: vec![],
+            cargo_capacity: 0,
         },
         "SHIP_LIGHT_SHUTTLE" => ShipModel {
             frame: "FRAME_SHUTTLE".to_string(),
@@ -221,6 +224,7 @@ lazy_static::lazy_static! {
             engine: "ENGINE_IMPULSE_DRIVE_I".to_string(),
             req_modules: vec![],
             req_mounts: vec![],
+            cargo_capacity: 40,
         },
         "SHIP_LIGHT_HAULER" => ShipModel {
             frame: "FRAME_LIGHT_FREIGHTER".to_string(),
@@ -228,6 +232,7 @@ lazy_static::lazy_static! {
             engine: "ENGINE_ION_DRIVE_I".to_string(),
             req_modules: vec![],
             req_mounts: vec![],
+            cargo_capacity: 80,
         },
         "SHIP_MINING_DRONE" => ShipModel {
             frame: "FRAME_DRONE".to_string(),
@@ -235,6 +240,7 @@ lazy_static::lazy_static! {
             engine: "ENGINE_IMPULSE_DRIVE_I".to_string(),
             req_modules: vec!["MODULE_MINERAL_PROCESSOR_I".to_string()],
             req_mounts: vec!["MOUNT_MINING_LASER_I".to_string()],
+            cargo_capacity: 15,
         },
         "SHIP_SURVEYOR" => ShipModel {
             frame: "FRAME_DRONE".to_string(),
@@ -242,6 +248,7 @@ lazy_static::lazy_static! {
             engine: "ENGINE_IMPULSE_DRIVE_I".to_string(),
             req_modules: vec![],
             req_mounts: vec!["MOUNT_SURVEYOR_I".to_string()],
+            cargo_capacity: 0,
         },
         "SHIP_SIPHON_DRONE" => ShipModel {
             frame: "FRAME_DRONE".to_string(),
@@ -249,6 +256,7 @@ lazy_static::lazy_static! {
             engine: "ENGINE_IMPULSE_DRIVE_I".to_string(),
             req_modules: vec!["MODULE_GAS_PROCESSOR_I".to_string()],
             req_mounts: vec!["MOUNT_GAS_SIPHON_I".to_string()],
+            cargo_capacity: 15,
         },
     };
 }
@@ -258,13 +266,11 @@ impl Ship {
         // find the model in SHIP_MODELS with matching frame, reactor, and engine
         let matching_models = SHIP_MODELS
             .iter()
+            .filter(|(_, ship_model)| self.frame.symbol == ship_model.frame)
+            .filter(|(_, ship_model)| self.reactor.symbol == ship_model.reactor)
+            .filter(|(_, ship_model)| self.engine.symbol == ship_model.engine)
+            .filter(|(_, ship_model)| self.cargo.capacity == ship_model.cargo_capacity)
             .filter(|(_, ship_model)| {
-                if self.frame.symbol != ship_model.frame
-                    || self.reactor.symbol != ship_model.reactor
-                    || self.engine.symbol != ship_model.engine
-                {
-                    return false;
-                }
                 for module in ship_model.req_modules.iter() {
                     if !self.modules.iter().any(|m| m.symbol == *module) {
                         return false;
