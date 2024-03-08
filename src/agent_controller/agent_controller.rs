@@ -411,6 +411,11 @@ impl AgentController {
         let current_credits = self.ledger.available_credits();
         let cheapest_shipard = shipyards[0].0.clone();
         let can_afford_cheapest = current_credits >= shipyards[0].1 + job_credit_reservation;
+        debug!("try_buy_ship Credits available: {}", current_credits);
+        debug!(
+            "try_buy_ship Extra credits for job reservation: {}",
+            job_credit_reservation
+        );
 
         let static_probes = self.statically_probed_waypoints();
         for (shipyard, cost) in &shipyards {

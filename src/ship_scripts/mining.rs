@@ -73,7 +73,7 @@ pub async fn run_mining_drone(ship: ShipController) {
     ship.goto_waypoint(&asteroid_location).await;
 
     loop {
-        let should_extract = ship.cargo_space_available() > 0;
+        let should_extract = ship.cargo_space_available() >= 4;
         if should_extract {
             // wait for cooldown before taking survey, helps to get a non-exhausted one
             ship.wait_for_cooldown().await;
@@ -154,6 +154,7 @@ pub async fn run_shuttle(ship: ShipController, db: DataClient) {
                                 ship.goto_waypoint(&sell_location).await;
                                 ship.refresh_market().await;
                                 while ship.cargo_good_count(&cargo.symbol) != 0 {
+                                    let holding = ship.cargo_good_count(&cargo.symbol);
                                     let market =
                                         ship.universe.get_market(&sell_location).await.unwrap();
                                     let market_good = market
@@ -162,11 +163,11 @@ pub async fn run_shuttle(ship: ShipController, db: DataClient) {
                                         .iter()
                                         .find(|g| g.symbol == cargo.symbol)
                                         .unwrap();
-                                    let units = min(market_good.trade_volume, cargo.units);
+                                    let units = min(market_good.trade_volume, holding);
                                     assert!(units > 0);
                                     ship.sell_goods(&cargo.symbol, units, false).await;
                                     let new_units = ship.cargo_good_count(&cargo.symbol);
-                                    assert!(new_units == cargo.units - units);
+                                    assert!(new_units == holding - units);
                                     ship.refresh_market().await;
                                 }
                             }
