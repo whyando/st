@@ -54,13 +54,13 @@ impl SurveyManager {
         for deposit in &survey.deposits {
             score += match deposit.symbol.as_str() {
                 // FAB_MATS:
-                "IRON_ORE" => 1.5,
-                "QUARTZ_SAND" => 1.5,
+                "IRON_ORE" => 1.0,
+                "QUARTZ_SAND" => 1.0,
                 // ADVANCED CIRCUITS
-                "COPPER_ORE" => 1.5,
-                "SILICON_CRYSTALS" => 1.5,
-                // USELESS?
-                "ALUMINUM_ORE" => 0.1,
+                "COPPER_ORE" => 1.0,
+                "SILICON_CRYSTALS" => 1.0,
+                // USELESS
+                "ALUMINUM_ORE" => 0.0,
                 "ICE_WATER" => 0.0,
                 _ => panic!("Unexpected deposit symbol: {}", deposit.symbol),
             };

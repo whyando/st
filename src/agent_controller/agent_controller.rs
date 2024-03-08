@@ -51,7 +51,7 @@ pub struct AgentController {
     agent: Arc<Mutex<Agent>>,
     ships: Arc<DashMap<String, Arc<Mutex<Ship>>>>,
 
-    ship_config: Arc<Vec<ShipConfig>>,
+    ship_config: Arc<Mutex<Vec<ShipConfig>>>,
     job_assignments: Arc<DashMap<String, String>>,
     job_assignments_rev: Arc<DashMap<String, String>>,
     // ship_futs: Arc<Mutex<VecDeque<tokio::task::JoinHandle<()>>>>,
@@ -180,25 +180,22 @@ impl AgentController {
             }
             ships
         };
+
+        // // (Debugging system market waypoints)
+        // let mut sorted_waypoints = waypoints
+        //     .iter()
+        //     .filter(|w| w.is_market())
+        //     .collect::<Vec<_>>();
+        // sorted_waypoints.sort_by_cached_key(|w| w.x * w.x + w.y * w.y);
+        // for waypoint in &sorted_waypoints {
+        //     let dist = ((waypoint.x * waypoint.x + waypoint.y * waypoint.y) as f64).sqrt() as i64;
+        //     debug!(
+        //         "{}, {}, ({},{}) ({})",
+        //         waypoint.symbol, waypoint.waypoint_type, waypoint.x, waypoint.y, dist
+        //     );
+        // }
+
         let system_symbol = agent.lock().unwrap().headquarters.system();
-        let waypoints: Vec<Waypoint> = universe.get_system_waypoints(&system_symbol).await;
-
-        // (Debugging system market waypoints)
-        let mut sorted_waypoints = waypoints
-            .iter()
-            .filter(|w| w.is_market())
-            .collect::<Vec<_>>();
-        sorted_waypoints.sort_by_cached_key(|w| w.x * w.x + w.y * w.y);
-        for waypoint in &sorted_waypoints {
-            let dist = ((waypoint.x * waypoint.x + waypoint.y * waypoint.y) as f64).sqrt() as i64;
-            debug!(
-                "{}, {}, ({},{}) ({})",
-                waypoint.symbol, waypoint.waypoint_type, waypoint.x, waypoint.y, dist
-            );
-        }
-
-        // static ship config - later we may allow limited modifications
-        let ship_config: Vec<ShipConfig> = ship_config(&waypoints);
         let job_assignments: DashMap<String, String> = db
             .get_value(&format!("{}/ship_assignments", callsign))
             .await
@@ -228,7 +225,7 @@ impl AgentController {
             listeners: Arc::new(Mutex::new(Vec::new())),
             // ship_futs: Arc::new(Mutex::new(VecDeque::new())),
             hdls: Arc::new(JoinHandles::new()),
-            ship_config: Arc::new(ship_config),
+            ship_config: Arc::new(Mutex::new(vec![])),
             job_assignments: Arc::new(job_assignments),
             job_assignments_rev: Arc::new(job_assignments_rev),
             task_manager: Arc::new(task_manager),
@@ -262,6 +259,13 @@ impl AgentController {
     pub fn num_ships(&self) -> usize {
         self.ships.len()
     }
+    pub fn get_ship_config(&self) -> Vec<ShipConfig> {
+        self.ship_config.lock().unwrap().clone()
+    }
+    pub fn set_ship_config(&self, config: Vec<ShipConfig>) {
+        let mut ship_config = self.ship_config.lock().unwrap();
+        *ship_config = config;
+    }
     pub async fn update_agent(&self, agent_upd: Agent) {
         self.emit_event(&Event::AgentUpdate(agent_upd.clone()))
             .await;
@@ -272,9 +276,11 @@ impl AgentController {
     fn debug(&self, msg: &str) {
         debug!("[{}] {}", self.callsign, msg);
     }
+    // fn ship_config()
 
     pub fn probed_waypoints(&self) -> Vec<(String, Vec<WaypointSymbol>)> {
-        self.ship_config
+        let ship_config = self.ship_config.lock().unwrap();
+        ship_config
             .iter()
             .filter_map(|job| {
                 if let ShipBehaviour::Probe(config) = &job.behaviour {
@@ -290,7 +296,8 @@ impl AgentController {
 
     // Waypoints that are probed, and the probe never leaves that single waypoint
     pub fn statically_probed_waypoints(&self) -> Vec<(String, WaypointSymbol)> {
-        self.ship_config
+        let ship_config = self.ship_config.lock().unwrap();
+        ship_config
             .iter()
             .filter_map(|job| {
                 if let ShipBehaviour::Probe(config) = &job.behaviour {
@@ -372,6 +379,10 @@ impl AgentController {
     // An attempt to buy a single specific ship
     async fn try_buy_ship(&self, purchaser: &Option<String>, job: &ShipConfig) -> BuyShipResult {
         let purchase_criteria = &job.purchase_criteria;
+        debug!(
+            "try_buy_ship ({:?}): {} {} {:?}",
+            purchaser, job.id, job.ship_model, purchase_criteria
+        );
         if purchase_criteria.never_purchase {
             return BuyShipResult::FailedNeverPurchase;
         }
@@ -457,11 +468,8 @@ impl AgentController {
         let _guard = self.try_buy_ships_lock().await;
         let mut purchased_ships = vec![];
 
-        for job in self
-            .ship_config
-            .iter()
-            .filter(|job| !self.job_assigned(&job.id))
-        {
+        let ship_config = self.get_ship_config();
+        for job in ship_config.iter().filter(|job| !self.job_assigned(&job.id)) {
             let result = self.try_buy_ship(&purchaser, &job).await;
             match result {
                 BuyShipResult::Bought(ship_symbol) => {
@@ -481,8 +489,13 @@ impl AgentController {
                 }
                 BuyShipResult::FailedNoPurchaser(waypoint) => {
                     if let Some(waypoint) = waypoint {
+                        debug!(
+                            "Not buying ship {}: no purchaser. Adding task @ {}",
+                            job.ship_model, waypoint
+                        );
                         return (purchased_ships, Some(waypoint));
                     }
+                    debug!("Not buying ship {}: no purchaser", job.ship_model);
                     return (purchased_ships, None);
                 }
             }
@@ -513,6 +526,16 @@ impl AgentController {
             self.hdls.push(join_hdl).await;
             debug!("spawn_broker pushed join_hdl");
         }
+
+        // set initial ship config - has to be static right now, because we don't have a way for
+        // ships to handle the the scenario where their config changes
+        let system = self.starting_system();
+        let waypoints: Vec<Waypoint> = self.universe.get_system_waypoints(&system).await;
+        let markets = self.universe.get_system_markets_remote(&system).await;
+        let shipyards = self.universe.get_system_shipyards_remote(&system).await;
+        let ship_config: Vec<ShipConfig> = ship_config(&waypoints, &markets, &shipyards);
+        self.set_ship_config(ship_config.clone());
+
         for ship in self.ships.iter() {
             let ship_symbol = ship.key().clone();
             if !self.ship_assigned(&ship_symbol) {
@@ -521,7 +544,7 @@ impl AgentController {
         }
         // setup ledger - important to do this before starting ship scripts or buying more ships
         self.ledger.reserve_credits("FUEL", 10000);
-        for ship_config in self.ship_config.iter() {
+        for ship_config in ship_config {
             if let Some(ship_symbol) = &self.job_assignments.get(&ship_config.id) {
                 let ship_symbol: &String = ship_symbol.value();
                 self.reserve_credits_for_job(&ship_config, ship_symbol);
@@ -547,7 +570,8 @@ impl AgentController {
         assert!(!self.job_assignments_rev.contains_key(ship_symbol));
         let ship = self.ships.get(ship_symbol).unwrap();
         let ship_model = { ship.lock().unwrap().model().unwrap() };
-        let job_opt = self.ship_config.iter().find(|job| {
+        let ship_config = self.get_ship_config();
+        let job_opt = ship_config.iter().find(|job| {
             !self.job_assignments.contains_key(&job.id) && job.ship_model == ship_model
         });
         match job_opt {
@@ -587,8 +611,8 @@ impl AgentController {
         debug!("Spawning task for {}", ship_symbol);
         match self.job_assignments_rev.get(&ship_symbol) {
             Some(job_id) => {
-                let job_spec = self
-                    .ship_config
+                let ship_config = self.get_ship_config();
+                let job_spec = ship_config
                     .iter()
                     .find(|s| s.id == *job_id)
                     .expect("job_id not found in ship_config_spec");

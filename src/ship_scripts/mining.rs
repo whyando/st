@@ -114,14 +114,9 @@ enum MiningShuttleState {
 }
 
 lazy_static! {
-    static ref SELL_GOODS: Vec<&'static str> = vec![
-        "SILICON_CRYSTALS",
-        "COPPER_ORE",
-        "IRON_ORE",
-        "QUARTZ_SAND",
-        "ALUMINUM_ORE"
-    ];
-    static ref JETTISON_GOODS: Vec<&'static str> = vec!["ICE_WATER"];
+    static ref SELL_GOODS: Vec<&'static str> =
+        vec!["SILICON_CRYSTALS", "COPPER_ORE", "IRON_ORE", "QUARTZ_SAND",];
+    static ref JETTISON_GOODS: Vec<&'static str> = vec!["ICE_WATER", "ALUMINUM_ORE",];
 }
 
 pub async fn run_shuttle(ship: ShipController, db: DataClient) {

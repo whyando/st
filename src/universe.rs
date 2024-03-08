@@ -122,6 +122,65 @@ impl Universe {
         }
     }
 
+    pub async fn get_system_markets(
+        &self,
+        symbol: &SystemSymbol,
+    ) -> Vec<(MarketRemoteView, Option<Arc<WithTimestamp<Market>>>)> {
+        let waypoints = self.get_system_waypoints(symbol).await;
+        let mut markets = Vec::new();
+        for waypoint in &waypoints {
+            if waypoint.is_market() {
+                let market_remote = self.get_market_remote(&waypoint.symbol).await;
+                let market_opt = self.get_market(&waypoint.symbol).await;
+                markets.push((market_remote, market_opt));
+            }
+        }
+        markets
+    }
+
+    pub async fn get_system_shipyards(
+        &self,
+        symbol: &SystemSymbol,
+    ) -> Vec<(ShipyardRemoteView, Option<Arc<WithTimestamp<Shipyard>>>)> {
+        let waypoints = self.get_system_waypoints(symbol).await;
+        let mut shipyards = Vec::new();
+        for waypoint in &waypoints {
+            if waypoint.is_shipyard() {
+                let shipyard_remote = self.get_shipyard_remote(&waypoint.symbol).await;
+                let shipyard_opt = self.get_shipyard(&waypoint.symbol).await;
+                shipyards.push((shipyard_remote, shipyard_opt));
+            }
+        }
+        shipyards
+    }
+
+    pub async fn get_system_markets_remote(&self, symbol: &SystemSymbol) -> Vec<MarketRemoteView> {
+        let waypoints = self.get_system_waypoints(symbol).await;
+        let mut markets = Vec::new();
+        for waypoint in &waypoints {
+            if waypoint.is_market() {
+                let market_remote = self.get_market_remote(&waypoint.symbol).await;
+                markets.push(market_remote);
+            }
+        }
+        markets
+    }
+
+    pub async fn get_system_shipyards_remote(
+        &self,
+        symbol: &SystemSymbol,
+    ) -> Vec<ShipyardRemoteView> {
+        let waypoints = self.get_system_waypoints(symbol).await;
+        let mut shipyards = Vec::new();
+        for waypoint in &waypoints {
+            if waypoint.is_shipyard() {
+                let shipyard_remote = self.get_shipyard_remote(&waypoint.symbol).await;
+                shipyards.push(shipyard_remote);
+            }
+        }
+        shipyards
+    }
+
     // get waypoints, but don't use api
     pub async fn get_system_waypoints_no_fetch(
         &self,

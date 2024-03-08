@@ -18,28 +18,34 @@ fn inner_market_waypoints(waypoints: &Vec<Waypoint>) -> Vec<WaypointSymbol> {
         .collect()
 }
 
-pub fn ship_config(waypoints: &Vec<Waypoint>) -> Vec<ShipConfig> {
+pub fn ship_config(
+    waypoints: &Vec<Waypoint>,
+    _markets: &Vec<MarketRemoteView>,
+    _shipyards: &Vec<ShipyardRemoteView>,
+) -> Vec<ShipConfig> {
     let mut ships = vec![];
 
     let inner_market_waypoints = inner_market_waypoints(waypoints);
 
     // Command frigate trades on logistics planner, but is restricted to 200 units from origin
-    ships.push(ShipConfig {
-        id: "cmd".to_string(),
-        ship_model: "SHIP_COMMAND_FRIGATE".to_string(),
-        purchase_criteria: PurchaseCriteria {
-            never_purchase: true,
-            ..PurchaseCriteria::default()
+    ships.push((
+        (1.0, 0.0),
+        ShipConfig {
+            id: "cmd".to_string(),
+            ship_model: "SHIP_COMMAND_FRIGATE".to_string(),
+            purchase_criteria: PurchaseCriteria {
+                never_purchase: true,
+                ..PurchaseCriteria::default()
+            },
+            behaviour: ShipBehaviour::Logistics(LogisticsScriptConfig {
+                use_planner: true,
+                waypoint_allowlist: Some(inner_market_waypoints.clone()),
+                allow_shipbuying: true,
+                allow_market_refresh: true,
+                allow_construction: false,
+            }),
         },
-        behaviour: ShipBehaviour::Logistics(LogisticsScriptConfig {
-            use_planner: true,
-            waypoint_allowlist: Some(inner_market_waypoints.clone()),
-            allow_shipbuying: true,
-            allow_market_refresh: true,
-            allow_construction: false,
-        }),
-        era: 1,
-    });
+    ));
 
     // Send probes to all inner markets with shipyards getting priority
     // probes rotate through all waypoints at a location
@@ -48,60 +54,71 @@ pub fn ship_config(waypoints: &Vec<Waypoint>) -> Vec<ShipConfig> {
         .iter()
         .filter(|w| inner_market_waypoints.contains(&w.symbol))
     {
-        let loc = format!("({},{})", w.x, w.y);
-        let e = probe_locations.entry(loc).or_insert((vec![], false));
-        e.0.push(w.symbol.clone());
-        if w.is_shipyard() {
-            e.1 = true;
-        }
-    }
-    for (loc, (waypoints, has_shipyard)) in probe_locations {
-        let era = if has_shipyard { 2 } else { 3 };
-        let config = ProbeScriptConfig { waypoints };
-        ships.push(ShipConfig {
-            id: format!("probe/{}", loc),
-            ship_model: "SHIP_PROBE".to_string(),
-            behaviour: ShipBehaviour::Probe(config),
-            purchase_criteria: PurchaseCriteria {
-                allow_logistic_task: true,
-                require_cheapest: false,
-                ..PurchaseCriteria::default()
-            },
-            era,
+        let loc = if w.is_shipyard() {
+            w.symbol.to_string()
+        } else {
+            format!("({},{})", w.x, w.y)
+        };
+        let e = probe_locations.entry(loc).or_insert_with(|| {
+            let dist = ((w.x * w.x + w.y * w.y) as f64).sqrt() as i64;
+            (vec![], w.is_shipyard(), dist)
         });
+        e.0.push(w.symbol.clone());
+    }
+    for (loc, (waypoints, has_shipyard, dist)) in probe_locations {
+        let config = ProbeScriptConfig { waypoints };
+        let order = -10000.0 * (has_shipyard as i64 as f64) + (dist as f64);
+        ships.push((
+            (2.0, order),
+            ShipConfig {
+                id: format!("probe/{}", loc),
+                ship_model: "SHIP_PROBE".to_string(),
+                behaviour: ShipBehaviour::Probe(config),
+                purchase_criteria: PurchaseCriteria {
+                    allow_logistic_task: true,
+                    require_cheapest: false,
+                    ..PurchaseCriteria::default()
+                },
+            },
+        ));
     }
 
     // Mining operation
     const NUM_SURVEYORS: i64 = 1;
     const NUM_MINING_DRONES: i64 = 8;
     const NUM_MINING_SHUTTLES: i64 = 2;
-    const ERA_WIDTH: i64 = 8;
     for i in 0..NUM_SURVEYORS {
-        ships.push(ShipConfig {
-            id: format!("surveyor/{}", i),
-            ship_model: "SHIP_SURVEYOR".to_string(),
-            purchase_criteria: PurchaseCriteria::default(),
-            behaviour: ShipBehaviour::MiningSurveyor,
-            era: 4 + (ERA_WIDTH * i) / NUM_SURVEYORS,
-        });
+        ships.push((
+            (3.0, (i as f64) / (NUM_SURVEYORS as f64)),
+            ShipConfig {
+                id: format!("surveyor/{}", i),
+                ship_model: "SHIP_SURVEYOR".to_string(),
+                purchase_criteria: PurchaseCriteria::default(),
+                behaviour: ShipBehaviour::MiningSurveyor,
+            },
+        ));
     }
     for i in 0..NUM_MINING_DRONES {
-        ships.push(ShipConfig {
-            id: format!("mining_drone/{}", i),
-            ship_model: "SHIP_MINING_DRONE".to_string(),
-            purchase_criteria: PurchaseCriteria::default(),
-            behaviour: ShipBehaviour::MiningDrone,
-            era: 4 + (ERA_WIDTH * i) / NUM_MINING_DRONES,
-        });
+        ships.push((
+            (3.0, (i as f64) / (NUM_MINING_DRONES as f64)),
+            ShipConfig {
+                id: format!("mining_drone/{}", i),
+                ship_model: "SHIP_MINING_DRONE".to_string(),
+                purchase_criteria: PurchaseCriteria::default(),
+                behaviour: ShipBehaviour::MiningDrone,
+            },
+        ));
     }
     for i in 0..NUM_MINING_SHUTTLES {
-        ships.push(ShipConfig {
-            id: format!("mining_shuttle/{}", i),
-            ship_model: "SHIP_LIGHT_HAULER".to_string(),
-            purchase_criteria: PurchaseCriteria::default(),
-            behaviour: ShipBehaviour::MiningShuttle,
-            era: 4 + (ERA_WIDTH * i) / NUM_MINING_SHUTTLES,
-        });
+        ships.push((
+            (3.0, (i as f64) / (NUM_MINING_SHUTTLES as f64)),
+            ShipConfig {
+                id: format!("mining_shuttle/{}", i),
+                ship_model: "SHIP_LIGHT_HAULER".to_string(),
+                purchase_criteria: PurchaseCriteria::default(),
+                behaviour: ShipBehaviour::MiningShuttle,
+            },
+        ));
     }
 
     // todo: Dedicated hauler for building jump gate
@@ -111,8 +128,8 @@ pub fn ship_config(waypoints: &Vec<Waypoint>) -> Vec<ShipConfig> {
     // 3 logistic haulers
     // 5 siphons + 1 hauler
 
-    ships.sort_by_key(|c| c.era);
-    ships
+    ships.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    ships.into_iter().map(|(_, c)| c).collect()
 }
 
 // pub fn ship_config(waypoints: &Vec<Waypoint>) -> Vec<ShipConfig> {

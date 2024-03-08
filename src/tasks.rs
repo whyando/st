@@ -118,6 +118,8 @@ impl LogisticTaskManager {
 
         let mut tasks = Vec::new();
 
+        // !! one day recalculate ship config here perhaps
+
         // execute contract actions + generate tasks
         // (todo)
 
@@ -146,20 +148,12 @@ impl LogisticTaskManager {
         }
 
         // load markets
-        let mut markets = Vec::new();
-        let mut shipyards = Vec::new();
-        for waypoint in &waypoints {
-            if waypoint.is_market() {
-                let market_remote = self.universe.get_market_remote(&waypoint.symbol).await;
-                let market_opt = self.universe.get_market(&waypoint.symbol).await;
-                markets.push((market_remote, market_opt));
-            }
-            if waypoint.is_shipyard() {
-                let shipyard_remote = self.universe.get_shipyard_remote(&waypoint.symbol).await;
-                let shipyard_opt = self.universe.get_shipyard(&waypoint.symbol).await;
-                shipyards.push((shipyard_remote, shipyard_opt));
-            }
-        }
+        let markets = self.universe.get_system_markets(&self.system_symbol).await;
+        let shipyards = self
+            .universe
+            .get_system_shipyards(&self.system_symbol)
+            .await;
+
         // unique list of goods
         let mut goods = BTreeSet::new();
         for (_, market_opt) in &markets {

@@ -128,7 +128,7 @@ pub struct ShipConfig {
     pub ship_model: String,
     pub purchase_criteria: PurchaseCriteria,
     pub behaviour: ShipBehaviour,
-    pub era: i64, // purchase/assignment priority
+    // pub era: i64, // purchase/assignment priority
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

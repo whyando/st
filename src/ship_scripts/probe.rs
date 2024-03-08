@@ -20,10 +20,10 @@ pub async fn run(ship_controller: ShipController, config: &ProbeScriptConfig) {
     }
 }
 
-// Refresh logic is less rate limit efficient
+// Roaming refresh logic is less rate limit efficient
 // - doesn't take into account whether the market has been refreshed recently
 // - uses extra api requests to move between waypoints
-// Additionally, cannot be used to buy ships, outside of this script
+// Additionally, cannot be used to buy ships
 pub async fn probe_multiple_locations(ship: ShipController, config: &ProbeScriptConfig) {
     let waypoint_symbols = config
         .waypoints
@@ -48,7 +48,7 @@ pub async fn probe_multiple_locations(ship: ShipController, config: &ProbeScript
     let rand_start_sleep = rand::random::<u64>() % 60;
     tokio::time::sleep(tokio::time::Duration::from_secs(rand_start_sleep)).await;
     let mut last_cycle_start: Option<DateTime<Utc>> = None;
-    for waypoint in waypoints {
+    loop {
         if let Some(last_cycle_start) = last_cycle_start {
             let sleep_duration =
                 last_cycle_start + Duration::try_minutes(15).unwrap() - chrono::Utc::now();
@@ -58,24 +58,26 @@ pub async fn probe_multiple_locations(ship: ShipController, config: &ProbeScript
             }
         }
         last_cycle_start = Some(chrono::Utc::now());
-        ship.navigate(ShipFlightMode::Cruise, &waypoint.symbol)
-            .await;
-        ship.refresh_market().await;
-
-        if waypoint.is_shipyard() {
-            ship.refresh_shipyard().await;
-
-            // Try to buy ships
-            info!("Starting routine buy task for probe {}", ship.ship_symbol);
-            ship.dock().await; // don't need to dock, but do so anyway to clear 'InTransit' status
-            let (bought, _shipyard_waypoints) = ship
-                .agent_controller
-                .try_buy_ships(Some(ship.ship_symbol.clone()))
+        for waypoint in &waypoints {
+            ship.navigate(ShipFlightMode::Cruise, &waypoint.symbol)
                 .await;
-            info!("Routine buy task resulted in {} ships bought", bought.len());
-            for ship_symbol in bought {
-                debug!("{} Bought ship {}", ship.ship_symbol, ship_symbol);
-                ship.agent_controller._spawn_run_ship(ship_symbol).await;
+            ship.refresh_market().await;
+
+            if waypoint.is_shipyard() {
+                ship.refresh_shipyard().await;
+
+                // // Try to buy ships
+                // info!("Starting routine buy task for probe {}", ship.ship_symbol);
+                // ship.dock().await; // don't need to dock, but do so anyway to clear 'InTransit' status
+                // let (bought, _shipyard_waypoints) = ship
+                //     .agent_controller
+                //     .try_buy_ships(Some(ship.ship_symbol.clone()))
+                //     .await;
+                // info!("Routine buy task resulted in {} ships bought", bought.len());
+                // for ship_symbol in bought {
+                //     debug!("{} Bought ship {}", ship.ship_symbol, ship_symbol);
+                //     ship.agent_controller._spawn_run_ship(ship_symbol).await;
+                // }
             }
         }
     }
