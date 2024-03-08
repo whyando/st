@@ -245,9 +245,12 @@ impl ShipController {
         self.update_cargo(cargo).await;
         self.agent_controller.update_agent(agent).await;
         if adjust_reserved_credits {
-            self.agent_controller
-                .ledger
-                .reserve_credits_delta(&self.ship_symbol, -transaction.total_price);
+            self.agent_controller.ledger.register_goods_change(
+                &self.ship_symbol,
+                &transaction.trade_symbol,
+                units,
+                transaction.price_per_unit,
+            );
         }
 
         self.debug(&format!(
@@ -276,9 +279,12 @@ impl ShipController {
         self.update_cargo(cargo).await;
         self.agent_controller.update_agent(agent).await;
         if adjust_reserved_credits {
-            self.agent_controller
-                .ledger
-                .reserve_credits_delta(&self.ship_symbol, transaction.total_price);
+            self.agent_controller.ledger.register_goods_change(
+                &self.ship_symbol,
+                &transaction.trade_symbol,
+                -units,
+                transaction.price_per_unit,
+            );
         }
         self.debug(&format!(
             "SOLD {} {} for ${} (total ${})",

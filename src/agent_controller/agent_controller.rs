@@ -244,8 +244,8 @@ impl AgentController {
             callsign, credits, num_ships
         );
         info!(
-            "{} reserved credits, {} available",
-            agent_controller.ledger.reserved_credits(),
+            "{} effective reserved credits, {} available",
+            agent_controller.ledger.effective_reserved_credits(),
             agent_controller.ledger.available_credits()
         );
         agent_controller
@@ -536,6 +536,30 @@ impl AgentController {
         let ship_config: Vec<ShipConfig> = ship_config(&waypoints, &markets, &shipyards);
         self.set_ship_config(ship_config.clone());
 
+        // Unassign
+        let mut keys_to_remove = Vec::new();
+        for it in self.job_assignments.iter() {
+            let (job_id, ship_symbol) = it.pair();
+            let job_exists = ship_config.iter().any(|job| job.id == *job_id);
+            if !job_exists {
+                // if the job no longer exists, unassign the ship,
+                // May be risky because we don't know if the ship is in the middle of a task
+                warn!("Unassigning ship {} from job {}", ship_symbol, job_id);
+                keys_to_remove.push((job_id.clone(), ship_symbol.clone()));
+            }
+        }
+        for (job_id, ship_symbol) in keys_to_remove {
+            self.job_assignments.remove(&job_id);
+            self.job_assignments_rev.remove(&ship_symbol);
+        }
+        self.db
+            .set_value(
+                &format!("{}/ship_assignments", self.callsign),
+                self.job_assignments.deref(),
+            )
+            .await;
+
+        // Assign
         for ship in self.ships.iter() {
             let ship_symbol = ship.key().clone();
             if !self.ship_assigned(&ship_symbol) {
@@ -615,7 +639,7 @@ impl AgentController {
                 let job_spec = ship_config
                     .iter()
                     .find(|s| s.id == *job_id)
-                    .expect("job_id not found in ship_config_spec");
+                    .unwrap_or_else(|| panic!("No job found for {}", *job_id));
                 // run script for assigned job
                 let join_hdl = match &job_spec.behaviour {
                     ShipBehaviour::Probe(config) => {
