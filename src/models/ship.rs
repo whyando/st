@@ -28,7 +28,19 @@ pub struct ShipNav {
     pub waypoint_symbol: WaypointSymbol,
     pub route: ShipNavRoute,
     pub status: ShipNavStatus,
-    pub flight_mode: String,
+    pub flight_mode: ShipFlightMode,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ShipFlightMode {
+    #[serde(rename = "CRUISE")]
+    Cruise,
+    #[serde(rename = "BURN")]
+    Burn,
+    #[serde(rename = "DRIFT")]
+    Drift,
+    #[serde(rename = "STEALTH")]
+    Stealth,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -45,7 +45,7 @@ impl ShipController {
     pub fn symbol(&self) -> String {
         self.ship_symbol.clone()
     }
-    pub fn flight_mode(&self) -> String {
+    pub fn flight_mode(&self) -> ShipFlightMode {
         let ship = self.ship.lock().unwrap();
         ship.nav.flight_mode.clone()
     }
@@ -161,6 +161,20 @@ impl ShipController {
         let uri = format!("/my/ships/{}/dock", self.ship_symbol);
         let mut response: Value = self.api_client.post(&uri, &json!({})).await;
         let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
+        self.update_nav(nav);
+    }
+
+    pub async fn set_flight_mode(&self, mode: ShipFlightMode) {
+        if self.flight_mode() == mode {
+            return;
+        }
+        self.debug(&format!("Setting flight mode to {:?}", mode));
+        let uri = format!("/my/ships/{}/nav", self.ship_symbol);
+        let mut response: Value = self
+            .api_client
+            .patch(&uri, &json!({ "flightMode": mode }))
+            .await;
+        let nav = serde_json::from_value(response["data"].take()).unwrap();
         self.update_nav(nav);
     }
 
@@ -343,11 +357,12 @@ impl ShipController {
         self.agent_controller.update_agent(agent);
     }
 
-    pub async fn navigate(&self, waypoint: &WaypointSymbol) {
+    pub async fn navigate(&self, flight_mode: ShipFlightMode, waypoint: &WaypointSymbol) {
         assert!(!self.is_in_transit(), "Ship is already in transit");
         if self.waypoint() == *waypoint {
             return;
         }
+        self.set_flight_mode(flight_mode).await;
         self.orbit().await;
         self.debug(&format!("Navigating to waypoint: {}", waypoint));
         let uri = format!("/my/ships/{}/navigate", self.ship_symbol);
@@ -378,7 +393,7 @@ impl ShipController {
         for (waypoint, edge, a_market, b_market) in route.hops {
             // calculate fuel required before leaving
             let required_fuel = if b_market {
-                edge.fuel_cost // @@ won't be true once we use BURN
+                edge.fuel_cost
             } else {
                 assert!(waypoint == *target);
                 edge.fuel_cost + route.req_terminal_fuel
@@ -387,8 +402,7 @@ impl ShipController {
                 assert!(a_market);
                 self.refuel(required_fuel).await;
             }
-            self.navigate(&waypoint).await;
-            self.wait_for_transit().await;
+            self.navigate(edge.flight_mode, &waypoint).await;
             self.debug(&format!("Arrived at waypoint: {}", waypoint));
         }
     }

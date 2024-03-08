@@ -1,10 +1,11 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use crate::models::{Waypoint, WaypointSymbol};
+use crate::models::{ShipFlightMode, Waypoint, WaypointSymbol};
 use std::cmp::max;
 
 #[allow(non_snake_case)]
 const CRUISE_NAV_MODIFIER: f64 = 25.0;
+const BURN_NAV_MODIFIER: f64 = 12.5;
 
 #[derive(Debug)]
 pub struct Pathfinding {
@@ -107,8 +108,7 @@ impl Pathfinding {
                             if x_symbol == y_symbol {
                                 return None;
                             }
-                            let e = edge(x, y, speed);
-                            if e.fuel_cost <= fuel_capacity {
+                            if let Some(e) = edge(x, y, speed, fuel_capacity) {
                                 Some((y_symbol.clone(), e.travel_duration))
                             } else {
                                 None
@@ -125,8 +125,7 @@ impl Pathfinding {
                         .iter()
                         .filter(|(_y_symbol, y)| y.is_market())
                         .filter_map(|(y_symbol, y)| {
-                            let e = edge(x, y, speed);
-                            if e.fuel_cost <= start_fuel {
+                            if let Some(e) = edge(x, y, speed, start_fuel) {
                                 Some((y_symbol.clone(), e.travel_duration))
                             } else {
                                 None
@@ -137,15 +136,13 @@ impl Pathfinding {
                 }
                 // add market -> non-market edge ( fuel_cost <= max_fuel - req_escape_fuel )
                 if !dest_is_market && x_symbol != dest_symbol {
-                    let e = edge(x, dst, speed);
-                    if e.fuel_cost <= fuel_capacity - req_escape_fuel {
+                    if let Some(e) = edge(x, dst, speed, fuel_capacity - req_escape_fuel) {
                         edges.push((dest_symbol.clone(), e.travel_duration));
                     }
                 }
                 // finally add non-market -> non-market edge ( fuel_cost <= start_fuel - req_escape_fuel )
                 if !src_is_market && !dest_is_market && x_symbol == src_symbol {
-                    let e = edge(src, dst, speed);
-                    if e.fuel_cost <= start_fuel - req_escape_fuel {
+                    if let Some(e) = edge(src, dst, speed, start_fuel - req_escape_fuel) {
                         edges.push((dest_symbol.clone(), e.travel_duration));
                     }
                 }
@@ -162,7 +159,13 @@ impl Pathfinding {
             .map(|(a_symbol, b_symbol)| {
                 let a = self.waypoints.get(a_symbol).unwrap();
                 let b = self.waypoints.get(b_symbol).unwrap();
-                let e = edge(a, b, speed);
+                let fuel_max = match (a.is_market(), b.is_market()) {
+                    (true, true) => fuel_capacity,
+                    (true, false) => fuel_capacity - req_escape_fuel,
+                    (false, true) => start_fuel,
+                    (false, false) => start_fuel - req_escape_fuel,
+                };
+                let e = edge(a, b, speed, fuel_max).unwrap();
                 (b_symbol.clone(), e, a.is_market(), b.is_market())
             })
             .collect();
@@ -183,16 +186,34 @@ pub struct Edge {
     pub distance: i64,
     pub travel_duration: i64,
     pub fuel_cost: i64,
+    pub flight_mode: ShipFlightMode,
 }
 
-pub fn edge(a: &Waypoint, b: &Waypoint, speed: i64) -> Edge {
+pub fn edge(a: &Waypoint, b: &Waypoint, speed: i64, fuel_max: i64) -> Option<Edge> {
     let distance = distance(a, b);
-    let travel_duration =
-        (15.0 + CRUISE_NAV_MODIFIER / (speed as f64) * (distance as f64)).round() as i64;
-    let fuel_cost = distance as i64;
-    Edge {
-        distance,
-        travel_duration,
-        fuel_cost,
+
+    // burn
+    if 2 * distance <= fuel_max {
+        let travel_duration =
+            (15.0 + BURN_NAV_MODIFIER / (speed as f64) * (distance as f64)).round() as i64;
+        return Some(Edge {
+            distance,
+            travel_duration,
+            fuel_cost: 2 * distance,
+            flight_mode: ShipFlightMode::Burn,
+        });
     }
+
+    // cruise
+    if distance <= fuel_max {
+        let travel_duration =
+            (15.0 + CRUISE_NAV_MODIFIER / (speed as f64) * (distance as f64)).round() as i64;
+        return Some(Edge {
+            distance,
+            travel_duration,
+            fuel_cost: distance,
+            flight_mode: ShipFlightMode::Cruise,
+        });
+    }
+    None
 }
