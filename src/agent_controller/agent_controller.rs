@@ -100,12 +100,13 @@ impl AgentController {
         assert!(listeners.len() <= 1);
     }
 
-    pub fn emit_event_blocking(&self, event: &Event) {
-        let listeners = { self.listeners.lock().unwrap().clone() };
-        for listener in listeners.iter() {
-            listener.blocking_send(event.clone()).unwrap();
-        }
-    }
+    // definitely causing issues
+    // pub fn emit_event_blocking(&self, event: &Event) {
+    //     let listeners = { self.listeners.lock().unwrap().clone() };
+    //     for listener in listeners.iter() {
+    //         listener.blocking_send(event.clone()).unwrap();
+    //     }
+    // }
     pub async fn emit_event(&self, event: &Event) {
         let listeners = { self.listeners.lock().unwrap().clone() };
         for listener in listeners.iter() {
@@ -121,8 +122,6 @@ impl AgentController {
         units: i64,
     ) {
         debug!("agent_controller::transfer_cargo");
-        let src_ship = self.ships.get(&src_ship_symbol).unwrap();
-        let dest_ship = self.ships.get(&dest_ship_symbol).unwrap();
 
         self.debug(&format!(
             "Transferring {} -> {} {} {}",
@@ -136,22 +135,28 @@ impl AgentController {
         });
         let mut response: Value = self.api_client.post(&uri, &body).await;
         let cargo: ShipCargo = serde_json::from_value(response["data"]["cargo"].take()).unwrap();
-        let mut src_ship = src_ship.lock().unwrap();
-        let mut dest_ship = dest_ship.lock().unwrap();
-
-        let transferred: ShipCargoItem = {
-            let mut x = src_ship
-                .cargo
-                .inventory
-                .iter()
-                .find(|x| x.symbol == good)
-                .unwrap()
-                .clone();
-            x.units = units;
-            x
+        let (src_ship, dest_ship) = {
+            let src_ship = self.ships.get(&src_ship_symbol).unwrap();
+            let dest_ship = self.ships.get(&dest_ship_symbol).unwrap();
+            let mut src_ship = src_ship.lock().unwrap();
+            let mut dest_ship = dest_ship.lock().unwrap();
+            let transferred: ShipCargoItem = {
+                let mut x = src_ship
+                    .cargo
+                    .inventory
+                    .iter()
+                    .find(|x| x.symbol == good)
+                    .unwrap()
+                    .clone();
+                x.units = units;
+                x
+            };
+            src_ship.cargo = cargo;
+            dest_ship.incr_cargo(transferred);
+            (src_ship.clone(), dest_ship.clone())
         };
-        src_ship.cargo = cargo;
-        dest_ship.incr_cargo(transferred);
+        self.emit_event(&Event::ShipUpdate(src_ship)).await;
+        self.emit_event(&Event::ShipUpdate(dest_ship)).await;
         debug!("agent_controller::transfer_cargo done");
     }
 
@@ -257,11 +262,12 @@ impl AgentController {
     pub fn num_ships(&self) -> usize {
         self.ships.len()
     }
-    pub fn update_agent(&self, agent_upd: Agent) {
+    pub async fn update_agent(&self, agent_upd: Agent) {
+        self.emit_event(&Event::AgentUpdate(agent_upd.clone()))
+            .await;
         let mut agent = self.agent.lock().unwrap();
         *agent = agent_upd;
         self.ledger.set_credits(agent.credits);
-        self.emit_event_blocking(&Event::AgentUpdate(agent.clone()));
     }
     fn debug(&self, msg: &str) {
         debug!("[{}] {}", self.callsign, msg);
@@ -321,7 +327,7 @@ impl AgentController {
         // let transaction = response["data"]["transaction"].take();
         let ship_symbol = ship.symbol.clone();
         self.debug(&format!("Successfully bought ship {}", ship_symbol));
-        self.update_agent(agent);
+        self.update_agent(agent).await;
         self.ships
             .insert(ship_symbol.clone(), Arc::new(Mutex::new(ship)));
         ship_symbol
