@@ -119,7 +119,8 @@ pub struct ShipFrame {
     pub module_slots: i64,
     pub mounting_points: i64,
     pub fuel_capacity: i64,
-    pub condition: Option<i64>,
+    pub condition: Option<f64>,
+    pub integrity: Option<f64>,
     pub requirements: ShipRequirements,
 }
 
@@ -140,7 +141,8 @@ pub struct ShipReactor {
     pub symbol: String,
     pub name: String,
     pub description: String,
-    pub condition: Option<i64>,
+    pub condition: Option<f64>,
+    pub integrity: Option<f64>,
     pub power_output: i64,
     pub requirements: ShipRequirements,
 }
@@ -151,7 +153,8 @@ pub struct ShipEngine {
     pub symbol: String,
     pub name: String,
     pub description: String,
-    pub condition: Option<i64>,
+    pub condition: Option<f64>,
+    pub integrity: Option<f64>,
     pub speed: i64,
     pub requirements: ShipRequirements,
 }

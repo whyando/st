@@ -164,6 +164,14 @@ pub struct KeyedSurvey {
     pub survey: Survey,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShipConditionEvent {
+    pub symbol: String,
+    pub component: String,
+    pub name: String,
+    pub description: String,
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

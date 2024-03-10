@@ -383,6 +383,8 @@ impl ShipController {
             .await;
         let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
         let fuel = serde_json::from_value(response["data"]["fuel"].take()).unwrap();
+        let events = serde_json::from_value(response["data"]["events"].take()).unwrap();
+        self.handle_ship_condition_events(&events);
         self.update_nav(nav).await;
         self.update_fuel(fuel).await;
         self.wait_for_transit().await;
@@ -462,6 +464,7 @@ impl ShipController {
         self.debug(&format!("Refreshing shipyard at waypoint {}", &waypoint));
         let uri = format!("/systems/{}/waypoints/{}/shipyard", &system, &waypoint);
         let mut response: Value = self.api_client.get(&uri).await;
+        debug!("{}", response.to_string());
         let shipyard: Shipyard = serde_json::from_value(response["data"].take()).unwrap();
         let shipyard = WithTimestamp::<Shipyard> {
             timestamp: chrono::Utc::now(),
@@ -595,6 +598,8 @@ impl ShipController {
         let siphon: Value = serde_json::from_value(response["data"]["siphon"].take()).unwrap();
         let good = siphon["yield"]["symbol"].as_str().unwrap();
         let units = siphon["yield"]["units"].as_i64().unwrap();
+        let events = serde_json::from_value(response["data"]["events"].take()).unwrap();
+        self.handle_ship_condition_events(&events);
         self.debug(&format!("Siphoned {} units of {}", units, good));
         self.update_cooldown(cooldown).await;
         self.update_cargo(cargo).await;
@@ -622,6 +627,8 @@ impl ShipController {
                     serde_json::from_value(response["data"]["cooldown"].take()).unwrap();
                 let extraction: Value =
                     serde_json::from_value(response["data"]["extraction"].take()).unwrap();
+                let events = serde_json::from_value(response["data"]["events"].take()).unwrap();
+                self.handle_ship_condition_events(&events);
                 let good = extraction["yield"]["symbol"].as_str().unwrap();
                 let units = extraction["yield"]["units"].as_i64().unwrap();
                 self.debug(&format!("Extracted {} units of {}", units, good));
@@ -666,5 +673,11 @@ impl ShipController {
                 resp_body
             ),
         };
+    }
+
+    pub fn handle_ship_condition_events(&self, events: &Vec<ShipConditionEvent>) {
+        for e in events {
+            self.debug(&format!("ENCOUNTERED SHIP EVENT: {:?}", e));
+        }
     }
 }
