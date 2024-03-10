@@ -40,9 +40,9 @@ async fn main() -> std::io::Result<()> {
         let val = format!("{}-{}", agent.starting_faction, agent.headquarters);
         let hq = headquarters.entry(val).or_insert((0, 0, 0));
 
-        if agent.credits <= 175000 && agent.ship_count == 2 {
-            continue;
-        }
+        // if agent.credits <= 175000 && agent.ship_count == 2 {
+        //     continue;
+        // }
         writeln!(
             &mut f,
             "{}\t{}\t{}\t{}",

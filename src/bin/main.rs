@@ -31,6 +31,7 @@ async fn main() {
             token
         }
     };
+    log::info!("Setting token {}", agent_token);
     api_client.set_agent_token(&agent_token);
 
     let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
