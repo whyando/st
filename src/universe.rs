@@ -300,14 +300,14 @@ impl Universe {
     pub async fn search_waypoints(
         &self,
         system_symbol: &SystemSymbol,
-        filters: Vec<WaypointFilter>,
+        filters: &[WaypointFilter],
     ) -> Vec<Waypoint> {
         let waypoints = self.get_system_waypoints(system_symbol).await;
         let mut filtered = Vec::new();
         for waypoint in waypoints {
             // matches_filter is async
             let mut matches = true;
-            for filter in &filters {
+            for filter in filters {
                 if !self.matches_filter(&waypoint, filter).await {
                     matches = false;
                     break;

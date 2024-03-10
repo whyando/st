@@ -22,7 +22,7 @@ pub async fn get_export_market(ship: &ShipController, good: &str) -> WaypointSym
     let filters = vec![WaypointFilter::Exports(good.to_string())];
     let waypoints = ship
         .universe
-        .search_waypoints(&ship.system(), filters)
+        .search_waypoints(&ship.system(), &filters)
         .await;
     assert!(waypoints.len() == 1);
     waypoints[0].symbol.clone()
@@ -31,7 +31,7 @@ pub async fn get_export_market(ship: &ShipController, good: &str) -> WaypointSym
 pub async fn get_jump_gate(ship: &ShipController) -> WaypointSymbol {
     let waypoints = ship
         .universe
-        .search_waypoints(&ship.system(), vec![WaypointFilter::JumpGate])
+        .search_waypoints(&ship.system(), &vec![WaypointFilter::JumpGate])
         .await;
     assert!(waypoints.len() == 1);
     waypoints[0].symbol.clone()

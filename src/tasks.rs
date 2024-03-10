@@ -8,7 +8,7 @@ use crate::models::MarketSupply::*;
 use crate::models::MarketType::*;
 use crate::models::*;
 use crate::models::{LogisticsScriptConfig, MarketActivity::*};
-use crate::universe::Universe;
+use crate::universe::{Universe, WaypointFilter};
 use chrono::{DateTime, Duration, Utc};
 use dashmap::DashMap;
 use log::*;
@@ -169,15 +169,136 @@ impl LogisticTaskManager {
             .iter()
             .find(|w| w.is_jump_gate())
             .expect("Star system has no jump gate");
-        let mut blacklist_trade_goods = BTreeSet::new();
+        let mut good_import_permits = BTreeMap::<String, Vec<WaypointSymbol>>::new();
+
         let construction = self.universe.get_construction(&jump_gate.symbol).await;
         if let Some(construction) = &construction.data {
+            let fab_mat_market = self
+                .universe
+                .search_waypoints(
+                    &self.system_symbol,
+                    &[
+                        WaypointFilter::Imports("QUARTZ_SAND".to_string()),
+                        WaypointFilter::Imports("IRON".to_string()),
+                        WaypointFilter::Exports("FAB_MATS".to_string()),
+                    ],
+                )
+                .await;
+            assert_eq!(fab_mat_market.len(), 1);
+            let fab_mat_market = &fab_mat_market[0].symbol;
+            let smeltery_market = self
+                .universe
+                .search_waypoints(
+                    &self.system_symbol,
+                    &[
+                        WaypointFilter::Imports("IRON_ORE".to_string()),
+                        WaypointFilter::Imports("COPPER_ORE".to_string()),
+                        WaypointFilter::Exports("IRON".to_string()),
+                        WaypointFilter::Exports("COPPER".to_string()),
+                    ],
+                )
+                .await;
+            assert_eq!(smeltery_market.len(), 1);
+            let smeltery_market = &smeltery_market[0].symbol;
+            let adv_circuit_market = self
+                .universe
+                .search_waypoints(
+                    &self.system_symbol,
+                    &[
+                        WaypointFilter::Imports("ELECTRONICS".to_string()),
+                        WaypointFilter::Imports("MICROPROCESSORS".to_string()),
+                        WaypointFilter::Exports("ADVANCED_CIRCUITRY".to_string()),
+                    ],
+                )
+                .await;
+            assert_eq!(adv_circuit_market.len(), 1);
+            let adv_circuit_market = &adv_circuit_market[0].symbol;
+
+            let electronics_market = self
+                .universe
+                .search_waypoints(
+                    &self.system_symbol,
+                    &[
+                        WaypointFilter::Imports("SILICON_CRYSTALS".to_string()),
+                        WaypointFilter::Imports("COPPER".to_string()),
+                        WaypointFilter::Exports("ELECTRONICS".to_string()),
+                    ],
+                )
+                .await;
+            assert_eq!(electronics_market.len(), 1);
+            let electronics_market = &electronics_market[0].symbol;
+            let microprocessor_market = self
+                .universe
+                .search_waypoints(
+                    &self.system_symbol,
+                    &[
+                        WaypointFilter::Imports("SILICON_CRYSTALS".to_string()),
+                        WaypointFilter::Imports("COPPER".to_string()),
+                        WaypointFilter::Exports("MICROPROCESSORS".to_string()),
+                    ],
+                )
+                .await;
+            assert_eq!(microprocessor_market.len(), 1);
+            let microprocessor_market = &microprocessor_market[0].symbol;
+
             for material in &construction.materials {
                 if material.fulfilled >= material.required {
                     continue;
                 }
                 // Don't trade goods for profit if we need them for construction
-                blacklist_trade_goods.insert(material.trade_symbol.clone());
+                match material.trade_symbol.as_str() {
+                    "FAB_MATS" => {
+                        // fab_mat_market
+                        good_import_permits
+                            .entry("IRON".to_string())
+                            .or_default()
+                            .push(fab_mat_market.clone());
+                        good_import_permits
+                            .entry("QUARTZ_SAND".to_string())
+                            .or_default()
+                            .push(fab_mat_market.clone());
+                        // smeltery_market
+                        good_import_permits
+                            .entry("IRON_ORE".to_string())
+                            .or_default()
+                            .push(smeltery_market.clone());
+                    }
+                    "ADVANCED_CIRCUITRY" => {
+                        // adv_circuit_market
+                        good_import_permits
+                            .entry("ELECTRONICS".to_string())
+                            .or_default()
+                            .push(adv_circuit_market.clone());
+                        good_import_permits
+                            .entry("MICROPROCESSORS".to_string())
+                            .or_default()
+                            .push(adv_circuit_market.clone());
+                        // electronics_market
+                        good_import_permits
+                            .entry("SILICON_CRYSTALS".to_string())
+                            .or_default()
+                            .push(electronics_market.clone());
+                        good_import_permits
+                            .entry("COPPER".to_string())
+                            .or_default()
+                            .push(electronics_market.clone());
+                        // microprocessor_market
+                        good_import_permits
+                            .entry("SILICON_CRYSTALS".to_string())
+                            .or_default()
+                            .push(microprocessor_market.clone());
+                        good_import_permits
+                            .entry("COPPER".to_string())
+                            .or_default()
+                            .push(microprocessor_market.clone());
+                        // smeltery_market
+                        good_import_permits
+                            .entry("COPPER_ORE".to_string())
+                            .or_default()
+                            .push(smeltery_market.clone());
+                    }
+                    _ => panic!("Unknown construction good: {}", material.trade_symbol),
+                };
 
                 let remaining = material.required - material.fulfilled;
                 let buy_trade_good = markets
@@ -283,9 +404,6 @@ impl LogisticTaskManager {
         }
 
         for good in goods {
-            if blacklist_trade_goods.contains(&good) {
-                continue;
-            }
             let trades = markets
                 .iter()
                 .filter_map(|(_, market_opt)| match market_opt {
@@ -321,6 +439,10 @@ impl LogisticTaskManager {
                     Import => trade.supply <= Moderate,
                     Export => false,
                     Exchange => true,
+                })
+                .filter(|(market, _)| match good_import_permits.get(&good) {
+                    Some(allowlist) => allowlist.contains(market),
+                    None => true,
                 })
                 .max_by_key(|(_, trade)| trade.sell_price);
             let (buy_trade_good, sell_trade_good) = match (buy_trade_good, sell_trade_good) {

@@ -19,7 +19,7 @@ lazy_static! {
 async fn siphon_location(ship: &ShipController) -> WaypointSymbol {
     let waypoints = ship
         .universe
-        .search_waypoints(&ship.system(), vec![WaypointFilter::GasGiant])
+        .search_waypoints(&ship.system(), &vec![WaypointFilter::GasGiant])
         .await;
     assert!(waypoints.len() == 1);
     waypoints[0].symbol.clone()
@@ -29,10 +29,10 @@ async fn sell_location(ship: &ShipController) -> WaypointSymbol {
     let filters = SIPHON_YIELDS
         .iter()
         .map(|good| WaypointFilter::Imports(good.to_string()))
-        .collect();
+        .collect::<Vec<WaypointFilter>>();
     let waypoints = ship
         .universe
-        .search_waypoints(&ship.system(), filters)
+        .search_waypoints(&ship.system(), &filters)
         .await;
     assert!(waypoints.len() == 1);
     waypoints[0].symbol.clone()
