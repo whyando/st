@@ -37,6 +37,7 @@ lazy_static = "1.4.0"
 rand = "0.8.5"
 uuid = { version = "1.7.0", features = ["v4"] }
 regex = "1.10.3"
+# moka = "0.12.5"
 
 [profile.dev.package.vrp-pragmatic]
 opt-level = 3

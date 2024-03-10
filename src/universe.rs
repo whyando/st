@@ -29,6 +29,10 @@ pub struct Universe {
     db: DataClient,
 
     constructions: Arc<DashMap<WaypointSymbol, Arc<WithTimestamp<Option<Construction>>>>>,
+    remote_markets: Arc<DashMap<WaypointSymbol, MarketRemoteView>>,
+    markets: Arc<DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Market>>>>>,
+    remote_shipyards: Arc<DashMap<WaypointSymbol, ShipyardRemoteView>>,
+    shipyards: Arc<DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Shipyard>>>>>,
 }
 
 impl Universe {
@@ -37,6 +41,10 @@ impl Universe {
             api_client: api_client.clone(),
             db: db.clone(),
             constructions: Arc::new(DashMap::new()),
+            remote_markets: Arc::new(DashMap::new()),
+            markets: Arc::new(DashMap::new()),
+            remote_shipyards: Arc::new(DashMap::new()),
+            shipyards: Arc::new(DashMap::new()),
         }
     }
 
@@ -44,14 +52,59 @@ impl Universe {
         &self,
         waypoint_symbol: &WaypointSymbol,
     ) -> Option<Arc<WithTimestamp<Market>>> {
-        self.db.get_market(waypoint_symbol).await
+        match self.markets.get(waypoint_symbol) {
+            Some(market) => market.clone(),
+            None => {
+                let market = self
+                    .db
+                    .get_market(waypoint_symbol)
+                    .await
+                    .map(|market| Arc::new(market));
+                self.markets.insert(waypoint_symbol.clone(), market.clone());
+                market
+            }
+        }
+    }
+
+    pub async fn save_market(
+        &self,
+        waypoint_symbol: &WaypointSymbol,
+        market: WithTimestamp<Market>,
+    ) {
+        self.markets
+            .insert(waypoint_symbol.clone(), Some(Arc::new(market.clone())));
+        self.db.save_market(waypoint_symbol, &market).await;
+        self.db.insert_market_trades(&market).await;
+        self.db.upsert_market_transactions(&market).await;
     }
 
     pub async fn get_shipyard(
         &self,
         waypoint_symbol: &WaypointSymbol,
     ) -> Option<Arc<WithTimestamp<Shipyard>>> {
-        self.db.get_shipyard(waypoint_symbol).await
+        match self.shipyards.get(waypoint_symbol) {
+            Some(shipyard) => shipyard.clone(),
+            None => {
+                let shipyard = self
+                    .db
+                    .get_shipyard(waypoint_symbol)
+                    .await
+                    .map(|x| Arc::new(x));
+                self.shipyards
+                    .insert(waypoint_symbol.clone(), shipyard.clone());
+                shipyard
+            }
+        }
+    }
+
+    pub async fn save_shipyard(
+        &self,
+        waypoint_symbol: &WaypointSymbol,
+        shipyard: WithTimestamp<Shipyard>,
+    ) {
+        self.shipyards
+            .insert(waypoint_symbol.clone(), Some(Arc::new(shipyard.clone())));
+        self.db.save_shipyard(waypoint_symbol, &shipyard).await;
     }
 
     // load Optional<Construction> from db, or fetch from api
@@ -213,29 +266,40 @@ impl Universe {
         }
     }
 
-    // !! needs caching layer
     pub async fn get_market_remote(&self, symbol: &WaypointSymbol) -> MarketRemoteView {
-        // cache behaviour: this data will never go stale
-        match self.db.get_market_remote(symbol).await {
-            Some(market) => market,
-            None => {
-                let market = self.api_client.get_market_remote(symbol).await;
-                self.db.save_market_remote(symbol, &market).await;
-                market
-            }
+        // Layer 1 - check cache
+        if let Some(market) = &self.remote_markets.get(symbol) {
+            return market.value().clone();
         }
+        // Layer 2 - check db
+        if let Some(market) = self.db.get_market_remote(symbol).await {
+            self.remote_markets.insert(symbol.clone(), market.clone());
+            return market;
+        }
+        // Layer 3 - fetch from api
+        let market = self.api_client.get_market_remote(symbol).await;
+        self.db.save_market_remote(symbol, &market).await;
+        self.remote_markets.insert(symbol.clone(), market.clone());
+        market
     }
 
     pub async fn get_shipyard_remote(&self, symbol: &WaypointSymbol) -> ShipyardRemoteView {
-        // cache behaviour: this data will never go stale
-        match self.db.get_shipyard_remote(symbol).await {
-            Some(shipyard) => shipyard,
-            None => {
-                let shipyard = self.api_client.get_shipyard_remote(symbol).await;
-                self.db.save_shipyard_remote(symbol, &shipyard).await;
-                shipyard
-            }
+        // Layer 1 - check cache
+        if let Some(shipyard) = &self.remote_shipyards.get(symbol) {
+            return shipyard.value().clone();
         }
+        // Layer 2 - check db
+        if let Some(shipyard) = self.db.get_shipyard_remote(symbol).await {
+            self.remote_shipyards
+                .insert(symbol.clone(), shipyard.clone());
+            return shipyard;
+        }
+        // Layer 3 - fetch from api
+        let shipyard = self.api_client.get_shipyard_remote(symbol).await;
+        self.db.save_shipyard_remote(symbol, &shipyard).await;
+        self.remote_shipyards
+            .insert(symbol.clone(), shipyard.clone());
+        shipyard
     }
 
     pub async fn search_shipyards(

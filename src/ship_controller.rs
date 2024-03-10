@@ -2,8 +2,8 @@ use crate::agent_controller::Event;
 use crate::models::{ShipCargoItem, ShipCooldown, Survey};
 use crate::ship_controller::ShipNavStatus::*;
 use crate::{
-    agent_controller::AgentController, api_client::ApiClient, data::DataClient,
-    logistics_planner::Action, models::*, universe::Universe,
+    agent_controller::AgentController, api_client::ApiClient, logistics_planner::Action, models::*,
+    universe::Universe,
 };
 use log::*;
 use reqwest::{Method, StatusCode};
@@ -16,7 +16,6 @@ pub struct ShipController {
     ship: Arc<Mutex<Ship>>,
 
     api_client: ApiClient,
-    data: DataClient,
     pub universe: Universe,
     pub agent_controller: AgentController,
 }
@@ -24,7 +23,6 @@ pub struct ShipController {
 impl ShipController {
     pub fn new(
         api_client: &ApiClient,
-        data_client: &DataClient,
         universe: &Universe,
         ship: Arc<Mutex<Ship>>,
         agent_controller: &AgentController,
@@ -32,7 +30,6 @@ impl ShipController {
         let symbol = ship.lock().unwrap().symbol.clone();
         ShipController {
             api_client: api_client.clone(),
-            data: data_client.clone(),
             universe: universe.clone(),
             ship,
             ship_symbol: symbol,
@@ -455,7 +452,7 @@ impl ShipController {
             timestamp: chrono::Utc::now(),
             data: market,
         };
-        self.data.save_market(&waypoint, market).await;
+        self.universe.save_market(&waypoint, market).await;
     }
 
     pub async fn refresh_shipyard(&self) {
@@ -470,7 +467,7 @@ impl ShipController {
             timestamp: chrono::Utc::now(),
             data: shipyard,
         };
-        self.data.save_shipyard(&waypoint, shipyard).await;
+        self.universe.save_shipyard(&waypoint, shipyard).await;
     }
 
     pub async fn survey(&self) {

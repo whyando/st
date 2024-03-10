@@ -15,7 +15,6 @@ use log::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
-use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::logistics_planner::Task;
@@ -34,9 +33,6 @@ use crate::{
 pub struct DataClient {
     db: Pool<AsyncPgConnection>,
     reset_id: String,
-    // cache
-    markets: Arc<DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Market>>>>>,
-    shipyards: Arc<DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Shipyard>>>>>,
 }
 
 impl DataClient {
@@ -65,8 +61,6 @@ impl DataClient {
         DataClient {
             db,
             reset_id: reset_identifier.to_string(),
-            markets: Arc::new(DashMap::new()),
-            shipyards: Arc::new(DashMap::new()),
         }
     }
 
@@ -167,27 +161,15 @@ impl DataClient {
         self.set_value(&key, shipyard).await
     }
 
-    pub async fn get_market(&self, symbol: &WaypointSymbol) -> Option<Arc<WithTimestamp<Market>>> {
-        if let Some(market_opt) = self.markets.get(symbol) {
-            return market_opt.clone();
-        }
+    pub async fn get_market(&self, symbol: &WaypointSymbol) -> Option<WithTimestamp<Market>> {
         let key = format!("markets/{}", symbol);
-        let market: Option<WithTimestamp<Market>> = self.get_value(&key).await;
-        let market = market.map(Arc::new);
-        self.markets.insert(symbol.clone(), market);
-        self.markets.get(symbol).unwrap().clone()
+        self.get_value(&key).await
     }
 
-    pub async fn save_market(&self, symbol: &WaypointSymbol, market: WithTimestamp<Market>) {
+    pub async fn save_market(&self, symbol: &WaypointSymbol, market: &WithTimestamp<Market>) {
         // save to snapshot market view
         let key = format!("markets/{}", symbol);
         self.set_value(&key, &market).await;
-        self.markets
-            .insert(symbol.clone(), Some(Arc::new(market.clone())));
-
-        // also save market to 'market_trades', and 'market_transactions'
-        self.insert_market_trades(&market).await;
-        self.upsert_market_transactions(&market).await;
     }
 
     pub async fn insert_market_trades(&self, market: &WithTimestamp<Market>) {
@@ -247,25 +229,14 @@ impl DataClient {
             .expect("DB Query error");
     }
 
-    pub async fn get_shipyard(
-        &self,
-        symbol: &WaypointSymbol,
-    ) -> Option<Arc<WithTimestamp<Shipyard>>> {
-        if let Some(shipyard_opt) = self.shipyards.get(symbol) {
-            return shipyard_opt.clone();
-        }
+    pub async fn get_shipyard(&self, symbol: &WaypointSymbol) -> Option<WithTimestamp<Shipyard>> {
         let key = format!("shipyards/{}", symbol);
-        let shipyard: Option<WithTimestamp<Shipyard>> = self.get_value(&key).await;
-        let shipyard = shipyard.map(Arc::new);
-        self.shipyards.insert(symbol.clone(), shipyard);
-        self.shipyards.get(symbol).unwrap().clone()
+        self.get_value(&key).await
     }
 
-    pub async fn save_shipyard(&self, symbol: &WaypointSymbol, shipyard: WithTimestamp<Shipyard>) {
+    pub async fn save_shipyard(&self, symbol: &WaypointSymbol, shipyard: &WithTimestamp<Shipyard>) {
         let key = format!("shipyards/{}", symbol);
         self.set_value(&key, &shipyard).await;
-        self.shipyards
-            .insert(symbol.clone(), Some(Arc::new(shipyard)));
     }
 
     pub async fn load_schedule(&self, ship_symbol: &str) -> Option<ShipSchedule> {

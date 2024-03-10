@@ -343,13 +343,7 @@ impl AgentController {
 
     pub fn ship_controller(&self, ship_symbol: &str) -> ShipController {
         let ship = self.ships.get(ship_symbol).unwrap();
-        ShipController::new(
-            &self.api_client,
-            &self.db,
-            &self.universe,
-            ship.clone(),
-            self,
-        )
+        ShipController::new(&self.api_client, &self.universe, ship.clone(), self)
     }
     pub fn ship_assigned(&self, ship_symbol: &str) -> bool {
         self.job_assignments_rev.contains_key(ship_symbol)
