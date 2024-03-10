@@ -1843,6 +1843,7 @@ dependencies = [
  "pathfinding",
  "pretty_env_logger",
  "rand",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

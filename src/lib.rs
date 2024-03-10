@@ -7,6 +7,7 @@ pub mod universe;
 
 pub mod agent_controller;
 pub mod broker;
+pub mod config;
 pub mod logistics_planner;
 pub mod pathfinding;
 pub mod ship_config;

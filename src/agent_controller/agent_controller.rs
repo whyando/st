@@ -1,5 +1,6 @@
 use super::ledger::Ledger;
 use crate::broker::{CargoBroker, TransferActor};
+use crate::config::CONFIG;
 use crate::models::{ShipNavStatus::*, *};
 use crate::ship_config::ship_config;
 use crate::survey_manager::SurveyManager;
@@ -645,6 +646,10 @@ impl AgentController {
                     .iter()
                     .find(|s| s.id == *job_id)
                     .unwrap_or_else(|| panic!("No job found for {}", *job_id));
+                if !CONFIG.job_id_filter.is_match(&job_spec.id) {
+                    return;
+                }
+
                 // run script for assigned job
                 let join_hdl = match &job_spec.behaviour {
                     ShipBehaviour::Probe(config) => {
@@ -694,6 +699,13 @@ impl AgentController {
                         let ship_controller = self.ship_controller(&ship_symbol);
                         tokio::spawn(async move {
                             ship_scripts::mining::run_surveyor(ship_controller).await;
+                        })
+                    }
+                    ShipBehaviour::ConstructionHauler => {
+                        let ship_controller = self.ship_controller(&ship_symbol);
+                        let db = self.db.clone();
+                        tokio::spawn(async move {
+                            ship_scripts::construction::run_hauler(ship_controller, db).await;
                         })
                     }
                 };

@@ -14,10 +14,13 @@ pub enum WaypointFilter {
     Imports(String),
     Exports(String),
     Exchanges(String),
+    // waypoint traits
     Market,
     Shipyard,
+    // waypoint types
     GasGiant,
     EngineeredAsteroid,
+    JumpGate,
 }
 
 #[derive(Clone)]
@@ -290,6 +293,7 @@ impl Universe {
             WaypointFilter::Shipyard => waypoint.is_shipyard(),
             WaypointFilter::GasGiant => waypoint.is_gas_giant(),
             WaypointFilter::EngineeredAsteroid => waypoint.is_engineered_asteroid(),
+            WaypointFilter::JumpGate => waypoint.is_jump_gate(),
         }
     }
 

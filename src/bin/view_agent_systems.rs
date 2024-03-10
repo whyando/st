@@ -1,3 +1,5 @@
+use std::fs::File;
+
 use serde::{Deserialize, Serialize};
 use st::api_client::ApiClient;
 use st::models::WaypointSymbol;
@@ -13,9 +15,17 @@ pub struct Agent {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
     pretty_env_logger::init_timed();
+
+    // output to ./all_agents.txt
+    let mut f = File::options()
+        .write(true)
+        .create(true)
+        .open("all_agents.txt")
+        .unwrap();
+    use std::io::Write as _;
 
     let api_client = ApiClient::new();
     // {"symbol":"05HD3ITEFVHT","headquarters":"X1-SZ63-A1","credits":175000,"startingFaction":"COSMIC","shipCount":2}
@@ -33,6 +43,11 @@ async fn main() {
         if agent.credits <= 175000 && agent.ship_count == 2 {
             continue;
         }
+        writeln!(
+            &mut f,
+            "{}\t{}\t{}\t{}",
+            agent.ship_count, agent.credits, agent.headquarters, agent.symbol
+        )?;
 
         faction.0 += 1;
         faction.1 += agent.credits;
@@ -43,18 +58,22 @@ async fn main() {
         hq.2 += agent.ship_count;
     }
 
-    println!("Factions:");
+    writeln!(&mut f, "")?;
+    writeln!(&mut f, "Factions:")?;
     for (faction, (count, credits, ship_count)) in factions {
-        println!(
+        writeln!(
+            &mut f,
             "{}: {} agents, {} credits, {} ships",
             faction, count, credits, ship_count
-        );
+        )?;
     }
-    println!("\nHeadquarters:");
+    writeln!(&mut f, "\nHeadquarters:")?;
     for (hq, (count, credits, ship_count)) in headquarters {
-        println!(
+        writeln!(
+            &mut f,
             "{}: {} agents, {} credits, {} ships",
             hq, count, credits, ship_count
-        );
+        )?;
     }
+    Ok(())
 }

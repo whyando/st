@@ -121,10 +121,19 @@ pub fn ship_config(
         ));
     }
 
-    // todo: Dedicated hauler for building jump gate
+    // Dedicated jump gate construction hauler
+    ships.push((
+        (4.0, 0.0),
+        ShipConfig {
+            id: "jump_gate_hauler".to_string(),
+            ship_model: "SHIP_LIGHT_HAULER".to_string(),
+            purchase_criteria: PurchaseCriteria::default(),
+            behaviour: ShipBehaviour::ConstructionHauler,
+        },
+    ));
 
     // todo: (Later)
-    // switch to static probes everywhere
+    // switch to static probes everywhere - should cope with being reassigned, just need to regenerate shipconfig at some point
     // 3 logistic haulers
     // 5 siphons + 1 hauler
 
