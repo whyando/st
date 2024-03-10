@@ -4,9 +4,11 @@ use st::data::DataClient;
 use st::models::Waypoint;
 use st::universe::Universe;
 use std::env;
+use std::fs::File;
+use std::io;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> io::Result<()> {
     dotenvy::dotenv().ok();
     pretty_env_logger::init_timed();
 
@@ -33,14 +35,24 @@ async fn main() {
             }
         }
     }
+
+    // output to ./markets.txt
+    let mut f = File::options()
+        .write(true)
+        .create(true)
+        .open("markets.txt")
+        .unwrap();
+    use std::io::Write as _;
+
     for market in markets {
-        println!("Market: {}", market.data.symbol);
+        writeln!(&mut f, "Market: {}", market.data.symbol)?;
         for trade_good in &market.data.trade_goods {
             let activity = match &trade_good.activity {
                 Some(x) => x.to_string(),
                 None => "".to_string(),
             };
-            println!(
+            writeln!(
+                &mut f,
                 "   {}\t{}\t{}\t{}\t{}\t${}/${}",
                 trade_good.symbol,
                 trade_good._type,
@@ -49,8 +61,10 @@ async fn main() {
                 trade_good.trade_volume,
                 trade_good.purchase_price,
                 trade_good.sell_price,
-            );
+            )?;
         }
-        println!();
+        writeln!(&mut f, "")?;
     }
+    log::info!("Wrote markets to markets.txt");
+    Ok(())
 }
