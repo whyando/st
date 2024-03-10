@@ -35,10 +35,12 @@ async fn sell_location(ship: &ShipController, cargo_symbol: &str) -> Option<Wayp
         })
         // sell filters
         .filter(|(_, trade)| match trade._type {
+            // !! selling IRON_ORE, COPPER_ORE, SILICON_CRYSTALS, and QUARTZ_SAND at import only gives the result we want for construction
             Export => false,
+            Exchange => false,
             Import => true,
-            Exchange => true,
         })
+        // price is a good enough approximation of supply
         .max_by_key(|(_, trade)| trade.sell_price);
     sell_trade_good.map(|(market_symbol, _)| market_symbol)
 }
@@ -146,6 +148,8 @@ pub async fn run_shuttle(ship: ShipController, db: DataClient) {
                     db.set_value(&key, &state).await;
                     continue;
                 }
+                // !! a smarter selling order would be good here:
+                // we risk navigating away from a market even though eg copper_ore and iron_ore are both in the same market
                 while let Some(cargo) = ship.cargo_first_item() {
                     if SELL_GOODS.contains(&cargo.symbol.as_str()) {
                         let sell_location = sell_location(&ship, &cargo.symbol).await;
