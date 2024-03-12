@@ -2,7 +2,7 @@ use log::info;
 use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
 use st::data::DataClient;
-use st::models::Waypoint;
+use st::models::{SystemSymbol, Waypoint};
 use st::universe::Universe;
 use std::env;
 use std::fs::File;
@@ -25,15 +25,19 @@ async fn main() -> io::Result<()> {
     let universe = Universe::new(&api_client, &db);
 
     let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
-    let system_symbol = agent_controller.starting_system();
+    // let system_symbol = agent_controller.starting_system();
+    let system_symbol = SystemSymbol("X1-TZ54".to_string());
 
     let waypoints: Vec<Waypoint> = universe.get_system_waypoints(&system_symbol).await;
     let mut shipyards = Vec::new();
+    let mut shipyards_remote = Vec::new();
     for waypoint in &waypoints {
         if waypoint.is_shipyard() {
             if let Some(shipyard) = universe.get_shipyard(&waypoint.symbol).await {
                 shipyards.push(shipyard);
             }
+            let shipyard_opt = universe.get_shipyard_remote(&waypoint.symbol).await;
+            shipyards_remote.push(shipyard_opt);
         }
     }
 
@@ -44,6 +48,17 @@ async fn main() -> io::Result<()> {
         .open("shipyards.txt")
         .unwrap();
     use std::io::Write as _;
+
+    for shipyard in shipyards_remote {
+        let ships = shipyard
+            .ship_types
+            .iter()
+            .map(|s| s.ship_type.clone())
+            .collect::<Vec<String>>()
+            .join(", ");
+        writeln!(&mut f, "Shipyard: {}", ships)?;
+    }
+    writeln!(&mut f, "")?;
 
     for shipyard in shipyards {
         writeln!(&mut f, "Shipyard: {}", shipyard.data.symbol)?;

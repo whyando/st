@@ -541,10 +541,22 @@ impl AgentController {
         for it in self.job_assignments.iter() {
             let (job_id, ship_symbol) = it.pair();
             let job_exists = ship_config.iter().any(|job| job.id == *job_id);
+            let ship_exists = self.ships.contains_key(ship_symbol);
             if !job_exists {
                 // if the job no longer exists, unassign the ship,
                 // May be risky because we don't know if the ship is in the middle of a task
-                warn!("Unassigning ship {} from job {}", ship_symbol, job_id);
+                warn!(
+                    "Unassigning ship {} from non-existant job {}",
+                    ship_symbol, job_id
+                );
+                keys_to_remove.push((job_id.clone(), ship_symbol.clone()));
+            }
+            if !ship_exists {
+                // if the ship no longer exists, unassign the job
+                warn!(
+                    "Unassigning non-existant ship {} from job {}",
+                    ship_symbol, job_id
+                );
                 keys_to_remove.push((job_id.clone(), ship_symbol.clone()));
             }
         }
