@@ -80,8 +80,9 @@ async fn tick(
 ) -> Option<ConstructionHaulerState> {
     let construction = ship.universe.get_construction(&jump_gate_symbol).await;
     let construction: &Construction = match &construction.data {
-        Some(x) => x,
         None => return Some(Completed),
+        Some(x) if x.is_complete => return Some(Completed),
+        Some(x) => x,
     };
     match state {
         Buying => {

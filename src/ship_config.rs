@@ -1,7 +1,7 @@
 use crate::models::*;
 use std::collections::BTreeMap;
 
-fn market_waypoints(waypoints: &Vec<Waypoint>, range: Option<i32>) -> Vec<WaypointSymbol> {
+fn market_waypoints(waypoints: &Vec<Waypoint>, range: Option<i64>) -> Vec<WaypointSymbol> {
     waypoints
         .iter()
         .filter(|w| w.is_market())
@@ -11,7 +11,7 @@ fn market_waypoints(waypoints: &Vec<Waypoint>, range: Option<i32>) -> Vec<Waypoi
         .filter(|w| w.waypoint_type != "ENGINEERED_ASTEROID")
         .filter(|w| {
             if let Some(range) = range {
-                let dist_from_origin = (w.x * w.x + w.y * w.y) as i32;
+                let dist_from_origin = ((w.x * w.x + w.y * w.y) as f64).sqrt() as i64;
                 dist_from_origin <= range
             } else {
                 true

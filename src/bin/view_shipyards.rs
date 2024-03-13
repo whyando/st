@@ -2,7 +2,7 @@ use log::info;
 use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
 use st::data::DataClient;
-use st::models::{SystemSymbol, Waypoint};
+use st::models::Waypoint;
 use st::universe::Universe;
 use std::env;
 use std::fs::File;
@@ -25,8 +25,8 @@ async fn main() -> io::Result<()> {
     let universe = Universe::new(&api_client, &db);
 
     let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
-    // let system_symbol = agent_controller.starting_system();
-    let system_symbol = SystemSymbol("X1-TZ54".to_string());
+    let system_symbol = agent_controller.starting_system();
+    // let system_symbol = SystemSymbol("X1-TZ54".to_string());
 
     let waypoints: Vec<Waypoint> = universe.get_system_waypoints(&system_symbol).await;
     let mut shipyards = Vec::new();
