@@ -464,7 +464,6 @@ impl ShipController {
         self.debug(&format!("Refreshing shipyard at waypoint {}", &waypoint));
         let uri = format!("/systems/{}/waypoints/{}/shipyard", &system, &waypoint);
         let mut response: Value = self.api_client.get(&uri).await;
-        debug!("{}", response.to_string());
         let shipyard: Shipyard = serde_json::from_value(response["data"].take()).unwrap();
         let shipyard = WithTimestamp::<Shipyard> {
             timestamp: chrono::Utc::now(),
