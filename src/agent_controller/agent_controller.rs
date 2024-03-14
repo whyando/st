@@ -284,7 +284,7 @@ impl AgentController {
     pub async fn faction_capital(&self) -> SystemSymbol {
         let faction_symbol = self.starting_faction();
         let faction = self.universe.get_faction(&faction_symbol).await;
-        faction.headquarters
+        faction.headquarters.unwrap()
     }
 
     pub fn probed_waypoints(&self) -> Vec<(String, Vec<WaypointSymbol>)> {

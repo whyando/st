@@ -392,6 +392,26 @@ impl ShipController {
         self.set_orbit_status().await;
     }
 
+    pub async fn jump(&self, waypoint: &WaypointSymbol) {
+        assert!(!self.is_in_transit(), "Ship is in transit");
+        self.wait_for_cooldown().await;
+        self.orbit().await;
+        self.debug(&format!("Jumping to waypoint: {}", waypoint));
+        let uri = format!("/my/ships/{}/jump", self.ship_symbol);
+        let body = json!({ "waypointSymbol": waypoint });
+        let mut response: Value = self.api_client.post(&uri, &body).await;
+
+        let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
+        let cooldown: ShipCooldown =
+            serde_json::from_value(response["data"]["cooldown"].take()).unwrap();
+        let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
+        let _transaction: MarketTransaction =
+            serde_json::from_value(response["data"]["transaction"].take()).unwrap();
+        self.update_nav(nav).await;
+        self.agent_controller.update_agent(agent).await;
+        self.update_cooldown(cooldown).await;
+    }
+
     // Navigation between two market waypoints
     pub async fn goto_waypoint(&self, target: &WaypointSymbol) {
         let route = self

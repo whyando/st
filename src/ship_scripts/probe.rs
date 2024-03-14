@@ -96,6 +96,24 @@ pub async fn probe_single_location(ship_controller: ShipController, config: &Pro
     ship_controller.wait_for_transit().await;
     let waypoint = ship_controller.universe.get_waypoint(waypoint_symbol).await;
 
+    if ship_controller.system() != waypoint.system_symbol {
+        // Assume we can do a single jump to the correct system
+        // nav to jumpgate
+        let jumpgate_src = ship_controller
+            .universe
+            .get_jumpgate(&ship_controller.system())
+            .await;
+        let jumpgate_dest = ship_controller
+            .universe
+            .get_jumpgate(&waypoint.system_symbol)
+            .await;
+        ship_controller
+            .navigate(ShipFlightMode::Cruise, &jumpgate_src)
+            .await;
+        // jump to correct system
+        ship_controller.jump(&jumpgate_dest).await;
+    }
+
     ship_controller
         .navigate(ShipFlightMode::Cruise, waypoint_symbol)
         .await;

@@ -440,4 +440,13 @@ impl Universe {
         self.load_factions().await;
         self.factions.get(faction).unwrap().clone()
     }
+
+    pub async fn get_jumpgate(&self, symbol: &SystemSymbol) -> WaypointSymbol {
+        let waypoints = self.get_system_waypoints(symbol).await;
+        waypoints
+            .into_iter()
+            .find(|waypoint| waypoint.is_jump_gate())
+            .unwrap()
+            .symbol
+    }
 }

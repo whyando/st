@@ -43,7 +43,8 @@ async fn ships_handler(State(state): State<Arc<AppState>>) -> axum::Json<Vec<Shi
 async fn waypoints_handler(
     State(state): State<Arc<AppState>>,
 ) -> Result<axum::Json<Vec<Waypoint>>, StatusCode> {
-    let system_symbol = state.agent_controller.starting_system(); // todo: make this a parameter
+    // let system_symbol = state.agent_controller.starting_system(); // todo: make this a parameter
+    let system_symbol = state.agent_controller.faction_capital().await;
     let waypoints_opt = state
         .universe
         .get_system_waypoints_no_fetch(&system_symbol)
