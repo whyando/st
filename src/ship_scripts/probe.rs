@@ -66,7 +66,7 @@ pub async fn probe_multiple_locations(ship: ShipController, config: &ProbeScript
             if waypoint.is_shipyard() {
                 ship.refresh_shipyard().await;
 
-                // // Try to buy ships
+                // // Try to buy ships (DISABLED)
                 // info!("Starting routine buy task for probe {}", ship.ship_symbol);
                 // ship.dock().await; // don't need to dock, but do so anyway to clear 'InTransit' status
                 // let (bought, _shipyard_waypoints) = ship

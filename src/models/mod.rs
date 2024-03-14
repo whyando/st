@@ -102,7 +102,7 @@ pub enum ShipBehaviour {
 pub struct PurchaseCriteria {
     // this ship is never purchased
     pub never_purchase: bool,
-    // require the ship to be bought from a specific system
+    // require the ship to be bought from a specific system (None = starter system)
     pub system_symbol: Option<SystemSymbol>,
     // allow a logistic task to be created to go to a waypoint
     pub allow_logistic_task: bool,

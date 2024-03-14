@@ -2,8 +2,9 @@ use super::ledger::Ledger;
 use crate::broker::{CargoBroker, TransferActor};
 use crate::config::CONFIG;
 use crate::models::{ShipNavStatus::*, *};
-use crate::ship_config::ship_config;
+use crate::ship_config::{ship_config_capital_system, ship_config_starter_system};
 use crate::survey_manager::SurveyManager;
+use crate::universe::WaypointFilter;
 use crate::{
     api_client::ApiClient,
     data::DataClient,
@@ -257,6 +258,9 @@ impl AgentController {
     pub fn starting_system(&self) -> SystemSymbol {
         self.agent.lock().unwrap().headquarters.system()
     }
+    pub fn starting_faction(&self) -> String {
+        self.agent.lock().unwrap().starting_faction.clone()
+    }
     pub fn num_ships(&self) -> usize {
         self.ships.len()
     }
@@ -277,7 +281,11 @@ impl AgentController {
     fn debug(&self, msg: &str) {
         debug!("[{}] {}", self.callsign, msg);
     }
-    // fn ship_config()
+    pub async fn faction_capital(&self) -> SystemSymbol {
+        let faction_symbol = self.starting_faction();
+        let faction = self.universe.get_faction(&faction_symbol).await;
+        faction.headquarters
+    }
 
     pub fn probed_waypoints(&self) -> Vec<(String, Vec<WaypointSymbol>)> {
         let ship_config = self.ship_config.lock().unwrap();
@@ -381,16 +389,16 @@ impl AgentController {
         if purchase_criteria.never_purchase {
             return BuyShipResult::FailedNeverPurchase;
         }
-        if let Some(system_symbol) = &purchase_criteria.system_symbol {
-            assert_eq!(system_symbol, &self.starting_system());
-        }
+        let purchase_system = match &purchase_criteria.system_symbol {
+            Some(system_symbol) => system_symbol.clone(),
+            None => self.starting_system(),
+        };
 
         // if ship docked at shipyard + credits available, buy ship immediately
         // otherwise, register as a (potential) task
-        let system = self.starting_system();
         let mut shipyards = self
             .universe
-            .search_shipyards(&system, &job.ship_model)
+            .search_shipyards(&purchase_system, &job.ship_model)
             .await;
         shipyards.sort_by_key(|x| x.1);
 
@@ -466,6 +474,9 @@ impl AgentController {
         purchaser: Option<String>,
     ) -> (Vec<String>, Option<WaypointSymbol>) {
         let _guard = self.try_buy_ships_lock().await;
+
+        self.refresh_ship_config().await;
+
         let mut purchased_ships = vec![];
 
         let ship_config = self.get_ship_config();
@@ -515,25 +526,56 @@ impl AgentController {
             .reserve_credits(ship_symbol, ship.cargo.capacity * 5000);
     }
 
-    pub async fn run_ships(&self) {
-        let self_clone = self.clone();
-        {
-            let join_hdl = tokio::spawn(async move {
-                let broker = self_clone.cargo_broker.clone();
-                broker.run(Box::new(self_clone)).await;
-            });
-            debug!("spawn_broker try push join_hdl");
-            self.hdls.push(join_hdl).await;
-            debug!("spawn_broker pushed join_hdl");
-        }
+    pub async fn generate_ship_config(&self) -> Vec<ShipConfig> {
+        let start_system = self.starting_system();
+        let waypoints: Vec<Waypoint> = self.universe.get_system_waypoints(&start_system).await;
+        let markets = self.universe.get_system_markets_remote(&start_system).await;
+        let shipyards = self
+            .universe
+            .get_system_shipyards_remote(&start_system)
+            .await;
 
-        // set initial ship config - has to be static right now, because we don't have a way for
-        // ships to handle the the scenario where their config changes
-        let system = self.starting_system();
-        let waypoints: Vec<Waypoint> = self.universe.get_system_waypoints(&system).await;
-        let markets = self.universe.get_system_markets_remote(&system).await;
-        let shipyards = self.universe.get_system_shipyards_remote(&system).await;
-        let ship_config: Vec<ShipConfig> = ship_config(&waypoints, &markets, &shipyards);
+        let mut ships = vec![];
+        // todo: if some credit threshold hit: switch to static probes only
+        ships.append(&mut ship_config_starter_system(
+            &waypoints, &markets, &shipyards, true,
+        ));
+
+        if self.is_jumpgate_finished().await {
+            let capital = self.faction_capital().await;
+            let waypoints: Vec<Waypoint> = self.universe.get_system_waypoints(&capital).await;
+            let markets = self.universe.get_system_markets_remote(&capital).await;
+            let shipyards = self.universe.get_system_shipyards_remote(&capital).await;
+            ships.append(&mut ship_config_capital_system(
+                &capital,
+                &start_system,
+                &waypoints,
+                &markets,
+                &shipyards,
+                false,
+            ));
+        }
+        ships
+    }
+
+    pub async fn is_jumpgate_finished(&self) -> bool {
+        let jump_gate_symbol = {
+            let waypoints = self
+                .universe
+                .search_waypoints(&self.starting_system(), &vec![WaypointFilter::JumpGate])
+                .await;
+            assert!(waypoints.len() == 1);
+            waypoints[0].symbol.clone()
+        };
+        let construction = self.universe.get_construction(&jump_gate_symbol).await;
+        match &construction.data {
+            None => true,
+            Some(x) => x.is_complete,
+        }
+    }
+
+    pub async fn refresh_ship_config(&self) {
+        let ship_config = self.generate_ship_config().await;
         self.set_ship_config(ship_config.clone());
 
         // Unassign
@@ -578,7 +620,8 @@ impl AgentController {
                 self.try_assign_ship(&ship_symbol).await;
             }
         }
-        // setup ledger - important to do this before starting ship scripts or buying more ships
+
+        // load/refresh ledger - important to do this before starting ship scripts or buying more ships
         self.ledger.reserve_credits("FUEL", 10000);
         for ship_config in ship_config {
             if let Some(ship_symbol) = &self.job_assignments.get(&ship_config.id) {
@@ -586,10 +629,23 @@ impl AgentController {
                 self.reserve_credits_for_job(&ship_config, ship_symbol);
             }
         }
+    }
 
+    pub async fn run_ships(&self) {
+        let self_clone = self.clone();
+        {
+            let join_hdl = tokio::spawn(async move {
+                let broker = self_clone.cargo_broker.clone();
+                broker.run(Box::new(self_clone)).await;
+            });
+            debug!("spawn_broker try push join_hdl");
+            self.hdls.push(join_hdl).await;
+            debug!("spawn_broker pushed join_hdl");
+        }
+
+        // Generate ship config, purchase + assign ships
+        // purchased ships are assigned, but not yet started
         let (_bought, _tasks) = self.try_buy_ships(None).await;
-        dbg!(&self.job_assignments);
-        dbg!(&self.job_assignments_rev);
 
         let self_clone = self.clone();
         let start = tokio::spawn(async move {
@@ -727,7 +783,7 @@ impl AgentController {
     }
 }
 
-// ! todo: replace JoinHandles with TaskTracker from tokio-util
+// ! todo: replace JoinHandles with TaskTracker from tokio-util (or tokio::task::join_set::JoinSet also from tokio-util)
 // https://docs.rs/tokio-util/0.7.10/tokio_util/task/task_tracker/struct.TaskTracker.html
 use tokio::task::JoinHandle;
 

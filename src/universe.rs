@@ -3,8 +3,8 @@ use dashmap::DashMap;
 use crate::api_client::ApiClient;
 use crate::data::DataClient;
 use crate::models::{
-    Construction, Market, MarketRemoteView, Shipyard, ShipyardRemoteView, System, SystemSymbol,
-    Waypoint, WaypointSymbol, WithTimestamp,
+    Construction, Faction, Market, MarketRemoteView, Shipyard, ShipyardRemoteView, System,
+    SystemSymbol, Waypoint, WaypointSymbol, WithTimestamp,
 };
 use crate::pathfinding::{Pathfinding, Route};
 use std::collections::BTreeMap;
@@ -33,6 +33,7 @@ pub struct Universe {
     markets: Arc<DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Market>>>>>,
     remote_shipyards: Arc<DashMap<WaypointSymbol, ShipyardRemoteView>>,
     shipyards: Arc<DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Shipyard>>>>>,
+    factions: DashMap<String, Faction>,
 }
 
 impl Universe {
@@ -45,6 +46,7 @@ impl Universe {
             markets: Arc::new(DashMap::new()),
             remote_shipyards: Arc::new(DashMap::new()),
             shipyards: Arc::new(DashMap::new()),
+            factions: DashMap::new(),
         }
     }
 
@@ -408,5 +410,34 @@ impl Universe {
         let waypoints = self.get_system_waypoints(&system_symbol).await;
         let pathfinding = Pathfinding::new(waypoints);
         pathfinding.get_route(src, dest, speed, start_fuel, fuel_capacity)
+    }
+
+    // make sure factions loaded
+    pub async fn load_factions(&self) {
+        let db_faction_key = "factions";
+        if self.factions.len() > 0 {
+            return;
+        }
+
+        // Layer - check db
+        let factions: Option<Vec<Faction>> = self.db.get_value(db_faction_key).await;
+        if let Some(factions) = factions {
+            for faction in factions {
+                self.factions
+                    .insert(faction.symbol.clone(), faction.clone());
+            }
+        }
+        // Layer - fetch from api
+        let factions: Vec<Faction> = self.api_client.get_all_pages("/factions").await;
+        self.db.set_value(db_faction_key, &factions).await;
+        for faction in factions {
+            self.factions
+                .insert(faction.symbol.clone(), faction.clone());
+        }
+    }
+
+    pub async fn get_faction(&self, faction: &str) -> Faction {
+        self.load_factions().await;
+        self.factions.get(faction).unwrap().clone()
     }
 }

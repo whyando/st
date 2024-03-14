@@ -3,6 +3,7 @@ use regex::Regex;
 
 pub struct Config {
     pub job_id_filter: Regex,
+    pub override_construction_supply_check: bool,
 }
 
 lazy_static! {
@@ -16,6 +17,13 @@ lazy_static! {
             Some(val) => Regex::new(&val).expect("Invalid JOB_ID_FILTER regex"),
             None => Regex::new(".*").expect("Invalid default regex"),
         };
-        Config { job_id_filter }
+        let override_construction_supply_check =
+            std::env::var("OVERRIDE_CONSTRUCTION_SUPPLY_CHECK")
+                .map(|val| val == "1")
+                .unwrap_or(false);
+        Config {
+            job_id_filter,
+            override_construction_supply_check,
+        }
     };
 }

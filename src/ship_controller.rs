@@ -373,6 +373,7 @@ impl ShipController {
         if self.waypoint() == *waypoint {
             return;
         }
+        assert_eq!(self.waypoint().system(), waypoint.system());
         self.set_flight_mode(flight_mode).await;
         self.orbit().await;
         self.debug(&format!("Navigating to waypoint: {}", waypoint));

@@ -4,6 +4,7 @@
 //! This script does NOT coordinate with the logistic task manager. Which means the logistics task manager
 //! needs to be configured not to create construction tasks, or any task involving the construction goods.
 //!
+use crate::config::CONFIG;
 use crate::models::MarketActivity::*;
 use crate::models::MarketSupply::*;
 use crate::models::MarketType::*;
@@ -116,7 +117,7 @@ async fn tick(
                         Strong => good.supply >= High,
                         _ => good.supply >= Moderate,
                     };
-                    if should_buy {
+                    if should_buy || CONFIG.override_construction_supply_check {
                         let required_units = mat.required - holding - mat.fulfilled;
                         let units = min(
                             good.trade_volume,
