@@ -29,9 +29,12 @@ async fn main() -> std::io::Result<()> {
 
     let api_client = ApiClient::new();
     // {"symbol":"05HD3ITEFVHT","headquarters":"X1-SZ63-A1","credits":175000,"startingFaction":"COSMIC","shipCount":2}
-    let agents: Vec<Agent> = api_client.get_all_pages("/agents").await;
+    let mut agents: Vec<Agent> = api_client.get_all_pages("/agents").await;
     let mut factions = std::collections::BTreeMap::new();
     let mut headquarters = std::collections::BTreeMap::new();
+
+    // sort by credits desc
+    agents.sort_by(|a, b| b.credits.cmp(&a.credits));
 
     for agent in agents {
         let faction = factions
@@ -45,8 +48,12 @@ async fn main() -> std::io::Result<()> {
         // }
         writeln!(
             &mut f,
-            "{}\t{}\t{}\t{}",
-            agent.ship_count, agent.credits, agent.headquarters, agent.symbol
+            "{}\t{}\t{}\t{}\t{}",
+            agent.ship_count,
+            agent.credits,
+            agent.headquarters,
+            agent.starting_faction,
+            agent.symbol
         )?;
 
         faction.0 += 1;

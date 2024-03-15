@@ -1,20 +1,21 @@
 
+GATE SPEEDUPS:
+- prio fabmats when credits low
+- don't overevolve iron import
+- maybe rush at end
+- maybe 2nd hauler purely for rush
+- implement credit threshold to wait after initial ships bought
+- ore haulers unload iron ore + copper ore together
 
-- fix credit threshold for buying a new ship
-- better era configuration
-- burn fuel profiles
-- tests for building gate faster
+
 
 - accounting (net worth etc)
 - api stats
 - segment market db tables by reset_date
 
 
-- expand to multiple systems
-- explorers, ore hounds
 - charting
 - multi system pathfinding
-- better universe caching
 - make the task manager distances more accurate
 
 

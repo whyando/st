@@ -288,24 +288,27 @@ pub fn ship_config_capital_system(
         },
     ));
 
-    ships.push((
-        (3.0, 0.0),
-        ShipConfig {
-            id: format!("logistics_freighter/greedy/{}", 1),
-            ship_model: "SHIP_REFINING_FREIGHTER".to_string(),
-            purchase_criteria: PurchaseCriteria {
-                system_symbol: Some(system_waypoint.clone()),
-                ..PurchaseCriteria::default()
+    const NUM_GREEDY_FREIGHTERS: i64 = 3;
+    for i in 1..=NUM_GREEDY_FREIGHTERS {
+        ships.push((
+            (3.0, 0.0),
+            ShipConfig {
+                id: format!("logistics_freighter/greedy/{}", i),
+                ship_model: "SHIP_REFINING_FREIGHTER".to_string(),
+                purchase_criteria: PurchaseCriteria {
+                    system_symbol: Some(system_waypoint.clone()),
+                    ..PurchaseCriteria::default()
+                },
+                behaviour: ShipBehaviour::Logistics(LogisticsScriptConfig {
+                    use_planner: false,
+                    waypoint_allowlist: None,
+                    allow_shipbuying: false,
+                    allow_market_refresh: false,
+                    allow_construction: false,
+                }),
             },
-            behaviour: ShipBehaviour::Logistics(LogisticsScriptConfig {
-                use_planner: false,
-                waypoint_allowlist: None,
-                allow_shipbuying: false,
-                allow_market_refresh: false,
-                allow_construction: false,
-            }),
-        },
-    ));
+        ));
+    }
 
     ships.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     ships.into_iter().map(|(_, c)| c).collect()

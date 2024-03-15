@@ -7,7 +7,10 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use tokio::time::Instant;
 
-use crate::models::*;
+use crate::{
+    models::*,
+    universe::{JumpGateConnections, JumpGateInfo},
+};
 
 #[derive(Debug, Clone)]
 pub struct ApiClient {
@@ -166,6 +169,49 @@ impl ApiClient {
         WithTimestamp::<Option<Construction>> {
             timestamp: chrono::Utc::now(),
             data: construction,
+        }
+    }
+
+    pub async fn get_jumpgate_conns(&self, symbol: &WaypointSymbol) -> JumpGateInfo {
+        let path = format!(
+            "/systems/{}/waypoints/{}/jump-gate",
+            symbol.system(),
+            symbol
+        );
+        let (status, resp_body): (StatusCode, Result<Value, String>) =
+            self.request(Method::GET, &path, None::<&()>).await;
+        let connections = match status {
+            StatusCode::OK => {
+                let mut response = resp_body.unwrap();
+                let connections: Vec<WaypointSymbol> =
+                    serde_json::from_value(response["data"]["connections"].take()).unwrap();
+                JumpGateConnections::Charted(connections)
+            }
+            StatusCode::BAD_REQUEST => {
+                let response: Value = serde_json::from_str(&resp_body.unwrap_err()).unwrap();
+                let code = response["error"]["code"].as_i64().unwrap();
+                if code == 4001 {
+                    // 400 {"error":{"message":"Waypoint X1-XS84-X11D is not accessible. Either the waypoint is uncharted or the agent has no ships present at the location.","code":4001,"data":{"waypointSymbol":"X1-XS84-X11D"}}}
+                    JumpGateConnections::Uncharted
+                } else {
+                    panic!(
+                        "Request failed: {} {} {}",
+                        status.as_u16(),
+                        Method::GET,
+                        path
+                    );
+                }
+            }
+            _ => panic!(
+                "Request failed: {} {} {}",
+                status.as_u16(),
+                Method::GET,
+                path
+            ),
+        };
+        JumpGateInfo {
+            timestamp: chrono::Utc::now(),
+            connections,
         }
     }
 

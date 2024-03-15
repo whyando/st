@@ -1,4 +1,6 @@
+use chrono::{DateTime, Utc};
 use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
 
 use crate::api_client::ApiClient;
 use crate::data::DataClient;
@@ -23,6 +25,18 @@ pub enum WaypointFilter {
     JumpGate,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JumpGateInfo {
+    pub timestamp: DateTime<Utc>,
+    pub connections: JumpGateConnections,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum JumpGateConnections {
+    Charted(Vec<WaypointSymbol>),
+    Uncharted,
+}
+
 #[derive(Clone)]
 pub struct Universe {
     api_client: ApiClient,
@@ -34,6 +48,7 @@ pub struct Universe {
     remote_shipyards: Arc<DashMap<WaypointSymbol, ShipyardRemoteView>>,
     shipyards: Arc<DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Shipyard>>>>>,
     factions: DashMap<String, Faction>,
+    jumpgates: Arc<DashMap<WaypointSymbol, JumpGateInfo>>,
 }
 
 impl Universe {
@@ -47,6 +62,7 @@ impl Universe {
             remote_shipyards: Arc::new(DashMap::new()),
             shipyards: Arc::new(DashMap::new()),
             factions: DashMap::new(),
+            jumpgates: Arc::new(DashMap::new()),
         }
     }
 
@@ -448,5 +464,27 @@ impl Universe {
             .find(|waypoint| waypoint.is_jump_gate())
             .unwrap()
             .symbol
+    }
+
+    pub async fn get_jumpgate_connections(&self, symbol: &WaypointSymbol) -> JumpGateInfo {
+        let db_jumpgate_key = format!("jumpgate/{}", symbol);
+
+        // Layer 1 - check cache
+        if let Some(jumpgate_info) = &self.jumpgates.get(symbol) {
+            return jumpgate_info.value().clone();
+        }
+        // Layer 2 - check db
+        let jumpgate_info: Option<JumpGateInfo> = self.db.get_value(&db_jumpgate_key).await;
+        if let Some(jumpgate_info) = jumpgate_info {
+            // !! at this point we might want to do a freshness check on jumpgate_info.timestamp if uncharted
+            // in case it's been charted since we last fetched it
+            self.jumpgates.insert(symbol.clone(), jumpgate_info.clone());
+            return jumpgate_info;
+        }
+        // Layer 3 - fetch from api
+        let jumpgate_info = self.api_client.get_jumpgate_conns(symbol).await;
+        self.db.set_value(&db_jumpgate_key, &jumpgate_info).await;
+        self.jumpgates.insert(symbol.clone(), jumpgate_info.clone());
+        jumpgate_info
     }
 }

@@ -25,6 +25,7 @@ async fn main() -> io::Result<()> {
 
     let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
     let system_symbol = agent_controller.starting_system();
+    // let system_symbol = agent_controller.faction_capital().await;
 
     let waypoints: Vec<Waypoint> = universe.get_system_waypoints(&system_symbol).await;
     let mut markets = Vec::new();
