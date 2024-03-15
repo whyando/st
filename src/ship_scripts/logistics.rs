@@ -18,7 +18,6 @@ pub async fn run(
 
     let ship_symbol = ship_controller.symbol();
     let system_symbol = ship_controller.system();
-    assert_eq!(system_symbol, taskmanager.system_symbol);
 
     loop {
         // Generate or resume schedule
@@ -41,6 +40,7 @@ pub async fn run(
             let schedule = taskmanager
                 .take_tasks(
                     &ship_symbol,
+                    &system_symbol,
                     &config,
                     ship_controller.cargo_capacity(),
                     ship_controller.engine_speed(),

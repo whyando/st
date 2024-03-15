@@ -27,10 +27,13 @@ async fn main() {
     api_client.set_agent_token(&agent_token);
 
     let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
+    // let system_symbol = agent_controller.starting_system();
+    let system_symbol = st::models::SystemSymbol("X1-JY8".to_string());
+
     dbg!(agent_controller.task_manager.in_progress_tasks());
     let task_list = agent_controller
         .task_manager
-        .generate_task_list(10000, false)
+        .generate_task_list(&system_symbol, 10000, false)
         .await;
     println!("Generated: {} tasks", task_list.len());
     for task in task_list {

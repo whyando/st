@@ -47,7 +47,7 @@ fn is_task_allowed(task: &Task, config: &LogisticsScriptConfig) -> bool {
 
 #[derive(Clone)]
 pub struct LogisticTaskManager {
-    pub system_symbol: SystemSymbol,
+    start_system: SystemSymbol,
     agent_controller: Arc<RwLock<Option<AgentController>>>,
     universe: Universe,
     db_client: DataClient,
@@ -61,14 +61,14 @@ impl LogisticTaskManager {
     pub async fn new(
         universe: &Universe,
         db_client: &DataClient,
-        system_symbol: &SystemSymbol,
+        start_system: &SystemSymbol,
     ) -> Self {
         let in_progress_tasks = db_client
-            .load_task_manager_state(system_symbol)
+            .load_task_manager_state(start_system)
             .await
             .unwrap_or_default();
         Self {
-            system_symbol: system_symbol.clone(),
+            start_system: start_system.clone(),
             universe: universe.clone(),
             db_client: db_client.clone(),
             agent_controller: Arc::new(RwLock::new(None)),
@@ -109,14 +109,22 @@ impl LogisticTaskManager {
 
     // add trading tasks to the task list, if they don't already exist
     // (this function is not without side effects: it may buy ships)
-    pub async fn generate_task_list(&self, capacity_cap: i64, buy_ships: bool) -> Vec<Task> {
+    pub async fn generate_task_list(
+        &self,
+        system_symbol: &SystemSymbol,
+        capacity_cap: i64,
+        buy_ships: bool,
+    ) -> Vec<Task> {
         let now = chrono::Utc::now();
-        let waypoints: Vec<Waypoint> = self
-            .universe
-            .get_system_waypoints(&self.system_symbol)
-            .await;
+        let waypoints: Vec<Waypoint> = self.universe.get_system_waypoints(system_symbol).await;
 
         let mut tasks = Vec::new();
+
+        let system_prefix = if system_symbol == &self.start_system {
+            "".to_string()
+        } else {
+            format!("{}/", system_symbol)
+        };
 
         // !! one day recalculate ship config here perhaps
 
@@ -137,22 +145,21 @@ impl LogisticTaskManager {
             self.agent_controller()._spawn_run_ship(ship_symbol).await;
         }
         if let Some(waypoint) = shipyard_task_waypoint {
-            tasks.push(Task {
-                id: format!("buyships_{}", waypoint),
-                actions: TaskActions::VisitLocation {
-                    waypoint: waypoint.clone(),
-                    action: Action::TryBuyShips,
-                },
-                value: 200000,
-            });
+            if &waypoint.system() == system_symbol {
+                tasks.push(Task {
+                    id: format!("{}buyships_{}", system_prefix, waypoint),
+                    actions: TaskActions::VisitLocation {
+                        waypoint: waypoint.clone(),
+                        action: Action::TryBuyShips,
+                    },
+                    value: 200000,
+                });
+            }
         }
 
         // load markets
-        let markets = self.universe.get_system_markets(&self.system_symbol).await;
-        let shipyards = self
-            .universe
-            .get_system_shipyards(&self.system_symbol)
-            .await;
+        let markets = self.universe.get_system_markets(system_symbol).await;
+        let shipyards = self.universe.get_system_shipyards(system_symbol).await;
 
         // unique list of goods
         let mut goods = BTreeSet::new();
@@ -172,11 +179,16 @@ impl LogisticTaskManager {
         let mut good_import_permits = BTreeMap::<String, Vec<WaypointSymbol>>::new();
 
         let construction = self.universe.get_construction(&jump_gate.symbol).await;
-        if let Some(construction) = &construction.data {
+        let construction = match &construction.data {
+            Some(c) if c.is_complete => None,
+            None => None,
+            Some(c) => Some(c),
+        };
+        if let Some(construction) = &construction {
             let fab_mat_market = self
                 .universe
                 .search_waypoints(
-                    &self.system_symbol,
+                    &system_symbol,
                     &[
                         WaypointFilter::Imports("QUARTZ_SAND".to_string()),
                         WaypointFilter::Imports("IRON".to_string()),
@@ -189,7 +201,7 @@ impl LogisticTaskManager {
             let smeltery_market = self
                 .universe
                 .search_waypoints(
-                    &self.system_symbol,
+                    &system_symbol,
                     &[
                         WaypointFilter::Imports("IRON_ORE".to_string()),
                         WaypointFilter::Imports("COPPER_ORE".to_string()),
@@ -203,7 +215,7 @@ impl LogisticTaskManager {
             let adv_circuit_market = self
                 .universe
                 .search_waypoints(
-                    &self.system_symbol,
+                    &system_symbol,
                     &[
                         WaypointFilter::Imports("ELECTRONICS".to_string()),
                         WaypointFilter::Imports("MICROPROCESSORS".to_string()),
@@ -217,7 +229,7 @@ impl LogisticTaskManager {
             let electronics_market = self
                 .universe
                 .search_waypoints(
-                    &self.system_symbol,
+                    &system_symbol,
                     &[
                         WaypointFilter::Imports("SILICON_CRYSTALS".to_string()),
                         WaypointFilter::Imports("COPPER".to_string()),
@@ -230,7 +242,7 @@ impl LogisticTaskManager {
             let microprocessor_market = self
                 .universe
                 .search_waypoints(
-                    &self.system_symbol,
+                    &system_symbol,
                     &[
                         WaypointFilter::Imports("SILICON_CRYSTALS".to_string()),
                         WaypointFilter::Imports("COPPER".to_string()),
@@ -345,7 +357,7 @@ impl LogisticTaskManager {
                         material.required
                     );
                     tasks.push(Task {
-                        id: format!("construction_{}", material.trade_symbol),
+                        id: format!("{}construction_{}", system_prefix, material.trade_symbol),
                         actions: TaskActions::TransportCargo {
                             src: buy_trade_good.0.clone(),
                             dest: jump_gate.symbol.clone(),
@@ -376,7 +388,7 @@ impl LogisticTaskManager {
                 market_remote.exports.is_empty() && market_remote.imports.is_empty();
             if requires_visit && !is_pure_exchange && !is_probed {
                 tasks.push(Task {
-                    id: format!("refreshmarket_{}", market_remote.symbol),
+                    id: format!("{}refreshmarket_{}", system_prefix, market_remote.symbol),
                     actions: TaskActions::VisitLocation {
                         waypoint: market_remote.symbol.clone(),
                         action: Action::RefreshMarket,
@@ -393,7 +405,10 @@ impl LogisticTaskManager {
             let is_probed = probe_locations.contains(&shipyard_remote.symbol);
             if requires_visit && !is_probed {
                 tasks.push(Task {
-                    id: format!("refreshshipyard_{}", shipyard_remote.symbol),
+                    id: format!(
+                        "{}refreshshipyard_{}",
+                        system_prefix, shipyard_remote.symbol
+                    ),
                     actions: TaskActions::VisitLocation {
                         waypoint: shipyard_remote.symbol.clone(),
                         action: Action::RefreshShipyard,
@@ -472,7 +487,7 @@ impl LogisticTaskManager {
                 );
                 tasks.push(Task {
                     // exclusion seems a bit broad right now, but it's a start
-                    id: format!("trade_{}", good),
+                    id: format!("{}trade_{}", system_prefix, good),
                     actions: TaskActions::TransportCargo {
                         src: buy_trade_good.0.clone(),
                         dest: sell_trade_good.0.clone(),
@@ -509,6 +524,7 @@ impl LogisticTaskManager {
     pub async fn take_tasks(
         &self,
         ship_symbol: &str,
+        system_symbol: &SystemSymbol,
         config: &LogisticsScriptConfig,
         cargo_capacity: i64,
         engine_speed: i64,
@@ -517,11 +533,13 @@ impl LogisticTaskManager {
         plan_length: Duration,
     ) -> ShipSchedule {
         let _guard = self.take_tasks_lock().await;
-        assert_eq!(start_waypoint.system(), self.system_symbol);
+        assert_eq!(&start_waypoint.system(), system_symbol);
 
         // Cleanup in_progress_tasks for this ship
         self.in_progress_tasks.retain(|_k, v| v.1 != ship_symbol);
-        let all_tasks = self.generate_task_list(cargo_capacity, true).await;
+        let all_tasks = self
+            .generate_task_list(system_symbol, cargo_capacity, true)
+            .await;
         self.agent_controller()
             .ledger
             .reserve_credits(ship_symbol, 5000 * cargo_capacity);
@@ -536,7 +554,7 @@ impl LogisticTaskManager {
 
         let matrix = self
             .universe
-            .estimate_duration_matrix(&self.system_symbol, engine_speed, fuel_capacity)
+            .estimate_duration_matrix(&system_symbol, engine_speed, fuel_capacity)
             .await;
         let logistics_ship = LogisticShip {
             symbol: ship_symbol.to_string(),
@@ -614,7 +632,7 @@ impl LogisticTaskManager {
             }
         }
         self.db_client
-            .save_task_manager_state(&self.system_symbol, &self.in_progress_tasks)
+            .save_task_manager_state(&self.start_system, &self.in_progress_tasks)
             .await;
 
         schedule
@@ -623,7 +641,7 @@ impl LogisticTaskManager {
     pub async fn set_task_completed(&self, task: &Task) {
         self.in_progress_tasks.remove(&task.id);
         self.db_client
-            .save_task_manager_state(&self.system_symbol, &self.in_progress_tasks)
+            .save_task_manager_state(&self.start_system, &self.in_progress_tasks)
             .await;
         debug!("Marking task {} as completed", task.id);
     }

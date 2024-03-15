@@ -223,6 +223,7 @@ pub fn ship_config_capital_system(
 ) -> Vec<ShipConfig> {
     let mut ships = vec![];
 
+    let inner_market_waypoints = market_waypoints(waypoints, Some(200));
     let all_market_waypoints = market_waypoints(waypoints, None);
 
     // Send probes to all shipyards
@@ -267,6 +268,44 @@ pub fn ship_config_capital_system(
             },
         ));
     }
+
+    ships.push((
+        (3.0, 0.0),
+        ShipConfig {
+            id: format!("logistics_freighter/planned/{}", 1),
+            ship_model: "SHIP_REFINING_FREIGHTER".to_string(),
+            purchase_criteria: PurchaseCriteria {
+                system_symbol: Some(system_waypoint.clone()),
+                ..PurchaseCriteria::default()
+            },
+            behaviour: ShipBehaviour::Logistics(LogisticsScriptConfig {
+                use_planner: true,
+                waypoint_allowlist: Some(inner_market_waypoints.clone()),
+                allow_shipbuying: false,
+                allow_market_refresh: false,
+                allow_construction: false,
+            }),
+        },
+    ));
+
+    ships.push((
+        (3.0, 0.0),
+        ShipConfig {
+            id: format!("logistics_freighter/greedy/{}", 1),
+            ship_model: "SHIP_REFINING_FREIGHTER".to_string(),
+            purchase_criteria: PurchaseCriteria {
+                system_symbol: Some(system_waypoint.clone()),
+                ..PurchaseCriteria::default()
+            },
+            behaviour: ShipBehaviour::Logistics(LogisticsScriptConfig {
+                use_planner: false,
+                waypoint_allowlist: None,
+                allow_shipbuying: false,
+                allow_market_refresh: false,
+                allow_construction: false,
+            }),
+        },
+    ));
 
     ships.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     ships.into_iter().map(|(_, c)| c).collect()

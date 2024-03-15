@@ -273,6 +273,30 @@ lazy_static::lazy_static! {
             req_mounts: vec!["MOUNT_GAS_SIPHON_I".to_string()],
             cargo_capacity: 15,
         },
+        "SHIP_REFINING_FREIGHTER" => ShipModel {
+            frame: "FRAME_HEAVY_FREIGHTER".to_string(),
+            reactor: "REACTOR_FUSION_I".to_string(),
+            engine: "ENGINE_ION_DRIVE_II".to_string(),
+            req_modules: vec!["MODULE_CARGO_HOLD_III".to_string(), "MODULE_ORE_REFINERY_I".to_string()],
+            req_mounts: vec!["MOUNT_MISSILE_LAUNCHER_I".to_string()],
+            cargo_capacity: 150,
+        },
+        "SHIP_ORE_HOUND" => ShipModel {
+            frame: "FRAME_MINER".to_string(),
+            reactor: "REACTOR_FISSION_I".to_string(),
+            engine: "ENGINE_ION_DRIVE_I".to_string(),
+            req_modules: vec!["MODULE_MINERAL_PROCESSOR_I".to_string()],
+            req_mounts: vec!["MOUNT_MINING_LASER_II".to_string(), "MOUNT_SURVEYOR_I".to_string()],
+            cargo_capacity: 40,
+        },
+        "SHIP_EXPLORER" => ShipModel {
+            frame: "FRAME_EXPLORER".to_string(),
+            reactor: "REACTOR_FUSION_I".to_string(),
+            engine: "ENGINE_ION_DRIVE_II".to_string(),
+            req_modules: vec!["MODULE_WARP_DRIVE_I".to_string()],
+            req_mounts: vec!["MOUNT_SENSOR_ARRAY_II".to_string(), "MOUNT_GAS_SIPHON_II".to_string()],
+            cargo_capacity: 40,
+        },
     };
 }
 
