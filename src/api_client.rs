@@ -298,7 +298,7 @@ impl ApiClient {
                 Some(ts) if ts > now => ts,
                 _ => now,
             };
-            *next_request_ts = Some(request_instant + std::time::Duration::from_millis(500));
+            *next_request_ts = Some(request_instant + std::time::Duration::from_millis(501));
             request_instant
         };
         let wait_duration = request_instant

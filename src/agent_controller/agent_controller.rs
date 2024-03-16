@@ -711,18 +711,42 @@ impl AgentController {
                 if !CONFIG.job_id_filter.is_match(&job_spec.id) {
                     return;
                 }
+                let ship_controller = self.ship_controller(&ship_symbol);
+                let ship = ship_controller.ship();
+                if ship.engine.condition.unwrap() <= 0.0 {
+                    warn!(
+                        "Ship {} has engine condition {}",
+                        ship_symbol,
+                        ship.engine.condition.unwrap()
+                    );
+                    return;
+                }
+                if ship.frame.condition.unwrap() <= 0.0 {
+                    warn!(
+                        "Ship {} has frame condition {}",
+                        ship_symbol,
+                        ship.frame.condition.unwrap()
+                    );
+                    return;
+                }
+                if ship.reactor.condition.unwrap() <= 0.0 {
+                    warn!(
+                        "Ship {} has reactor condition {}",
+                        ship_symbol,
+                        ship.reactor.condition.unwrap()
+                    );
+                    return;
+                }
 
                 // run script for assigned job
                 let join_hdl = match &job_spec.behaviour {
                     ShipBehaviour::Probe(config) => {
-                        let ship_controller = self.ship_controller(&ship_symbol);
                         let config = config.clone();
                         tokio::spawn(async move {
                             ship_scripts::probe::run(ship_controller, &config).await;
                         })
                     }
                     ShipBehaviour::Logistics(config) => {
-                        let ship_controller = self.ship_controller(&ship_symbol);
                         let db = self.db.clone();
                         let task_manager = self.task_manager.clone();
                         let config = config.clone();
@@ -731,40 +755,28 @@ impl AgentController {
                                 .await;
                         })
                     }
-                    ShipBehaviour::SiphonDrone => {
-                        let ship_controller = self.ship_controller(&ship_symbol);
-                        tokio::spawn(async move {
-                            ship_scripts::siphon::run_drone(ship_controller).await;
-                        })
-                    }
+                    ShipBehaviour::SiphonDrone => tokio::spawn(async move {
+                        ship_scripts::siphon::run_drone(ship_controller).await;
+                    }),
                     ShipBehaviour::SiphonShuttle => {
-                        let ship_controller = self.ship_controller(&ship_symbol);
                         let db = self.db.clone();
                         tokio::spawn(async move {
                             ship_scripts::siphon::run_shuttle(ship_controller, db).await;
                         })
                     }
-                    ShipBehaviour::MiningDrone => {
-                        let ship_controller = self.ship_controller(&ship_symbol);
-                        tokio::spawn(async move {
-                            ship_scripts::mining::run_mining_drone(ship_controller).await;
-                        })
-                    }
+                    ShipBehaviour::MiningDrone => tokio::spawn(async move {
+                        ship_scripts::mining::run_mining_drone(ship_controller).await;
+                    }),
                     ShipBehaviour::MiningShuttle => {
-                        let ship_controller = self.ship_controller(&ship_symbol);
                         let db = self.db.clone();
                         tokio::spawn(async move {
                             ship_scripts::mining::run_shuttle(ship_controller, db).await;
                         })
                     }
-                    ShipBehaviour::MiningSurveyor => {
-                        let ship_controller = self.ship_controller(&ship_symbol);
-                        tokio::spawn(async move {
-                            ship_scripts::mining::run_surveyor(ship_controller).await;
-                        })
-                    }
+                    ShipBehaviour::MiningSurveyor => tokio::spawn(async move {
+                        ship_scripts::mining::run_surveyor(ship_controller).await;
+                    }),
                     ShipBehaviour::ConstructionHauler => {
-                        let ship_controller = self.ship_controller(&ship_symbol);
                         let db = self.db.clone();
                         tokio::spawn(async move {
                             ship_scripts::construction::run_hauler(ship_controller, db).await;
