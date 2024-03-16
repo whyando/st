@@ -713,7 +713,7 @@ impl AgentController {
                 }
                 let ship_controller = self.ship_controller(&ship_symbol);
                 let ship = ship_controller.ship();
-                if ship.engine.condition.unwrap() <= 0.0 {
+                if ship.engine.condition.unwrap() < 0.0 {
                     warn!(
                         "Ship {} has engine condition {}",
                         ship_symbol,
@@ -721,7 +721,7 @@ impl AgentController {
                     );
                     return;
                 }
-                if ship.frame.condition.unwrap() <= 0.0 {
+                if ship.frame.condition.unwrap() < 0.0 {
                     warn!(
                         "Ship {} has frame condition {}",
                         ship_symbol,
@@ -729,7 +729,7 @@ impl AgentController {
                     );
                     return;
                 }
-                if ship.reactor.condition.unwrap() <= 0.0 {
+                if ship.reactor.condition.unwrap() < 0.0 {
                     warn!(
                         "Ship {} has reactor condition {}",
                         ship_symbol,
