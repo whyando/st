@@ -782,6 +782,12 @@ impl AgentController {
                             ship_scripts::construction::run_hauler(ship_controller, db).await;
                         })
                     }
+                    ShipBehaviour::Explorer => {
+                        let db = self.db.clone();
+                        tokio::spawn(async move {
+                            ship_scripts::exploration::run_explorer(ship_controller, db).await;
+                        })
+                    }
                 };
                 debug!("spawn_run_ship try push join_hdl");
                 self.hdls.push(join_hdl).await;

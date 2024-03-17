@@ -389,6 +389,23 @@ pub fn ship_config_capital_system(
         ));
     }
 
+    // Charting
+    const NUM_EXPLORERS: i64 = 0; // @@
+    for i in 0..NUM_EXPLORERS {
+        ships.push((
+            (4.0, (i as f64) / (NUM_EXPLORERS as f64)),
+            ShipConfig {
+                id: format!("{}/explorer/{}", system_waypoint, i),
+                ship_model: "SHIP_EXPLORER".to_string(),
+                purchase_criteria: PurchaseCriteria {
+                    system_symbol: Some(system_waypoint.clone()),
+                    ..PurchaseCriteria::default()
+                },
+                behaviour: ShipBehaviour::Explorer,
+            },
+        ));
+    }
+
     ships.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     ships.into_iter().map(|(_, c)| c).collect()
 }
