@@ -269,6 +269,7 @@ pub fn ship_config_capital_system(
         ));
     }
 
+    // Profit-making haulers: 1x planner, 3x greedy
     ships.push((
         (3.0, 0.0),
         ShipConfig {
@@ -287,7 +288,6 @@ pub fn ship_config_capital_system(
             }),
         },
     ));
-
     const NUM_GREEDY_FREIGHTERS: i64 = 3;
     for i in 1..=NUM_GREEDY_FREIGHTERS {
         ships.push((
@@ -306,6 +306,85 @@ pub fn ship_config_capital_system(
                     allow_market_refresh: false,
                     allow_construction: false,
                 }),
+            },
+        ));
+    }
+
+    // Siphon drones + haulers
+    const NUM_SIPHON_DRONES: usize = 4;
+    const NUM_SIPHON_SHUTTLES: usize = 1;
+    for i in 0..NUM_SIPHON_DRONES {
+        ships.push((
+            (7.0, (i as f64) / (NUM_SIPHON_DRONES as f64)),
+            ShipConfig {
+                id: format!("{}/siphon_drone/{}", system_waypoint, i),
+                ship_model: "SHIP_SIPHON_DRONE".to_string(),
+                purchase_criteria: PurchaseCriteria {
+                    system_symbol: Some(system_waypoint.clone()),
+                    ..PurchaseCriteria::default()
+                },
+                behaviour: ShipBehaviour::SiphonDrone,
+            },
+        ));
+    }
+    for i in 0..NUM_SIPHON_SHUTTLES {
+        ships.push((
+            (7.0, (i as f64) / (NUM_SIPHON_SHUTTLES as f64)),
+            ShipConfig {
+                id: format!("{}/siphon_shuttle/{}", system_waypoint, i),
+                ship_model: "SHIP_REFINING_FREIGHTER".to_string(),
+                purchase_criteria: PurchaseCriteria {
+                    system_symbol: Some(system_waypoint.clone()),
+                    ..PurchaseCriteria::default()
+                },
+                behaviour: ShipBehaviour::SiphonShuttle,
+            },
+        ));
+    }
+
+    // Mining operation
+    const NUM_SURVEYORS: i64 = 1;
+    const NUM_MINING_DRONES: i64 = 4;
+    const NUM_MINING_SHUTTLES: i64 = 1;
+    for i in 0..NUM_SURVEYORS {
+        ships.push((
+            (3.0, (i as f64) / (NUM_SURVEYORS as f64)),
+            ShipConfig {
+                id: format!("{}/surveyor/{}", system_waypoint, i),
+                ship_model: "SHIP_SURVEYOR".to_string(),
+                purchase_criteria: PurchaseCriteria {
+                    system_symbol: Some(system_waypoint.clone()),
+                    ..PurchaseCriteria::default()
+                },
+                behaviour: ShipBehaviour::MiningSurveyor,
+            },
+        ));
+    }
+    for i in 0..NUM_MINING_DRONES {
+        ships.push((
+            (3.0, (i as f64) / (NUM_MINING_DRONES as f64)),
+            ShipConfig {
+                id: format!("{}/mining_drone/{}", system_waypoint, i),
+                ship_model: "SHIP_ORE_HOUND".to_string(),
+                purchase_criteria: PurchaseCriteria {
+                    system_symbol: Some(system_waypoint.clone()),
+                    ..PurchaseCriteria::default()
+                },
+                behaviour: ShipBehaviour::MiningDrone,
+            },
+        ));
+    }
+    for i in 0..NUM_MINING_SHUTTLES {
+        ships.push((
+            (3.0, (i as f64) / (NUM_MINING_SHUTTLES as f64)),
+            ShipConfig {
+                id: format!("{}/mining_shuttle/{}", system_waypoint, i),
+                ship_model: "SHIP_REFINING_FREIGHTER".to_string(),
+                purchase_criteria: PurchaseCriteria {
+                    system_symbol: Some(system_waypoint.clone()),
+                    ..PurchaseCriteria::default()
+                },
+                behaviour: ShipBehaviour::MiningShuttle,
             },
         ));
     }
