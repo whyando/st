@@ -523,21 +523,30 @@ impl ShipController {
         match action {
             Action::RefreshMarket => self.refresh_market().await,
             Action::RefreshShipyard => self.refresh_shipyard().await,
+            // Interpret this action as units is the target
             Action::BuyGoods(good, units) => {
-                // todo, check market price + trade volume before issuing api request to buy
-                self.buy_goods(good, *units, true).await;
+                let good_count = self.cargo_good_count(good);
+                let mut remaining_to_buy = units - good_count;
                 self.refresh_market().await;
+                while remaining_to_buy > 0 {
+                    let market = self.universe.get_market(&self.waypoint()).await.unwrap();
+                    let trade = market
+                        .data
+                        .trade_goods
+                        .iter()
+                        .find(|g| g.symbol == *good)
+                        .unwrap();
+                    let buy_units = min(trade.trade_volume, remaining_to_buy);
+                    self.buy_goods(good, buy_units, true).await;
+                    self.refresh_market().await;
+                    remaining_to_buy -= buy_units;
+                }
             }
-            Action::SellGoods(good, units) => {
+            // Always sell to 0
+            Action::SellGoods(good, _units) => {
                 // We need to handle falling trade volume
                 let good_count = self.cargo_good_count(good);
-                if good_count != *units {
-                    warn!(
-                        "Trying to sell {} units of {} but only have {}",
-                        units, good, good_count
-                    );
-                }
-                let mut remaining_to_sell = min(*units, good_count);
+                let mut remaining_to_sell = good_count; // min(*units, good_count);
                 self.refresh_market().await;
                 while remaining_to_sell > 0 {
                     let market = self.universe.get_market(&self.waypoint()).await.unwrap();
