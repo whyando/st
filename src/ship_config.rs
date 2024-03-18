@@ -311,8 +311,8 @@ pub fn ship_config_capital_system(
     }
 
     // Siphon drones + haulers
-    const NUM_SIPHON_DRONES: usize = 4;
-    const NUM_SIPHON_SHUTTLES: usize = 1;
+    const NUM_SIPHON_DRONES: usize = 0; // 4;
+    const NUM_SIPHON_SHUTTLES: usize = 0; // 1;
     for i in 0..NUM_SIPHON_DRONES {
         ships.push((
             (7.0, (i as f64) / (NUM_SIPHON_DRONES as f64)),
@@ -343,9 +343,9 @@ pub fn ship_config_capital_system(
     }
 
     // Mining operation
-    const NUM_SURVEYORS: i64 = 1;
-    const NUM_MINING_DRONES: i64 = 4;
-    const NUM_MINING_SHUTTLES: i64 = 1;
+    const NUM_SURVEYORS: i64 = 0; // 1;
+    const NUM_MINING_DRONES: i64 = 0; // 4;
+    const NUM_MINING_SHUTTLES: i64 = 0; // 1;
     for i in 0..NUM_SURVEYORS {
         ships.push((
             (3.0, (i as f64) / (NUM_SURVEYORS as f64)),
