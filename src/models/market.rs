@@ -148,6 +148,15 @@ pub struct MarketTransaction {
     pub timestamp: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScrapTransaction {
+    pub waypoint_symbol: WaypointSymbol,
+    pub ship_symbol: String,
+    pub total_price: i64,
+    pub timestamp: DateTime<Utc>,
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

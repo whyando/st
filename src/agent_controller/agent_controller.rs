@@ -544,6 +544,10 @@ impl AgentController {
         self.check_era_advance().await;
         self.refresh_ship_config().await;
 
+        if CONFIG.scrap_all_ships {
+            return (vec![], None);
+        }
+
         let mut purchased_ships = vec![];
 
         let ship_config = self.get_ship_config();
@@ -778,6 +782,16 @@ impl AgentController {
 
     pub async fn spawn_run_ship(&self, ship_symbol: String) {
         debug!("Spawning task for {}", ship_symbol);
+
+        if CONFIG.scrap_all_ships {
+            let ship_controller = self.ship_controller(&ship_symbol);
+            let join_hdl = tokio::spawn(async move {
+                ship_scripts::scrap::run(ship_controller).await;
+            });
+            self.hdls.push(join_hdl).await;
+            return;
+        }
+
         match self.job_assignments_rev.get(&ship_symbol) {
             Some(job_id) => {
                 let ship_config = self.get_ship_config();

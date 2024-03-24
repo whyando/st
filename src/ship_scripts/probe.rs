@@ -1,7 +1,4 @@
-use crate::{
-    models::{ProbeScriptConfig, ShipFlightMode},
-    ship_controller::ShipController,
-};
+use crate::{models::ProbeScriptConfig, ship_controller::ShipController};
 use chrono::{DateTime, Duration, Utc};
 use lazy_static::lazy_static;
 use log::*;
@@ -59,8 +56,7 @@ pub async fn probe_multiple_locations(ship: ShipController, config: &ProbeScript
         }
         last_cycle_start = Some(chrono::Utc::now());
         for waypoint in &waypoints {
-            ship.navigate(ShipFlightMode::Cruise, &waypoint.symbol)
-                .await;
+            ship.goto_waypoint(&waypoint.symbol).await;
             ship.refresh_market().await;
 
             if waypoint.is_shipyard() {
@@ -107,16 +103,12 @@ pub async fn probe_single_location(ship_controller: ShipController, config: &Pro
             .universe
             .get_jumpgate(&waypoint.system_symbol)
             .await;
-        ship_controller
-            .navigate(ShipFlightMode::Cruise, &jumpgate_src)
-            .await;
+        ship_controller.goto_waypoint(&jumpgate_src).await;
         // jump to correct system
         ship_controller.jump(&jumpgate_dest).await;
     }
 
-    ship_controller
-        .navigate(ShipFlightMode::Cruise, waypoint_symbol)
-        .await;
+    ship_controller.goto_waypoint(waypoint_symbol).await;
     ship_controller.dock().await; // don't need to dock, but do so anyway to clear 'InTransit' status
 
     // Random sleep for a gentler startup

@@ -368,7 +368,7 @@ impl ShipController {
         self.agent_controller.update_agent(agent).await;
     }
 
-    pub async fn navigate(&self, flight_mode: ShipFlightMode, waypoint: &WaypointSymbol) {
+    async fn navigate(&self, flight_mode: ShipFlightMode, waypoint: &WaypointSymbol) {
         assert!(!self.is_in_transit(), "Ship is already in transit");
         if self.waypoint() == *waypoint {
             return;
@@ -412,8 +412,14 @@ impl ShipController {
         self.update_cooldown(cooldown).await;
     }
 
-    // Navigation between two market waypoints
+    // Navigation between two waypoints
     pub async fn goto_waypoint(&self, target: &WaypointSymbol) {
+        assert!(!self.is_in_transit(), "Ship is already in transit");
+        if self.fuel_capacity() == 0 {
+            self.navigate(ShipFlightMode::Burn, target).await;
+            self.debug(&format!("Arrived at waypoint: {}", target));
+            return;
+        }
         let route = self
             .universe
             .get_route(
@@ -702,6 +708,22 @@ impl ShipController {
                 resp_body
             ),
         };
+    }
+
+    pub async fn scrap(&self) {
+        assert!(!self.is_in_transit(), "Ship is in transit");
+        self.dock().await;
+        self.debug("Scraping");
+        let uri = format!("/my/ships/{}/scrap", self.ship_symbol);
+        let mut response: Value = self.api_client.post(&uri, &json!({})).await;
+        let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
+        let transaction: ScrapTransaction =
+            serde_json::from_value(response["data"]["transaction"].take()).unwrap();
+        info!(
+            "{} Scrapped ship for ${}",
+            self.ship_symbol, transaction.total_price
+        );
+        self.agent_controller.update_agent(agent).await;
     }
 
     pub fn handle_ship_condition_events(&self, events: &Vec<ShipConditionEvent>) {
