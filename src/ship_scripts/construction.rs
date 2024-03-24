@@ -104,6 +104,13 @@ async fn tick(
                     "ADVANCED_CIRCUITRY" => &adv_circuit_market,
                     _ => panic!("Unknown construction good: {}", mat.trade_symbol),
                 };
+                // Add a credit buffer against advanced circuitry, since FABMATs are higher priority when credits are low
+                // because they are the long pole
+                let credit_buffer = match mat.trade_symbol.as_str() {
+                    "FAB_MATS" => 0,
+                    "ADVANCED_CIRCUITRY" => 1_000_000,
+                    _ => panic!("Unknown construction good: {}", mat.trade_symbol),
+                };
                 let market = ship.universe.get_market(&market_symbol).await;
                 if let Some(market) = market {
                     let good = market
@@ -127,10 +134,10 @@ async fn tick(
 
                         let expected_cost = good.purchase_price * units;
                         let credits = ship.agent_controller.ledger.available_credits();
-                        if expected_cost > credits {
+                        if expected_cost > credits - credit_buffer {
                             debug!(
-                                "Insufficient funds to buy {} units of {}. {}/{}",
-                                units, good.symbol, credits, expected_cost
+                                "Insufficient funds to buy {} units of {}. {}/{} (buffer: {})",
+                                units, good.symbol, credits, expected_cost, credit_buffer
                             );
                             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
                             return None;
