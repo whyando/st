@@ -176,7 +176,14 @@ impl LogisticTaskManager {
             .iter()
             .find(|w| w.is_jump_gate())
             .expect("Star system has no jump gate");
+
+        // Markets deemed critical enough to be the exclusive recipient of certain goods
         let mut good_import_permits = BTreeMap::<String, Vec<WaypointSymbol>>::new();
+        // Goods where their flow is more important that prices (bypasses the STRONG MODERATE condition)
+        let mut good_req_constant_flow = BTreeSet::<String>::new();
+        // Markets where we would like to cap the amount of units we import once we reach a target evolution
+        // to prevent overevolution and yo-yo behaviours
+        let mut market_capped_import = BTreeMap::<(WaypointSymbol, String), i64>::new();
 
         let construction = self.universe.get_construction(&jump_gate.symbol).await;
         let construction = match &construction.data {
@@ -274,6 +281,9 @@ impl LogisticTaskManager {
                             .entry("IRON_ORE".to_string())
                             .or_default()
                             .push(smeltery_market.clone());
+                        good_req_constant_flow.insert("IRON".to_string());
+                        market_capped_import
+                            .insert((fab_mat_market.clone(), "IRON".to_string()), 100);
                     }
                     "ADVANCED_CIRCUITRY" => {
                         // adv_circuit_market
@@ -312,65 +322,67 @@ impl LogisticTaskManager {
                     _ => panic!("Unknown construction good: {}", material.trade_symbol),
                 };
 
-                let remaining = material.required - material.fulfilled;
-                let buy_trade_good = markets
-                    .iter()
-                    .filter_map(|(_, market_opt)| match market_opt {
-                        Some(market) => {
-                            let market_symbol = market.data.symbol.clone();
-                            let trade = market
-                                .data
-                                .trade_goods
-                                .iter()
-                                .find(|g| g.symbol == material.trade_symbol);
-                            trade.map(|trade| (market_symbol, trade))
-                        }
-                        None => None,
-                    })
-                    // purchase filters
-                    .filter(|(_, trade)| match trade._type {
-                        Import => false,
-                        Export => {
-                            // unsure if this is just causing weird fluctuations
-                            // Strong markets are where we'll make the most consistent profit
-                            // ?? what about RESTRICTED markets?
-                            if trade.activity == Some(Strong) {
-                                trade.supply >= High
-                            } else {
-                                trade.supply >= Moderate
-                            }
-                            // trade.supply >= Moderate
-                        }
-                        Exchange => true,
-                    })
-                    .min_by_key(|(_, trade)| trade.purchase_price);
-                if let Some(buy_trade_good) = buy_trade_good {
-                    let units = min(min(remaining, capacity_cap), buy_trade_good.1.trade_volume);
-                    let cost = units * buy_trade_good.1.purchase_price;
-                    // if cost + 2000000 <= available_credits {
-                    debug!(
-                        "Construction: buy {} @ {} for ${}, progress: {}/{}",
-                        material.trade_symbol,
-                        buy_trade_good.1.purchase_price,
-                        cost,
-                        material.fulfilled,
-                        material.required
-                    );
-                    tasks.push(Task {
-                        id: format!("{}construction_{}", system_prefix, material.trade_symbol),
-                        actions: TaskActions::TransportCargo {
-                            src: buy_trade_good.0.clone(),
-                            dest: jump_gate.symbol.clone(),
-                            src_action: Action::BuyGoods(material.trade_symbol.clone(), units),
-                            dest_action: Action::DeliverConstruction(
-                                material.trade_symbol.clone(),
-                                units,
-                            ),
-                        },
-                        value: 100000,
-                    });
-                    // }
-                }
+                // !! Don't add construction tasks
+
+                // let remaining = material.required - material.fulfilled;
+                // let buy_trade_good = markets
+                //     .iter()
+                //     .filter_map(|(_, market_opt)| match market_opt {
+                //         Some(market) => {
+                //             let market_symbol = market.data.symbol.clone();
+                //             let trade = market
+                //                 .data
+                //                 .trade_goods
+                //                 .iter()
+                //                 .find(|g| g.symbol == material.trade_symbol);
+                //             trade.map(|trade| (market_symbol, trade))
+                //         }
+                //         None => None,
+                //     })
+                //     // purchase filters
+                //     .filter(|(_, trade)| match trade._type {
+                //         Import => false,
+                //         Export => {
+                //             let req_constant_flow = good_req_constant_flow.contains(&material.trade_symbol);
+                //             // unsure if this is just causing weird fluctuations
+                //             // Strong markets are where we'll make the most consistent profit
+                //             // ?? what about RESTRICTED markets?
+                //             if !req_constant_flow && trade.activity == Some(Strong) {
+                //                 trade.supply >= High
+                //             } else {
+                //                 trade.supply >= Moderate
+                //             }
+                //             // trade.supply >= Moderate
+                //         }
+                //         Exchange => true,
+                //     })
+                //     .min_by_key(|(_, trade)| trade.purchase_price);
+                // if let Some(buy_trade_good) = buy_trade_good {
+                //     let units = min(min(remaining, capacity_cap), buy_trade_good.1.trade_volume);
+                //     let cost = units * buy_trade_good.1.purchase_price;
+                //     // if cost + 2000000 <= available_credits {
+                //     debug!(
+                //         "Construction: buy {} @ {} for ${}, progress: {}/{}",
+                //         material.trade_symbol,
+                //         buy_trade_good.1.purchase_price,
+                //         cost,
+                //         material.fulfilled,
+                //         material.required
+                //     );
+                //     tasks.push(Task {
+                //         id: format!("{}construction_{}", system_prefix, material.trade_symbol),
+                //         actions: TaskActions::TransportCargo {
+                //             src: buy_trade_good.0.clone(),
+                //             dest: jump_gate.symbol.clone(),
+                //             src_action: Action::BuyGoods(material.trade_symbol.clone(), units),
+                //             dest_action: Action::DeliverConstruction(
+                //                 material.trade_symbol.clone(),
+                //                 units,
+                //             ),
+                //         },
+                //         value: 100000,
+                //     });
+                // }
             }
         }
 
@@ -419,6 +431,7 @@ impl LogisticTaskManager {
         }
 
         for good in goods {
+            let req_constant_flow = good_req_constant_flow.contains(&good);
             let trades = markets
                 .iter()
                 .filter_map(|(_, market_opt)| match market_opt {
@@ -435,21 +448,38 @@ impl LogisticTaskManager {
                 .filter(|(_, trade)| match trade._type {
                     Import => false,
                     Export => {
-                        // !! unsure if this is just causing weird fluctuations
                         // Strong markets are where we'll make the most consistent profit
-                        // ?? what about RESTRICTED markets?
-                        if trade.activity == Some(Strong) {
+                        if !req_constant_flow && trade.activity == Some(Strong) {
                             trade.supply >= High
                         } else {
                             trade.supply >= Moderate
                         }
-                        // trade.supply >= Moderate
                     }
                     Exchange => true,
                 })
                 .min_by_key(|(_, trade)| trade.purchase_price);
             let sell_trade_good = trades
                 .iter()
+                .filter(|(market_symbol, trade)| {
+                    let key = (market_symbol.clone(), good.clone());
+                    let evo_cap = market_capped_import.get(&key);
+                    match evo_cap {
+                        Some(evo_cap) => {
+                            assert_eq!(
+                                trade._type, Import,
+                                "Only import trades should have an import evolution cap"
+                            );
+                            if trade.trade_volume >= *evo_cap {
+                                // If we reached the evolution cap, then add an extra requirement to only IMPORT at LIMITED supply
+                                // keep the import above scarce, and push limited into low moderate
+                                trade.supply <= Limited
+                            } else {
+                                true
+                            }
+                        }
+                        None => true,
+                    }
+                })
                 .filter(|(_, trade)| match trade._type {
                     Import => trade.supply <= Moderate,
                     Export => false,
