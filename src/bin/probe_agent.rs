@@ -1,4 +1,3 @@
-use core::panic;
 use reqwest::StatusCode;
 use serde_json::Value;
 use st::api_client::ApiClient;
