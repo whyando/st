@@ -713,7 +713,7 @@ impl ShipController {
     pub async fn scrap(&self) {
         assert!(!self.is_in_transit(), "Ship is in transit");
         self.dock().await;
-        self.debug("Scraping");
+        self.debug("Scrapping Ship");
         let uri = format!("/my/ships/{}/scrap", self.ship_symbol);
         let mut response: Value = self.api_client.post(&uri, &json!({})).await;
         let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
