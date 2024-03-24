@@ -282,8 +282,9 @@ impl LogisticTaskManager {
                             .or_default()
                             .push(smeltery_market.clone());
                         good_req_constant_flow.insert("IRON".to_string());
+                        // iron: cap evolution at 120 (double initial trade volume)
                         market_capped_import
-                            .insert((fab_mat_market.clone(), "IRON".to_string()), 100);
+                            .insert((fab_mat_market.clone(), "IRON".to_string()), 120);
                     }
                     "ADVANCED_CIRCUITRY" => {
                         // adv_circuit_market
