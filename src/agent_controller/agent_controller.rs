@@ -18,6 +18,7 @@ use dashmap::DashMap;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use log::*;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::ops::Deref;
 use std::pin::Pin;
@@ -42,6 +43,31 @@ enum BuyShipResult {
     FailedNoPurchaser(Option<WaypointSymbol>),
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum AgentEra {
+    // Initial era, where the agent has two ships
+    StartingSystem1,
+
+    // Some credit threshold has been met: buy more ships
+    StartingSystem2,
+
+    // Jumpgate is completed, agent has access to the capital system
+    InterSystem1,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct AgentState {
+    pub era: AgentEra,
+}
+
+impl Default for AgentState {
+    fn default() -> Self {
+        Self {
+            era: AgentEra::StartingSystem1,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct AgentController {
     universe: Universe,
@@ -50,6 +76,7 @@ pub struct AgentController {
 
     listeners: Arc<Mutex<Vec<Sender<Event>>>>,
     callsign: String,
+    state: Arc<Mutex<AgentState>>,
     agent: Arc<Mutex<Agent>>,
     ships: Arc<DashMap<String, Arc<Mutex<Ship>>>>,
 
@@ -86,6 +113,9 @@ impl TransferActor for AgentController {
 impl AgentController {
     pub fn agent(&self) -> Agent {
         self.agent.lock().unwrap().clone()
+    }
+    pub fn state(&self) -> AgentState {
+        self.state.lock().unwrap().clone()
     }
     pub fn ships(&self) -> Vec<Ship> {
         self.ships
@@ -183,20 +213,6 @@ impl AgentController {
             ships
         };
 
-        // // (Debugging system market waypoints)
-        // let mut sorted_waypoints = waypoints
-        //     .iter()
-        //     .filter(|w| w.is_market())
-        //     .collect::<Vec<_>>();
-        // sorted_waypoints.sort_by_cached_key(|w| w.x * w.x + w.y * w.y);
-        // for waypoint in &sorted_waypoints {
-        //     let dist = ((waypoint.x * waypoint.x + waypoint.y * waypoint.y) as f64).sqrt() as i64;
-        //     debug!(
-        //         "{}, {}, ({},{}) ({})",
-        //         waypoint.symbol, waypoint.waypoint_type, waypoint.x, waypoint.y, dist
-        //     );
-        // }
-
         let system_symbol = agent.lock().unwrap().headquarters.system();
         let job_assignments: DashMap<String, String> = db
             .get_value(&format!("{}/ship_assignments", callsign))
@@ -217,8 +233,13 @@ impl AgentController {
             agent.credits
         };
         let ledger = Ledger::new(initial_credits);
+        let state: AgentState = db
+            .get_value(&format!("{}/state", callsign))
+            .await
+            .unwrap_or_default();
         let agent_controller = Self {
             callsign: callsign.to_string(),
+            state: Arc::new(Mutex::new(state)),
             agent,
             ships,
             api_client: api_client.clone(),
@@ -285,6 +306,51 @@ impl AgentController {
         let faction_symbol = self.starting_faction();
         let faction = self.universe.get_faction(&faction_symbol).await;
         faction.headquarters.unwrap()
+    }
+    pub async fn update_era(&self, era: AgentEra) {
+        let state = {
+            let mut state = self.state.lock().unwrap();
+            state.era = era;
+            state.clone()
+        };
+        self.db
+            .set_value(&format!("{}/state", self.callsign), &state)
+            .await;
+    }
+
+    pub async fn check_era_advance(&self) {
+        loop {
+            let current_era = self.state().era;
+            let next_era = match current_era {
+                AgentEra::StartingSystem1 => {
+                    // Conditions for going to mid:
+                    // - 2000000 credits available
+                    let credits = self.ledger.available_credits();
+                    if credits >= 2_000_000 {
+                        Some(AgentEra::StartingSystem2)
+                    } else {
+                        None
+                    }
+                }
+                AgentEra::StartingSystem2 => {
+                    let jumpgate_finished = self.is_jumpgate_finished().await;
+                    if jumpgate_finished {
+                        Some(AgentEra::InterSystem1)
+                    } else {
+                        None
+                    }
+                }
+                AgentEra::InterSystem1 => None,
+            };
+            match next_era {
+                None => break,
+                Some(next_era) => {
+                    assert_ne!(current_era, next_era);
+                    info!("Agent {} advancing to era {:?}", self.callsign, next_era);
+                    self.update_era(next_era).await;
+                }
+            }
+        }
     }
 
     pub fn probed_waypoints(&self) -> Vec<(String, Vec<WaypointSymbol>)> {
@@ -475,6 +541,7 @@ impl AgentController {
     ) -> (Vec<String>, Option<WaypointSymbol>) {
         let _guard = self.try_buy_ships_lock().await;
 
+        self.check_era_advance().await;
         self.refresh_ship_config().await;
 
         let mut purchased_ships = vec![];
@@ -527,6 +594,7 @@ impl AgentController {
     }
 
     pub async fn generate_ship_config(&self) -> Vec<ShipConfig> {
+        let era = self.state().era;
         let start_system = self.starting_system();
         let waypoints: Vec<Waypoint> = self.universe.get_system_waypoints(&start_system).await;
         let markets = self.universe.get_system_markets_remote(&start_system).await;
@@ -536,12 +604,21 @@ impl AgentController {
             .await;
 
         let mut ships = vec![];
-        // todo: if some credit threshold hit: switch to static probes only
+
+        let use_nonstatic_probes = true;
+        let incl_outer_probes_and_siphons = match era {
+            AgentEra::StartingSystem1 => false,
+            _ => true,
+        };
         ships.append(&mut ship_config_starter_system(
-            &waypoints, &markets, &shipyards, true,
+            &waypoints,
+            &markets,
+            &shipyards,
+            use_nonstatic_probes,
+            incl_outer_probes_and_siphons,
         ));
 
-        if self.is_jumpgate_finished().await {
+        if era == AgentEra::InterSystem1 {
             let capital = self.faction_capital().await;
             let waypoints: Vec<Waypoint> = self.universe.get_system_waypoints(&capital).await;
             let markets = self.universe.get_system_markets_remote(&capital).await;
