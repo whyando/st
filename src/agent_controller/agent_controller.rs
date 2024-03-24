@@ -324,9 +324,9 @@ impl AgentController {
             let next_era = match current_era {
                 AgentEra::StartingSystem1 => {
                     // Conditions for going to mid:
-                    // - 2000000 credits available
+                    // - 1000000 credits available
                     let credits = self.ledger.available_credits();
-                    if credits >= 2_000_000 {
+                    if credits >= 1_000_000 {
                         Some(AgentEra::StartingSystem2)
                     } else {
                         None
