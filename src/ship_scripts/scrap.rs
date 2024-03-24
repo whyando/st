@@ -29,4 +29,5 @@ pub async fn run(ship: ShipController) {
     let shipyard = shipyard.unwrap();
 
     ship.goto_waypoint(&shipyard.symbol).await;
+    ship.scrap().await;
 }
