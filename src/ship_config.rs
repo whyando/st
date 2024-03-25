@@ -163,8 +163,8 @@ pub fn ship_config_starter_system(
             ));
         }
 
-        // Add 3 logistics haulers - not using planner
-        const NUM_LHAULERS: i64 = 3;
+        // Add 2 logistics haulers - not using planner
+        const NUM_LHAULERS: i64 = 2;
         for i in 0..NUM_LHAULERS {
             ships.push((
                 (6.0, (i as f64) / (NUM_LHAULERS as f64)),

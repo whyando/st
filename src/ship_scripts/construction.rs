@@ -108,7 +108,7 @@ async fn tick(
                 // because they are the long pole
                 let credit_buffer = match mat.trade_symbol.as_str() {
                     "FAB_MATS" => 0,
-                    "ADVANCED_CIRCUITRY" => 2_000_000,
+                    "ADVANCED_CIRCUITRY" => 1_000_000,
                     _ => panic!("Unknown construction good: {}", mat.trade_symbol),
                 };
                 let market = ship.universe.get_market(&market_symbol).await;
