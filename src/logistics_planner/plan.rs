@@ -57,8 +57,8 @@ pub fn run_planner(
         .map(|task| {
             match &task.actions {
                 TaskActions::VisitLocation { waypoint, action } => {
-                    let id = format!("Visit-{}-{:?}", waypoint.0, action);
-                    let tag = format!("[{}] {:?}", waypoint.0, action);
+                    let id = format!("Visit-{}-{:?}", waypoint, action);
+                    let tag = format!("[{}] {:?}", waypoint, action);
                     task_job_id_map.insert(id.clone(), task);
                     Job {
                         id,
@@ -112,10 +112,7 @@ pub fn run_planner(
                                 },
                                 duration: 0.0,
                                 times: Some(time_window.clone()),
-                                tag: Some(format!(
-                                    "[{}] {:?} {} {}",
-                                    src.0, src_action, units, good
-                                )),
+                                tag: Some(format!("[{}] {:?} {} {}", src, src_action, units, good)),
                             }],
                             demand: Some(vec![*units as i32]),
                             order: None,
@@ -129,7 +126,7 @@ pub fn run_planner(
                                 times: Some(time_window.clone()),
                                 tag: Some(format!(
                                     "[{}] {:?} {} {}",
-                                    dest.0, dest_action, units, good
+                                    dest, dest_action, units, good
                                 )),
                             }],
                             demand: Some(vec![*units as i32]),
@@ -380,20 +377,20 @@ mod test {
                 symbol: "SHIP1".to_string(),
                 capacity: 100,
                 speed: 10,
-                start_waypoint: WaypointSymbol("WAYPOINT1".to_string()),
+                start_waypoint: WaypointSymbol::new("X1-S1-W1"),
             },
             LogisticShip {
                 symbol: "SHIP2".to_string(),
                 capacity: 200,
                 speed: 20,
-                start_waypoint: WaypointSymbol("WAYPOINT1".to_string()),
+                start_waypoint: WaypointSymbol::new("X1-S1-W1"),
             },
         ];
         let tasks = vec![
             Task {
                 id: "TASK1".to_string(),
                 actions: TaskActions::VisitLocation {
-                    waypoint: WaypointSymbol("WAYPOINT1".to_string()),
+                    waypoint: WaypointSymbol::new("X1-S1-W1"),
                     action: Action::RefreshMarket,
                 },
                 value: 1000,
@@ -401,7 +398,7 @@ mod test {
             Task {
                 id: "TASK2".to_string(),
                 actions: TaskActions::VisitLocation {
-                    waypoint: WaypointSymbol("WAYPOINT2".to_string()),
+                    waypoint: WaypointSymbol::new("X1-S1-W2"),
                     action: Action::RefreshShipyard,
                 },
                 value: 1000,
@@ -409,8 +406,8 @@ mod test {
             Task {
                 id: "TASK3".to_string(),
                 actions: TaskActions::TransportCargo {
-                    src: WaypointSymbol("WAYPOINT1".to_string()),
-                    dest: WaypointSymbol("WAYPOINT2".to_string()),
+                    src: WaypointSymbol::new("X1-S1-W1"),
+                    dest: WaypointSymbol::new("X1-S1-W2"),
                     src_action: Action::BuyGoods("FOOD".to_string(), 10),
                     dest_action: Action::SellGoods("FOOD".to_string(), 10),
                 },
@@ -424,16 +421,16 @@ mod test {
         let matrix = {
             let mut duration_matrix: BTreeMap<WaypointSymbol, BTreeMap<WaypointSymbol, i64>> =
                 BTreeMap::new();
-            duration_matrix.insert(WaypointSymbol("WAYPOINT1".to_string()), {
+            duration_matrix.insert(WaypointSymbol::new("X1-S1-W1"), {
                 let mut dests = BTreeMap::new();
-                dests.insert(WaypointSymbol("WAYPOINT1".to_string()), 0);
-                dests.insert(WaypointSymbol("WAYPOINT2".to_string()), 100);
+                dests.insert(WaypointSymbol::new("X1-S1-W1"), 0);
+                dests.insert(WaypointSymbol::new("X1-S1-W2"), 100);
                 dests
             });
-            duration_matrix.insert(WaypointSymbol("WAYPOINT2".to_string()), {
+            duration_matrix.insert(WaypointSymbol::new("X1-S1-W2"), {
                 let mut dests = BTreeMap::new();
-                dests.insert(WaypointSymbol("WAYPOINT1".to_string()), 100);
-                dests.insert(WaypointSymbol("WAYPOINT2".to_string()), 0);
+                dests.insert(WaypointSymbol::new("X1-S1-W1"), 100);
+                dests.insert(WaypointSymbol::new("X1-S1-W2"), 0);
                 dests
             });
             duration_matrix

@@ -99,7 +99,7 @@ fn main() {
     #[allow(non_snake_case)]
     let TIME_LIMIT_MINUTES = 30;
     #[allow(non_snake_case)]
-    let START_WAYPOINT = waypoints[0].symbol.clone();
+    let START_WAYPOINT = waypoints[0].symbol();
 
     // ?! Add only 1 job for each good
     // we can't add multiple jobs for a (market, good) pair, because the act of completing one job will change the reward for the next job
@@ -231,10 +231,10 @@ fn main() {
     let mut distances = vec![];
     for src_symbol in locations.iter() {
         for dest_symbol in locations.iter() {
-            let src = waypoints.iter().find(|w| w.symbol == *src_symbol).unwrap();
-            let dest = waypoints.iter().find(|w| w.symbol == *dest_symbol).unwrap();
+            let src = waypoints.iter().find(|w| w.symbol() == src_symbol).unwrap();
+            let dest = waypoints.iter().find(|w| w.symbol() == dest_symbol).unwrap();
             // euclidean distance
-            let d2 = (src.x - dest.x).pow(2) + (src.y - dest.y).pow(2);
+            let d2 = (src.x() - dest.x()).pow(2) + (src.y() - dest.y()).pow(2);
             let d = (d2 as f64).sqrt();
             let duration = (15.0 + 25.0 / SPEED * d) as i64;
             travel_times.push(duration);

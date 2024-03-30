@@ -2,13 +2,19 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 
+use crate::api_client::api_models::WaypointDetailed;
 use crate::api_client::ApiClient;
-use crate::data::DataClient;
+use crate::db::db_models;
+use crate::db::DbClient;
 use crate::models::{
     Construction, Faction, Market, MarketRemoteView, Shipyard, ShipyardRemoteView, System,
     SystemSymbol, Waypoint, WaypointSymbol, WithTimestamp,
 };
 use crate::pathfinding::{Pathfinding, Route};
+use crate::schema::*;
+use diesel::ExpressionMethods as _;
+use diesel::QueryDsl as _;
+use diesel_async::RunQueryDsl as _;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -37,32 +43,82 @@ pub enum JumpGateConnections {
     Uncharted,
 }
 
-#[derive(Clone)]
 pub struct Universe {
     api_client: ApiClient,
-    db: DataClient,
+    db: DbClient,
 
-    constructions: Arc<DashMap<WaypointSymbol, Arc<WithTimestamp<Option<Construction>>>>>,
-    remote_markets: Arc<DashMap<WaypointSymbol, MarketRemoteView>>,
-    markets: Arc<DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Market>>>>>,
-    remote_shipyards: Arc<DashMap<WaypointSymbol, ShipyardRemoteView>>,
-    shipyards: Arc<DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Shipyard>>>>>,
+    systems: DashMap<SystemSymbol, System>,
+    constructions: DashMap<WaypointSymbol, Arc<WithTimestamp<Option<Construction>>>>,
+    remote_markets: DashMap<WaypointSymbol, MarketRemoteView>,
+    markets: DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Market>>>>,
+    remote_shipyards: DashMap<WaypointSymbol, ShipyardRemoteView>,
+    shipyards: DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Shipyard>>>>,
     factions: DashMap<String, Faction>,
-    jumpgates: Arc<DashMap<WaypointSymbol, JumpGateInfo>>,
+    jumpgates: DashMap<WaypointSymbol, JumpGateInfo>,
 }
 
 impl Universe {
-    pub fn new(api_client: &ApiClient, db: &DataClient) -> Self {
+    pub fn new(api_client: &ApiClient, db: &DbClient) -> Self {
         Self {
             api_client: api_client.clone(),
             db: db.clone(),
-            constructions: Arc::new(DashMap::new()),
-            remote_markets: Arc::new(DashMap::new()),
-            markets: Arc::new(DashMap::new()),
-            remote_shipyards: Arc::new(DashMap::new()),
-            shipyards: Arc::new(DashMap::new()),
+            systems: DashMap::new(),
+            constructions: DashMap::new(),
+            remote_markets: DashMap::new(),
+            markets: DashMap::new(),
+            remote_shipyards: DashMap::new(),
+            shipyards: DashMap::new(),
             factions: DashMap::new(),
-            jumpgates: Arc::new(DashMap::new()),
+            jumpgates: DashMap::new(),
+        }
+    }
+
+    pub async fn init_systems(&self) {
+        let systems: Vec<db_models::System> = systems::table
+            .filter(systems::reset_id.eq(self.db.reset_date()))
+            .select((
+                systems::symbol,
+                systems::type_,
+                systems::x,
+                systems::y,
+                systems::created_at,
+                systems::updated_at,
+            ))
+            .load(&mut self.db.conn().await)
+            .await
+            .expect("DB Query error");
+        if systems.len() != 0 {
+            for system in systems {
+                self.systems.insert(
+                    SystemSymbol::new(&system.symbol),
+                    System {
+                        symbol: SystemSymbol::new(&system.symbol),
+                        system_type: system.type_,
+                        x: system.x as i64,
+                        y: system.y as i64,
+                        waypoints: Vec::new(), // @@
+                    },
+                );
+            }
+        } else {        
+            let systems: Vec<System> = self.api_client.get("systems.json").await;
+            let inserts = systems
+                .iter()
+                .map(|system| db_models::NewSystem {
+                    symbol: system.symbol.to_string(),
+                    type_: system.system_type.to_string(),
+                    x: system.x as i32,
+                    y: system.y as i32,
+                })
+                .collect::<Vec<_>>();
+            diesel::insert_into(systems::table)
+                .values(&inserts)
+                .execute(&mut self.db.conn().await)
+                .await
+                .expect("DB Insert error");
+            for system in systems.into_iter() {
+                self.systems.insert(system.symbol.clone(), system);
+            }
         }
     }
 
@@ -169,28 +225,20 @@ impl Universe {
     }
 
     pub async fn get_system(&self, symbol: &SystemSymbol) -> System {
-        // cache behaviour: this data will never go stale
-        // check data cache first then use api
-        match self.db.get_system(symbol).await {
-            Some(system) => system,
-            None => {
-                let system = self.api_client.get_system(symbol).await;
-                self.db.save_system(&system.symbol, &system).await;
-                system
-            }
-        }
+        self.systems.get(symbol).expect("System not found").value().clone()
     }
 
-    // !! needs caching layer
-    pub async fn get_system_waypoints(&self, symbol: &SystemSymbol) -> Vec<Waypoint> {
-        // cache behaviour: waypoint data mostly not go stale, except for fields: 'modifiers' and 'is_under_construction'
-        // also: chart and traits if UNCHARTED
-        // check data cache first then use api
-        match self.db.get_system_waypoints(symbol).await {
+    pub async fn get_system_waypoints(&self, symbol: &SystemSymbol) -> Vec<WaypointDetailed> {
+        let system = self.get_system(symbol).await;
+        let waypoints: Option<Vec<WaypointDetailed>> = system.waypoints.into_iter().map(|w| match w {
+            Waypoint::Simplified(s) => None,
+            Waypoint::Detailed(d) => Some(d),
+        }).collect();
+        match waypoints {
             Some(waypoints) => waypoints,
             None => {
-                let waypoints = self.api_client.get_system_waypoints(symbol).await;
-                self.db.save_system_waypoints(symbol, &waypoints).await;
+                let waypoints: Vec<WaypointDetailed> = self.api_client.get_system_waypoints(symbol).await;
+                // @@ save to database
                 waypoints
             }
         }
@@ -255,16 +303,7 @@ impl Universe {
         shipyards
     }
 
-    // get waypoints, but don't use api
-    pub async fn get_system_waypoints_no_fetch(
-        &self,
-        symbol: &SystemSymbol,
-    ) -> Option<Vec<Waypoint>> {
-        // needs caching layer
-        self.db.get_system_waypoints(symbol).await
-    }
-
-    pub async fn get_waypoint(&self, symbol: &WaypointSymbol) -> Waypoint {
+    pub async fn get_waypoint(&self, symbol: &WaypointSymbol) -> WaypointDetailed {
         let system_waypoints = self.get_system_waypoints(&symbol.system()).await;
         system_waypoints
             .into_iter()
@@ -345,7 +384,7 @@ impl Universe {
         shipyards
     }
 
-    async fn matches_filter(&self, waypoint: &Waypoint, filter: &WaypointFilter) -> bool {
+    async fn matches_filter(&self, waypoint: &WaypointDetailed, filter: &WaypointFilter) -> bool {
         match filter {
             WaypointFilter::Imports(good) => {
                 if !waypoint.is_market() {
@@ -383,7 +422,7 @@ impl Universe {
         &self,
         system_symbol: &SystemSymbol,
         filters: &[WaypointFilter],
-    ) -> Vec<Waypoint> {
+    ) -> Vec<WaypointDetailed> {
         let waypoints = self.get_system_waypoints(system_symbol).await;
         let mut filtered = Vec::new();
         for waypoint in waypoints {

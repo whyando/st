@@ -1,11 +1,11 @@
-use crate::data::DataClient;
+use crate::db::DbClient;
 use crate::models::{KeyedSurvey, Survey, WaypointSymbol};
 use chrono::Duration;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 pub struct SurveyManager {
-    db: DataClient,
+    db: DbClient,
     inner: Mutex<SurveyManagerInner>,
 }
 
@@ -14,7 +14,7 @@ struct SurveyManagerInner {
 }
 
 impl SurveyManager {
-    pub async fn new(db: &DataClient) -> Self {
+    pub async fn new(db: &DbClient) -> Self {
         let surveys = db.get_surveys().await;
         let surveys = surveys
             .into_iter()

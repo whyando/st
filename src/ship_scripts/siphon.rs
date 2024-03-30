@@ -1,6 +1,5 @@
 use crate::{
-    data::DataClient, models::WaypointSymbol, ship_controller::ShipController,
-    universe::WaypointFilter,
+    db::DbClient, models::WaypointSymbol, ship_controller::ShipController, universe::WaypointFilter,
 };
 use lazy_static::lazy_static;
 use log::*;
@@ -65,7 +64,7 @@ enum SiphonShuttleState {
     Selling,
 }
 
-pub async fn run_shuttle(ship: ShipController, db: DataClient) {
+pub async fn run_shuttle(ship: ShipController, db: DbClient) {
     info!("Starting script siphon_shuttle for {}", ship.symbol());
     ship.wait_for_transit().await;
 

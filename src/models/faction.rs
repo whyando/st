@@ -33,7 +33,7 @@ where
             if s.is_empty() {
                 None
             } else {
-                Some(SystemSymbol(s))
+                Some(SystemSymbol::new(&s))
             }
         }
         None => None,

@@ -1,13 +1,14 @@
 use futures::future::BoxFuture;
 use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
-use st::data::DataClient;
+use st::db::DbClient;
 use st::models::WaypointSymbol;
 use st::universe::JumpGateConnections;
 use st::universe::Universe;
 use std::collections::HashMap;
 use std::env;
 use std::io;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -20,10 +21,10 @@ async fn main() -> io::Result<()> {
     let status = api_client.status().await;
 
     // Use the reset date on the status response as a unique identifier to partition data between resets
-    let db = DataClient::new(&status.reset_date).await;
+    let db = DbClient::new(&status.reset_date).await;
     let agent_token = db.get_agent_token(&callsign).await.unwrap();
     api_client.set_agent_token(&agent_token);
-    let universe = Universe::new(&api_client, &db);
+    let universe = Arc::new(Universe::new(&api_client, &db));
 
     let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
 
@@ -33,7 +34,7 @@ async fn main() -> io::Result<()> {
         .await;
 
     // recursively explore the universe
-    let mut dfs = Dfs::new(universe).await;
+    let mut dfs = Dfs::new(&universe).await;
     dfs.explore(root_gate).await;
     dfs.result();
 
@@ -41,14 +42,14 @@ async fn main() -> io::Result<()> {
 }
 
 struct Dfs {
-    universe: Universe,
+    universe: Arc<Universe>,
     state: HashMap<WaypointSymbol, i32>,
 }
 
 impl Dfs {
-    async fn new(universe: Universe) -> Self {
+    async fn new(universe: &Arc<Universe>) -> Self {
         Self {
-            universe,
+            universe: universe.clone(),
             state: HashMap::new(),
         }
     }
@@ -78,5 +79,9 @@ impl Dfs {
 
     fn result(&self) {
         log::info!("Reachable: {}", self.state.len());
+        let num_charted = self.state.values().filter(|&&v| v > 0).count();
+        log::info!("Charted: {}", num_charted);
+        let num_uncharted = self.state.values().filter(|&&v| v == 0).count();
+        log::info!("Uncharted: {}", num_uncharted);
     }
 }

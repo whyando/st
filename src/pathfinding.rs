@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use crate::models::{ShipFlightMode, Waypoint, WaypointSymbol};
+use crate::{api_client::api_models::WaypointDetailed, models::{ShipFlightMode, System, Waypoint, WaypointSymbol}};
 use std::cmp::max;
 
 #[allow(non_snake_case)]
@@ -9,7 +9,7 @@ const BURN_NAV_MODIFIER: f64 = 12.5;
 
 #[derive(Debug)]
 pub struct Pathfinding {
-    waypoints: Arc<BTreeMap<WaypointSymbol, Waypoint>>,
+    waypoints: Arc<BTreeMap<WaypointSymbol, WaypointDetailed>>,
     closest_market: BTreeMap<WaypointSymbol, (WaypointSymbol, i64)>,
 }
 
@@ -20,8 +20,8 @@ pub struct Route {
 }
 
 impl Pathfinding {
-    pub fn new(waypoints: Vec<Waypoint>) -> Pathfinding {
-        let mut waypoint_map: BTreeMap<WaypointSymbol, Waypoint> = BTreeMap::new();
+    pub fn new(waypoints: Vec<WaypointDetailed>) -> Pathfinding {
+        let mut waypoint_map: BTreeMap<WaypointSymbol, WaypointDetailed> = BTreeMap::new();
         let mut closest_market: BTreeMap<WaypointSymbol, (WaypointSymbol, i64)> = BTreeMap::new();
         for waypoint in &waypoints {
             waypoint_map.insert(waypoint.symbol.clone(), waypoint.clone());
@@ -32,7 +32,7 @@ impl Pathfinding {
                 .iter()
                 .filter(|w| w.is_market())
                 .map(|w| {
-                    let dist = distance(&waypoint, w);
+                    let dist = waypoint.distance(w);
                     (w.symbol.clone(), dist)
                 })
                 .min_by_key(|(_symbol, distance)| *distance)
@@ -59,7 +59,7 @@ impl Pathfinding {
                     src_map.insert(dest.symbol.clone(), 0);
                     continue;
                 }
-                let distance = distance(&src, &dest);
+                let distance = src.distance(&dest);
                 let travel_duration = (15.0
                     + CRUISE_NAV_MODIFIER / (speed as f64) * (distance as f64))
                     .round() as i64;
@@ -177,9 +177,18 @@ impl Pathfinding {
     }
 }
 
-fn distance(a: &Waypoint, b: &Waypoint) -> i64 {
-    let distance2 = (a.x - b.x).pow(2) + (a.y - b.y).pow(2);
-    max(1, (distance2 as f64).sqrt().round() as i64)
+impl WaypointDetailed {
+    pub fn distance(&self, other: &WaypointDetailed) -> i64 {
+        let distance2 = (self.x - other.x).pow(2) + (self.y - other.y).pow(2);
+        max(1, (distance2 as f64).sqrt().round() as i64)
+    }
+}
+
+impl System {
+    pub fn distance(&self, other: &System) -> i64 {
+        let distance2 = (self.x - other.x).pow(2) + (self.y - other.y).pow(2);
+        max(1, (distance2 as f64).sqrt().round() as i64)
+    }
 }
 
 pub struct Edge {
@@ -189,8 +198,8 @@ pub struct Edge {
     pub flight_mode: ShipFlightMode,
 }
 
-pub fn edge(a: &Waypoint, b: &Waypoint, speed: i64, fuel_max: i64) -> Option<Edge> {
-    let distance = distance(a, b);
+pub fn edge(a: &WaypointDetailed, b: &WaypointDetailed, speed: i64, fuel_max: i64) -> Option<Edge> {
+    let distance = a.distance(b);
 
     // burn
     if 2 * distance <= fuel_max {

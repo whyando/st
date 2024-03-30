@@ -1,7 +1,7 @@
 use reqwest::StatusCode;
 use serde_json::Value;
 use st::api_client::ApiClient;
-use st::data::DataClient;
+use st::db::DbClient;
 use std::env;
 
 #[tokio::main]
@@ -18,7 +18,7 @@ async fn main() {
     let status = api_client.status().await;
 
     // Use the reset date on the status response as a unique identifier to partition data between resets
-    let db = DataClient::new(&status.reset_date).await;
+    let db = DbClient::new(&status.reset_date).await;
 
     // Startup Phase: register if not already registered, and load agent token
     let agent_token = match db.get_agent_token(&callsign).await {

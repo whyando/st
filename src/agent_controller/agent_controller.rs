@@ -1,4 +1,5 @@
 use super::ledger::Ledger;
+use crate::api_client::api_models::WaypointDetailed;
 use crate::broker::{CargoBroker, TransferActor};
 use crate::config::CONFIG;
 use crate::models::{ShipNavStatus::*, *};
@@ -7,8 +8,8 @@ use crate::survey_manager::SurveyManager;
 use crate::universe::WaypointFilter;
 use crate::{
     api_client::ApiClient,
-    data::DataClient,
-    models::{Agent, Ship, ShipBehaviour, ShipConfig, SystemSymbol, Waypoint, WaypointSymbol},
+    db::DbClient,
+    models::{Agent, Ship, ShipBehaviour, ShipConfig, SystemSymbol, WaypointSymbol},
     ship_controller::ShipController,
     ship_scripts,
     tasks::LogisticTaskManager,
@@ -70,9 +71,9 @@ impl Default for AgentState {
 
 #[derive(Clone)]
 pub struct AgentController {
-    universe: Universe,
+    universe: Arc<Universe>,
     api_client: ApiClient,
-    db: DataClient,
+    db: DbClient,
 
     listeners: Arc<Mutex<Vec<Sender<Event>>>>,
     callsign: String,
@@ -194,8 +195,8 @@ impl AgentController {
 
     pub async fn new(
         api_client: &ApiClient,
-        db: &DataClient,
-        universe: &Universe,
+        db: &DbClient,
+        universe: &Arc<Universe>,
         callsign: &str,
     ) -> Self {
         // Load agent + ships
@@ -600,7 +601,7 @@ impl AgentController {
     pub async fn generate_ship_config(&self) -> Vec<ShipConfig> {
         let era = self.state().era;
         let start_system = self.starting_system();
-        let waypoints: Vec<Waypoint> = self.universe.get_system_waypoints(&start_system).await;
+        let waypoints: Vec<WaypointDetailed> = self.universe.get_system_waypoints(&start_system).await;
         let markets = self.universe.get_system_markets_remote(&start_system).await;
         let shipyards = self
             .universe
@@ -624,7 +625,7 @@ impl AgentController {
 
         if era == AgentEra::InterSystem1 {
             let capital = self.faction_capital().await;
-            let waypoints: Vec<Waypoint> = self.universe.get_system_waypoints(&capital).await;
+            let waypoints: Vec<WaypointDetailed> = self.universe.get_system_waypoints(&capital).await;
             let markets = self.universe.get_system_markets_remote(&capital).await;
             let shipyards = self.universe.get_system_shipyards_remote(&capital).await;
             ships.append(&mut ship_config_capital_system(

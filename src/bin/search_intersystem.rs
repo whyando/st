@@ -1,6 +1,6 @@
 use log::*;
 use st::api_client::ApiClient;
-use st::data::DataClient;
+use st::db::DbClient;
 use st::models::WaypointSymbol;
 use st::universe::Universe;
 
@@ -13,7 +13,7 @@ async fn main() {
     let status = api_client.status().await;
 
     // Use the reset date on the status response as a unique identifier to partition data between resets
-    let db = DataClient::new(&status.reset_date).await;
+    let db = DbClient::new(&status.reset_date).await;
     let universe = Universe::new(&api_client, &db);
 
     let mut systems = universe.all_systems().await;
@@ -23,7 +23,7 @@ async fn main() {
         usize::MAX
             - s.waypoints
                 .iter()
-                .filter(|w| w.waypoint_type != "ASTEROID")
+                .filter(|w| w.waypoint_type() != "ASTEROID")
                 .count()
     });
     for system in systems.iter().take(500) {
@@ -31,12 +31,12 @@ async fn main() {
         let num_non_asteroid = system
             .waypoints
             .iter()
-            .filter(|w| w.waypoint_type != "ASTEROID")
+            .filter(|w| w.waypoint_type() != "ASTEROID")
             .count();
         let num_en_asteroid = system
             .waypoints
             .iter()
-            .filter(|w| w.waypoint_type == "ENGINEERED_ASTEROID")
+            .filter(|w| w.waypoint_type() == "ENGINEERED_ASTEROID")
             .count();
         let shipyards = waypoints.iter().filter(|w| w.is_shipyard()).count();
         let markets = waypoints.iter().filter(|w| w.is_market()).count();

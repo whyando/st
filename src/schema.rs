@@ -50,9 +50,38 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    systems (reset_id, symbol) {
+        reset_id -> Text,
+        symbol -> Text,
+        #[sql_name = "type"]
+        type_ -> Text,
+        x -> Int4,
+        y -> Int4,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    waypoints (reset_id, symbol) {
+        reset_id -> Text,
+        symbol -> Text,
+        system_symbol -> Text,
+        #[sql_name = "type"]
+        type_ -> Text,
+        x -> Int4,
+        y -> Int4,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     general_lookup,
     market_trades,
     market_transactions,
     surveys,
+    systems,
+    waypoints,
 );

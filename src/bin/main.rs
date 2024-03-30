@@ -1,9 +1,10 @@
 use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
-use st::data::DataClient;
+use st::db::DbClient;
 use st::universe::Universe;
 use st::web_api_server::WebApiServer;
 use std::env;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
@@ -19,8 +20,8 @@ async fn main() {
     let status = api_client.status().await;
 
     // Use the reset date on the status response as a unique identifier to partition data between resets
-    let db = DataClient::new(&status.reset_date).await;
-    let universe = Universe::new(&api_client, &db);
+    let db = DbClient::new(&status.reset_date).await;
+    let universe = Arc::new(Universe::new(&api_client, &db));
 
     // Startup Phase: register if not already registered, and load agent token
     let agent_token = match db.get_agent_token(&callsign).await {

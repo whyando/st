@@ -210,7 +210,7 @@ mod test {
         let transaction: MarketTransaction = serde_json::from_str(json).unwrap();
         assert_eq!(
             transaction.waypoint_symbol,
-            WaypointSymbol("X1-HB61-A1".to_string())
+            WaypointSymbol::new("X1-HB61-A1")
         );
     }
 

@@ -1,6 +1,6 @@
 use crate::{
     agent_controller::{AgentController, Event},
-    data::DataClient,
+    db::DbClient,
     models::{Agent, Ship, Waypoint},
     universe::Universe,
 };
@@ -16,15 +16,15 @@ use tower_http::cors::CorsLayer;
 
 pub struct WebApiServer {
     agent_controller: AgentController,
-    db_client: DataClient,
-    universe: Universe,
+    db_client: DbClient,
+    universe: Arc<Universe>,
 }
 
 struct AppState {
     agent_controller: AgentController,
     #[allow(dead_code)]
-    db_client: DataClient,
-    universe: Universe,
+    db_client: DbClient,
+    universe: Arc<Universe>,
 }
 
 #[debug_handler]
@@ -43,17 +43,18 @@ async fn ships_handler(State(state): State<Arc<AppState>>) -> axum::Json<Vec<Shi
 async fn waypoints_handler(
     State(state): State<Arc<AppState>>,
 ) -> Result<axum::Json<Vec<Waypoint>>, StatusCode> {
-    // todo: make this a parameter
-    let system_symbol = state.agent_controller.starting_system();
-    // let system_symbol = state.agent_controller.faction_capital().await;
-    let waypoints_opt = state
-        .universe
-        .get_system_waypoints_no_fetch(&system_symbol)
-        .await;
-    match waypoints_opt {
-        Some(waypoints) => Ok(axum::Json(waypoints)),
-        None => Err(StatusCode::NOT_FOUND),
-    }
+    return Ok(axum::Json(vec![]));
+    // // todo: make this a parameter
+    // let system_symbol = state.agent_controller.starting_system();
+    // // let system_symbol = state.agent_controller.faction_capital().await;
+    // let waypoints_opt = state
+    //     .universe
+    //     .get_system_waypoints_no_fetch(&system_symbol)
+    //     .await;
+    // match waypoints_opt {
+    //     Some(waypoints) => Ok(axum::Json(waypoints)),
+    //     None => Err(StatusCode::NOT_FOUND),
+    // }
 }
 
 #[debug_handler]
@@ -75,8 +76,8 @@ async fn background_task(io: SocketIo, mut rx: tokio::sync::mpsc::Receiver<Event
 impl WebApiServer {
     pub fn new(
         agent_controller: &AgentController,
-        db_client: &DataClient,
-        universe: &Universe,
+        db_client: &DbClient,
+        universe: &Arc<Universe>,
     ) -> Self {
         Self {
             agent_controller: agent_controller.clone(),

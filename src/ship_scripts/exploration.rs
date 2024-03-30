@@ -1,4 +1,4 @@
-use crate::{data::DataClient, ship_controller::ShipController};
+use crate::{db::DbClient, ship_controller::ShipController};
 use log::*;
 use serde::{Deserialize, Serialize};
 use ExplorerState::*;
@@ -10,7 +10,7 @@ enum ExplorerState {
     Exit,
 }
 
-pub async fn run_explorer(ship: ShipController, db: DataClient) {
+pub async fn run_explorer(ship: ShipController, db: DbClient) {
     info!("Starting script explorer for {}", ship.symbol());
     ship.wait_for_transit().await;
 

@@ -16,14 +16,14 @@ pub struct ShipController {
     ship: Arc<Mutex<Ship>>,
 
     api_client: ApiClient,
-    pub universe: Universe,
+    pub universe: Arc<Universe>,
     pub agent_controller: AgentController,
 }
 
 impl ShipController {
     pub fn new(
         api_client: &ApiClient,
-        universe: &Universe,
+        universe: &Arc<Universe>,
         ship: Arc<Mutex<Ship>>,
         agent_controller: &AgentController,
     ) -> ShipController {

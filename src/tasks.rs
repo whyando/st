@@ -1,5 +1,6 @@
 use crate::agent_controller::AgentController;
-use crate::data::DataClient;
+use crate::api_client::api_models::WaypointDetailed;
+use crate::db::DbClient;
 use crate::logistics_planner::plan::task_to_scheduled_action;
 use crate::logistics_planner::{
     self, Action, LogisticShip, PlannerConstraints, ShipSchedule, Task, TaskActions,
@@ -49,8 +50,8 @@ fn is_task_allowed(task: &Task, config: &LogisticsScriptConfig) -> bool {
 pub struct LogisticTaskManager {
     start_system: SystemSymbol,
     agent_controller: Arc<RwLock<Option<AgentController>>>,
-    universe: Universe,
-    db_client: DataClient,
+    universe: Arc<Universe>,
+    db_client: DbClient,
 
     // task_id -> (task, ship_symbol, timestamp)
     in_progress_tasks: Arc<DashMap<String, (Task, String, DateTime<Utc>)>>,
@@ -59,8 +60,8 @@ pub struct LogisticTaskManager {
 
 impl LogisticTaskManager {
     pub async fn new(
-        universe: &Universe,
-        db_client: &DataClient,
+        universe: &Arc<Universe>,
+        db_client: &DbClient,
         start_system: &SystemSymbol,
     ) -> Self {
         let in_progress_tasks = db_client
@@ -116,7 +117,7 @@ impl LogisticTaskManager {
         buy_ships: bool,
     ) -> Vec<Task> {
         let now = chrono::Utc::now();
-        let waypoints: Vec<Waypoint> = self.universe.get_system_waypoints(system_symbol).await;
+        let waypoints: Vec<WaypointDetailed> = self.universe.get_system_waypoints(system_symbol).await;
 
         let mut tasks = Vec::new();
 
@@ -688,7 +689,7 @@ mod test {
         let task = Task {
             id: "test".to_string(),
             actions: TaskActions::VisitLocation {
-                waypoint: WaypointSymbol("A".to_string()),
+                waypoint: WaypointSymbol::new("X1-S1-A1"),
                 action: Action::RefreshMarket,
             },
             value: 20000,

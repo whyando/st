@@ -1,3 +1,16 @@
+pub mod db_models;
+
+use crate::logistics_planner::Task;
+use crate::models::Construction;
+use crate::models::KeyedSurvey;
+use crate::schema::*;
+use crate::{
+    logistics_planner::ShipSchedule,
+    models::{
+        Market, MarketRemoteView, Shipyard, ShipyardRemoteView, System, SystemSymbol, Waypoint,
+        WaypointSymbol, WithTimestamp,
+    },
+};
 use chrono::DateTime;
 use chrono::Utc;
 use dashmap::DashMap;
@@ -15,28 +28,17 @@ use log::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
+use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::logistics_planner::Task;
-use crate::models::Construction;
-use crate::models::KeyedSurvey;
-use crate::schema::*;
-use crate::{
-    logistics_planner::ShipSchedule,
-    models::{
-        Market, MarketRemoteView, Shipyard, ShipyardRemoteView, System, SystemSymbol, Waypoint,
-        WaypointSymbol, WithTimestamp,
-    },
-};
-
 #[derive(Clone)]
-pub struct DataClient {
+pub struct DbClient {
     db: Pool<AsyncPgConnection>,
-    reset_id: String,
+    reset_id: Arc<String>,
 }
 
-impl DataClient {
-    pub async fn new(reset_identifier: &str) -> DataClient {
+impl DbClient {
+    pub async fn new(reset_identifier: &str) -> DbClient {
         let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
         let db = {
             let manager = AsyncDieselConnectionManager::<AsyncPgConnection>::new(database_url);
@@ -58,9 +60,9 @@ impl DataClient {
             assert_eq!(result[0].value, 1);
             info!("Successfully connected to database");
         }
-        DataClient {
+        DbClient {
             db,
-            reset_id: reset_identifier.to_string(),
+            reset_id: Arc::new(reset_identifier.to_string()),
         }
     }
 
@@ -82,7 +84,7 @@ impl DataClient {
         debug!("db get: {}", key);
         let value_opt: Option<Value> = general_lookup::table
             .select(general_lookup::value)
-            .filter(general_lookup::reset_id.eq(&self.reset_id))
+            .filter(general_lookup::reset_id.eq(self.reset_date()))
             .filter(general_lookup::key.eq(key))
             .first(&mut self.conn().await)
             .await
@@ -99,7 +101,7 @@ impl DataClient {
         let value: Value = serde_json::to_value(value).unwrap();
         diesel::insert_into(general_lookup::table)
             .values((
-                general_lookup::reset_id.eq(&self.reset_id),
+                general_lookup::reset_id.eq(self.reset_date()),
                 general_lookup::key.eq(key),
                 general_lookup::value.eq(&value),
             ))
@@ -120,23 +122,23 @@ impl DataClient {
             .await
     }
 
-    pub async fn get_system(&self, symbol: &SystemSymbol) -> Option<System> {
-        self.get_value(&format!("systems/{}", symbol)).await
-    }
+    // pub async fn get_system(&self, symbol: &SystemSymbol) -> Option<System> {
+    //     self.get_value(&format!("systems/{}", symbol)).await
+    // }
 
-    pub async fn save_system(&self, symbol: &SystemSymbol, system: &System) {
-        self.set_value(&format!("systems/{}", symbol), system).await
-    }
+    // pub async fn save_system(&self, symbol: &SystemSymbol, system: &System) {
+    //     self.set_value(&format!("systems/{}", symbol), system).await
+    // }
 
-    pub async fn get_system_waypoints(&self, symbol: &SystemSymbol) -> Option<Vec<Waypoint>> {
-        let key = format!("system_waypoints/{}", symbol);
-        self.get_value(&key).await
-    }
+    // pub async fn get_system_waypoints(&self, symbol: &SystemSymbol) -> Option<Vec<Waypoint>> {
+    //     let key = format!("system_waypoints_2/{}", symbol);
+    //     self.get_value(&key).await
+    // }
 
-    pub async fn save_system_waypoints(&self, symbol: &SystemSymbol, waypoints: &Vec<Waypoint>) {
-        let key = format!("system_waypoints/{}", symbol);
-        self.set_value(&key, waypoints).await
-    }
+    // pub async fn save_system_waypoints(&self, symbol: &SystemSymbol, waypoints: &Vec<Waypoint>) {
+    //     let key = format!("system_waypoints_2/{}", symbol);
+    //     self.set_value(&key, waypoints).await
+    // }
 
     pub async fn get_market_remote(&self, symbol: &WaypointSymbol) -> Option<MarketRemoteView> {
         self.get_value(&format!("markets_remote/{}", symbol)).await
@@ -298,7 +300,7 @@ impl DataClient {
             .iter()
             .map(|survey| {
                 (
-                    surveys::reset_id.eq(&self.reset_id),
+                    surveys::reset_id.eq(self.reset_date()),
                     surveys::uuid.eq(&survey.uuid),
                     surveys::survey.eq(serde_json::to_value(&survey.survey).unwrap()),
                     surveys::asteroid_symbol.eq(survey.survey.symbol.to_string()),
@@ -316,7 +318,7 @@ impl DataClient {
 
     pub async fn get_surveys(&self) -> Vec<KeyedSurvey> {
         let surveys: Vec<(Uuid, Value)> = surveys::table
-            .filter(surveys::reset_id.eq(&self.reset_id))
+            .filter(surveys::reset_id.eq(self.reset_date()))
             .select((surveys::uuid, surveys::survey))
             .load(&mut self.conn().await)
             .await
@@ -333,11 +335,35 @@ impl DataClient {
     pub async fn remove_survey(&self, uuid: &Uuid) {
         diesel::delete(
             surveys::table
-                .filter(surveys::reset_id.eq(&self.reset_id))
+                .filter(surveys::reset_id.eq(self.reset_date()))
                 .filter(surveys::uuid.eq(uuid)),
         )
         .execute(&mut self.conn().await)
         .await
         .expect("DB Query error");
+    }
+
+    pub async fn get_systems(&self) -> Vec<db_models::System> {
+        systems::table
+            .filter(systems::reset_id.eq(self.reset_date()))
+            .select((
+                systems::symbol,
+                systems::type_,
+                systems::x,
+                systems::y,
+                systems::created_at,
+                systems::updated_at,
+            ))
+            .load(&mut self.conn().await)
+            .await
+            .expect("DB Query error")
+    }
+
+    pub async fn insert_systems(&self, systems: &Vec<db_models::NewSystem>) {
+        diesel::insert_into(systems::table)
+            .values(systems)
+            .execute(&mut self.conn().await)
+            .await
+            .expect("DB Query error");
     }
 }

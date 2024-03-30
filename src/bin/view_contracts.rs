@@ -1,7 +1,7 @@
 use log::*;
 //use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
-use st::data::DataClient;
+use st::db::DbClient;
 use st::models::*;
 //use st::universe::Universe;
 use std::env;
@@ -17,7 +17,7 @@ async fn main() {
     let status = api_client.status().await;
 
     // Use the reset date on the status response as a unique identifier to partition data between resets
-    let db = DataClient::new(&status.reset_date).await;
+    let db = DbClient::new(&status.reset_date).await;
     let agent_token = db.get_agent_token(&callsign).await.unwrap();
     api_client.set_agent_token(&agent_token);
     // let universe = Universe::new(&api_client, &db);

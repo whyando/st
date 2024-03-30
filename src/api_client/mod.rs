@@ -1,12 +1,12 @@
+pub mod api_models;
+
 use core::panic;
 use std::sync::{Arc, Mutex, RwLock};
-
 use log::*;
 use reqwest::{self, Method, StatusCode};
 use serde::Serialize;
 use serde_json::{json, Value};
 use tokio::time::Instant;
-
 use crate::{
     models::*,
     universe::{JumpGateConnections, JumpGateInfo},
@@ -118,12 +118,12 @@ impl ApiClient {
         self.get_all_pages("/my/ships").await
     }
 
-    pub async fn get_system(&self, system_symbol: &SystemSymbol) -> System {
-        let system: Data<System> = self.get(&format!("/systems/{}", system_symbol)).await;
+    pub async fn get_system(&self, system_symbol: &SystemSymbol) -> api_models::System {
+        let system: Data<api_models::System> = self.get(&format!("/systems/{}", system_symbol)).await;
         system.data
     }
 
-    pub async fn get_system_waypoints(&self, system_symbol: &SystemSymbol) -> Vec<Waypoint> {
+    pub async fn get_system_waypoints(&self, system_symbol: &SystemSymbol) -> Vec<api_models::WaypointDetailed> {
         self.get_all_pages(&format!("/systems/{}/waypoints", system_symbol))
             .await
     }

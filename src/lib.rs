@@ -2,7 +2,7 @@ pub mod models;
 pub mod schema;
 
 pub mod api_client;
-pub mod data;
+pub mod db;
 pub mod universe;
 
 pub mod agent_controller;

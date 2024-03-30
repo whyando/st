@@ -9,7 +9,7 @@ use crate::models::MarketActivity::*;
 use crate::models::MarketSupply::*;
 use crate::models::MarketType::*;
 use crate::{
-    data::DataClient,
+    db::DbClient,
     models::{Construction, WaypointSymbol},
     ship_controller::ShipController,
     universe::WaypointFilter,
@@ -45,7 +45,7 @@ enum ConstructionHaulerState {
     Completed,
 }
 
-pub async fn run_hauler(ship: ShipController, db: DataClient) {
+pub async fn run_hauler(ship: ShipController, db: DbClient) {
     info!("Starting script construction_hauler for {}", ship.symbol());
     ship.wait_for_transit().await;
 

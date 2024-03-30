@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use crate::{
-    data::DataClient, models::LogisticsScriptConfig, ship_controller::ShipController,
+    db::DbClient, models::LogisticsScriptConfig, ship_controller::ShipController,
     tasks::LogisticTaskManager,
 };
 use chrono::Duration;
@@ -9,7 +9,7 @@ use log::*;
 
 pub async fn run(
     ship_controller: ShipController,
-    db: DataClient,
+    db: DbClient,
     taskmanager: Arc<LogisticTaskManager>,
     config: LogisticsScriptConfig,
 ) {

@@ -1,9 +1,10 @@
 use std::cmp::min;
 
+use crate::api_client::api_models::WaypointDetailed;
 use crate::models::MarketType::*;
 use crate::ship_controller::ShipController;
 use crate::universe::WaypointFilter;
-use crate::{data::DataClient, models::*};
+use crate::{db::DbClient, models::*};
 use lazy_static::lazy_static;
 use log::*;
 use serde::{Deserialize, Serialize};
@@ -11,7 +12,7 @@ use MiningShuttleState::*;
 
 async fn sell_location(ship: &ShipController, cargo_symbol: &str) -> Option<WaypointSymbol> {
     let mut markets = Vec::new();
-    let waypoints: Vec<Waypoint> = ship.universe.get_system_waypoints(&ship.system()).await;
+    let waypoints: Vec<WaypointDetailed> = ship.universe.get_system_waypoints(&ship.system()).await;
     for waypoint in &waypoints {
         if waypoint.is_market() {
             let market_remote = ship.universe.get_market_remote(&waypoint.symbol).await;
@@ -121,7 +122,7 @@ lazy_static! {
     static ref JETTISON_GOODS: Vec<&'static str> = vec!["ICE_WATER", "ALUMINUM_ORE",];
 }
 
-pub async fn run_shuttle(ship: ShipController, db: DataClient) {
+pub async fn run_shuttle(ship: ShipController, db: DbClient) {
     info!("Starting script extraction shuttle for {}", ship.symbol());
     ship.wait_for_transit().await;
 

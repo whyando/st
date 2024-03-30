@@ -222,7 +222,7 @@ mod tests {
 
         let mock = MockTransferActor::new();
         let broker = Arc::new(CargoBroker::new());
-        let waypoint = WaypointSymbol("WAYPOINT1".to_string());
+        let waypoint = WaypointSymbol::new("X1-S1-W1");
         let broker_handle = {
             let broker = broker.clone();
             tokio::task::spawn(async move { broker.run(Box::new(mock)).await })

@@ -1,12 +1,14 @@
 use log::info;
 use st::agent_controller::AgentController;
+use st::api_client::api_models::WaypointDetailed;
 use st::api_client::ApiClient;
-use st::data::DataClient;
+use st::db::DbClient;
 use st::models::Waypoint;
 use st::universe::Universe;
 use std::env;
 use std::fs::File;
 use std::io;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -19,16 +21,16 @@ async fn main() -> io::Result<()> {
     let status = api_client.status().await;
 
     // Use the reset date on the status response as a unique identifier to partition data between resets
-    let db = DataClient::new(&status.reset_date).await;
+    let db = DbClient::new(&status.reset_date).await;
     let agent_token = db.get_agent_token(&callsign).await.unwrap();
     api_client.set_agent_token(&agent_token);
-    let universe = Universe::new(&api_client, &db);
+    let universe = Arc::new(Universe::new(&api_client, &db));
 
     let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
     let system_symbol = agent_controller.starting_system();
     // let system_symbol = st::models::SystemSymbol("X1-JY8".to_string());
 
-    let waypoints: Vec<Waypoint> = universe.get_system_waypoints(&system_symbol).await;
+    let waypoints: Vec<WaypointDetailed> = universe.get_system_waypoints(&system_symbol).await;
     let mut shipyards = Vec::new();
     let mut shipyards_remote = Vec::new();
     for waypoint in &waypoints {

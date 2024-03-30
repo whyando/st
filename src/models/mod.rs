@@ -215,7 +215,7 @@ mod test {
         assert_eq!(ship.symbol, "WHYANDO_TEST_1-1");
 
         let ship_nav: ship::ShipNav = ship.nav;
-        assert_eq!(ship_nav.system_symbol, SystemSymbol("X1-TZ26".into()));
+        assert_eq!(ship_nav.system_symbol, SystemSymbol::new("X1-TZ26"));
     }
 
     #[test]
@@ -234,7 +234,7 @@ mod test {
         let construction_incomplete: WithTimestamp<Option<Construction>> = WithTimestamp {
             timestamp: DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
             data: Some(Construction {
-                symbol: WaypointSymbol("X1-HS80-I58".into()),
+                symbol: WaypointSymbol::new("X1-HS80-I58"),
                 materials: vec![ConstructionMaterial {
                     trade_symbol: "FAB_MATS".into(),
                     required: 4000,

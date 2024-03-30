@@ -1,5 +1,5 @@
 use st::api_client::ApiClient;
-use st::data::DataClient;
+use st::db::DbClient;
 use st::universe::Universe;
 use std::fs::File;
 use std::io;
@@ -13,7 +13,7 @@ async fn main() -> io::Result<()> {
     let status = api_client.status().await;
 
     // Use the reset date on the status response as a unique identifier to partition data between resets
-    let db = DataClient::new(&status.reset_date).await;
+    let db = DbClient::new(&status.reset_date).await;
     let universe = Universe::new(&api_client, &db);
 
     let mut all_systems = universe.all_systems().await;
@@ -21,7 +21,7 @@ async fn main() -> io::Result<()> {
     all_systems.sort_by_cached_key(|s| {
         -(s.waypoints
             .iter()
-            .filter(|w| w.waypoint_type != "ASTEROID")
+            .filter(|w| w.waypoint_type() != "ASTEROID")
             .count() as i32)
     });
 
@@ -32,7 +32,7 @@ async fn main() -> io::Result<()> {
         let num_non_asteroid = s
             .waypoints
             .iter()
-            .filter(|w| w.waypoint_type != "ASTEROID")
+            .filter(|w| w.waypoint_type() != "ASTEROID")
             .count();
         writeln!(
             &mut f,

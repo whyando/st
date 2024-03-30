@@ -1,7 +1,7 @@
-use crate::models::*;
+use crate::{api_client::api_models::WaypointDetailed, models::*};
 use std::collections::BTreeMap;
 
-fn market_waypoints(waypoints: &Vec<Waypoint>, range: Option<i64>) -> Vec<WaypointSymbol> {
+fn market_waypoints(waypoints: &Vec<WaypointDetailed>, range: Option<i64>) -> Vec<WaypointSymbol> {
     waypoints
         .iter()
         .filter(|w| w.is_market())
@@ -22,7 +22,7 @@ fn market_waypoints(waypoints: &Vec<Waypoint>, range: Option<i64>) -> Vec<Waypoi
 }
 
 pub fn ship_config_starter_system(
-    waypoints: &Vec<Waypoint>,
+    waypoints: &Vec<WaypointDetailed>,
     _markets: &Vec<MarketRemoteView>,
     _shipyards: &Vec<ShipyardRemoteView>,
     use_nonstatic_probes: bool,
@@ -217,7 +217,7 @@ pub fn ship_config_starter_system(
 pub fn ship_config_capital_system(
     system_waypoint: &SystemSymbol,
     seed_system: &SystemSymbol,
-    waypoints: &Vec<Waypoint>,
+    waypoints: &Vec<WaypointDetailed>,
     _markets: &Vec<MarketRemoteView>,
     _shipyards: &Vec<ShipyardRemoteView>,
     use_nonstatic_probes: bool,
