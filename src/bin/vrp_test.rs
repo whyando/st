@@ -198,7 +198,7 @@ fn main() {
             "start": {
                 "earliest": get_timestamp(0),
                 "location": {
-                    "index": waypoint_index(&mut locations, &START_WAYPOINT),
+                    "index": waypoint_index(&mut locations, START_WAYPOINT),
                 },
             },
             // "end": {

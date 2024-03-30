@@ -3,7 +3,7 @@ use st::agent_controller::AgentController;
 use st::api_client::api_models::WaypointDetailed;
 use st::api_client::ApiClient;
 use st::db::DbClient;
-use st::models::Waypoint;
+
 use st::universe::Universe;
 use std::env;
 use std::fs::File;
@@ -60,7 +60,7 @@ async fn main() -> io::Result<()> {
             .join(", ");
         writeln!(&mut f, "Shipyard: {}", ships)?;
     }
-    writeln!(&mut f, "")?;
+    writeln!(&mut f)?;
 
     for shipyard in shipyards {
         writeln!(&mut f, "Shipyard: {}", shipyard.data.symbol)?;

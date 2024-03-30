@@ -2,7 +2,7 @@ use st::agent_controller::AgentController;
 use st::api_client::api_models::WaypointDetailed;
 use st::api_client::ApiClient;
 use st::db::DbClient;
-use st::models::Waypoint;
+
 use st::universe::Universe;
 use std::env;
 use std::fs::File;
@@ -66,7 +66,7 @@ async fn main() -> io::Result<()> {
                 trade_good.sell_price,
             )?;
         }
-        writeln!(&mut f, "")?;
+        writeln!(&mut f)?;
     }
     log::info!("Wrote markets to markets.txt");
     Ok(())

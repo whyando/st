@@ -65,7 +65,7 @@ async fn main() -> std::io::Result<()> {
         hq.2 += agent.ship_count;
     }
 
-    writeln!(&mut f, "")?;
+    writeln!(&mut f)?;
     writeln!(&mut f, "Factions:")?;
     for (faction, (count, credits, ship_count)) in factions {
         writeln!(

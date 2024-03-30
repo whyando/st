@@ -35,7 +35,7 @@ async fn main() -> io::Result<()> {
         .iter()
         .filter(|s| s.is_starter_system())
         .map(|s| {
-            let dist = src_system.distance(&s);
+            let dist = src_system.distance(s);
             (s, dist)
         })
         .collect::<Vec<_>>();

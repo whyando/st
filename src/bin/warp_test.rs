@@ -21,7 +21,7 @@ async fn main() {
     let systems = universe.all_systems().await;
     let systems = systems
         .into_iter()
-        .filter(|s| s.waypoints.len() > 0)
+        .filter(|s| !s.waypoints.is_empty())
         .collect::<Vec<_>>();
     let jump_gate_systems = systems
         .iter()
@@ -47,7 +47,7 @@ async fn main() {
             .iter()
             .find(|w| w.waypoint_type == "JUMP_GATE")
             .unwrap();
-        let conn = universe.get_jumpgate_connections(&jumpgate.symbol()).await;
+        let conn = universe.get_jumpgate_connections(jumpgate.symbol()).await;
         jumpgates.push((jump_gate_system, conn, jump_waypoint.is_under_construction));
     }
 
@@ -58,13 +58,13 @@ async fn main() {
     // note: explorer has 40 cargo, so 4000 extra fuel can be carried
 
     let src = SystemSymbol::new("X1-YR70");
-    let dest = SystemSymbol::new("X1-NS64");
+    let _dest = SystemSymbol::new("X1-NS64");
 
     // debug: closest systems to src
     let src_system = systems.iter().find(|s| s.symbol == src).unwrap();
     let mut s = systems
         .iter()
-        .map(|s| (s.symbol.clone(), s.distance(&src_system)))
+        .map(|s| (s.symbol.clone(), s.distance(src_system)))
         .collect::<Vec<_>>();
     s.sort_by_key(|(_, d)| *d);
     info!("Closest systems to {}:", src);
@@ -149,7 +149,7 @@ async fn main() {
         }
     }
 
-    for (jump_gate_system, conn, is_under_construction) in jumpgates.iter() {
+    for (jump_gate_system, conn, _is_under_construction) in jumpgates.iter() {
         if let JumpGateConnections::Charted(conn) = &conn.connections {
             for conn in conn.iter() {
                 let dest_system = systems.iter().find(|s| s.symbol == conn.system()).unwrap();
