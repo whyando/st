@@ -1,6 +1,9 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use crate::{api_client::api_models::WaypointDetailed, models::{ShipFlightMode, System, Waypoint, WaypointSymbol}};
+use crate::{
+    api_client::api_models::WaypointDetailed,
+    models::{ShipFlightMode, System, Waypoint, WaypointSymbol},
+};
 use std::cmp::max;
 
 #[allow(non_snake_case)]

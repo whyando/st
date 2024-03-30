@@ -100,7 +100,7 @@ impl Universe {
                     },
                 );
             }
-        } else {        
+        } else {
             let systems: Vec<System> = self.api_client.get("systems.json").await;
             let inserts = systems
                 .iter()
@@ -225,19 +225,28 @@ impl Universe {
     }
 
     pub async fn get_system(&self, symbol: &SystemSymbol) -> System {
-        self.systems.get(symbol).expect("System not found").value().clone()
+        self.systems
+            .get(symbol)
+            .expect("System not found")
+            .value()
+            .clone()
     }
 
     pub async fn get_system_waypoints(&self, symbol: &SystemSymbol) -> Vec<WaypointDetailed> {
         let system = self.get_system(symbol).await;
-        let waypoints: Option<Vec<WaypointDetailed>> = system.waypoints.into_iter().map(|w| match w {
-            Waypoint::Simplified(s) => None,
-            Waypoint::Detailed(d) => Some(d),
-        }).collect();
+        let waypoints: Option<Vec<WaypointDetailed>> = system
+            .waypoints
+            .into_iter()
+            .map(|w| match w {
+                Waypoint::Simplified(s) => None,
+                Waypoint::Detailed(d) => Some(d),
+            })
+            .collect();
         match waypoints {
             Some(waypoints) => waypoints,
             None => {
-                let waypoints: Vec<WaypointDetailed> = self.api_client.get_system_waypoints(symbol).await;
+                let waypoints: Vec<WaypointDetailed> =
+                    self.api_client.get_system_waypoints(symbol).await;
                 // @@ save to database
                 waypoints
             }

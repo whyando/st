@@ -601,7 +601,8 @@ impl AgentController {
     pub async fn generate_ship_config(&self) -> Vec<ShipConfig> {
         let era = self.state().era;
         let start_system = self.starting_system();
-        let waypoints: Vec<WaypointDetailed> = self.universe.get_system_waypoints(&start_system).await;
+        let waypoints: Vec<WaypointDetailed> =
+            self.universe.get_system_waypoints(&start_system).await;
         let markets = self.universe.get_system_markets_remote(&start_system).await;
         let shipyards = self
             .universe
@@ -625,7 +626,8 @@ impl AgentController {
 
         if era == AgentEra::InterSystem1 {
             let capital = self.faction_capital().await;
-            let waypoints: Vec<WaypointDetailed> = self.universe.get_system_waypoints(&capital).await;
+            let waypoints: Vec<WaypointDetailed> =
+                self.universe.get_system_waypoints(&capital).await;
             let markets = self.universe.get_system_markets_remote(&capital).await;
             let shipyards = self.universe.get_system_shipyards_remote(&capital).await;
             ships.append(&mut ship_config_capital_system(

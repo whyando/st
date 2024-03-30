@@ -232,7 +232,10 @@ fn main() {
     for src_symbol in locations.iter() {
         for dest_symbol in locations.iter() {
             let src = waypoints.iter().find(|w| w.symbol() == src_symbol).unwrap();
-            let dest = waypoints.iter().find(|w| w.symbol() == dest_symbol).unwrap();
+            let dest = waypoints
+                .iter()
+                .find(|w| w.symbol() == dest_symbol)
+                .unwrap();
             // euclidean distance
             let d2 = (src.x() - dest.x()).pow(2) + (src.y() - dest.y()).pow(2);
             let d = (d2 as f64).sqrt();

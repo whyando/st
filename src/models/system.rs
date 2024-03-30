@@ -1,13 +1,13 @@
+use crate::api_client::api_models;
 use crate::models::{SystemSymbol, WaypointSymbol};
 use serde::{Deserialize, Serialize};
-use crate::api_client::api_models;
 
-/// 
+///
 /// Simplified: output from systems.json, and for uncharted systems
 /// Detailed: output from /systems/:system_symbol}/waypoints
-/// 
+///
 /// Main difference is traits.
-/// 
+///
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Waypoint {
     Simplified(api_models::WaypointSimplified),

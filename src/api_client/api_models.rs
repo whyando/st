@@ -1,7 +1,6 @@
-use serde::{Deserialize, Serialize};
-use super::{SystemSymbol, WaypointSymbol};
 use super::{Symbol, SymbolNameDescr};
-
+use super::{SystemSymbol, WaypointSymbol};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +13,6 @@ pub struct System {
     pub waypoints: Vec<WaypointSimplified>,
     // pub factions: Vec<Symbol>,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -68,7 +66,10 @@ impl WaypointDetailed {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{api_client::WaypointSymbol, models::{Data, PaginatedList}};
+    use crate::{
+        api_client::WaypointSymbol,
+        models::{Data, PaginatedList},
+    };
 
     #[test]
     fn test_get_system() {
@@ -82,7 +83,8 @@ mod test {
     fn test_get_waypoints() {
         // get waypoints response
         let waypoint_json = r#"{"data":[{"systemSymbol":"X1-HN18","symbol":"X1-HN18-ZX1B","type":"GAS_GIANT","x":16,"y":3,"orbitals":[],"traits":[{"symbol":"UNCHARTED","name":"Uncharted","description":"An unexplored region of space, full of potential discoveries and hidden dangers."}],"modifiers":[],"isUnderConstruction":false},{"systemSymbol":"X1-HN18","symbol":"X1-HN18-DD4X","type":"ASTEROID","x":116,"y":-713,"orbitals":[],"traits":[{"symbol":"UNCHARTED","name":"Uncharted","description":"An unexplored region of space, full of potential discoveries and hidden dangers."}],"modifiers":[],"isUnderConstruction":false},{"systemSymbol":"X1-HN18","symbol":"X1-HN18-EB5E","type":"ASTEROID","x":694,"y":249,"orbitals":[],"traits":[{"symbol":"UNCHARTED","name":"Uncharted","description":"An unexplored region of space, full of potential discoveries and hidden dangers."}],"modifiers":[],"isUnderConstruction":false},{"systemSymbol":"X1-HN18","symbol":"X1-HN18-ED6Z","type":"ASTEROID","x":-464,"y":573,"orbitals":[],"traits":[{"symbol":"UNCHARTED","name":"Uncharted","description":"An unexplored region of space, full of potential discoveries and hidden dangers."}],"modifiers":[],"isUnderConstruction":false},{"systemSymbol":"X1-HN18","symbol":"X1-HN18-XC8X","type":"ASTEROID","x":-371,"y":619,"orbitals":[],"traits":[{"symbol":"UNCHARTED","name":"Uncharted","description":"An unexplored region of space, full of potential discoveries and hidden dangers."}],"modifiers":[],"isUnderConstruction":false},{"systemSymbol":"X1-HN18","symbol":"X1-HN18-FB9Z","type":"ASTEROID","x":-228,"y":724,"orbitals":[],"traits":[{"symbol":"UNCHARTED","name":"Uncharted","description":"An unexplored region of space, full of potential discoveries and hidden dangers."}],"modifiers":[],"isUnderConstruction":false},{"systemSymbol":"X1-HN18","symbol":"X1-HN18-FB2D","type":"ASTEROID","x":-621,"y":-423,"orbitals":[],"traits":[{"symbol":"UNCHARTED","name":"Uncharted","description":"An unexplored region of space, full of potential discoveries and hidden dangers."}],"modifiers":[],"isUnderConstruction":false},{"systemSymbol":"X1-HN18","symbol":"X1-HN18-CD7D","type":"ASTEROID","x":-203,"y":733,"orbitals":[],"traits":[{"symbol":"UNCHARTED","name":"Uncharted","description":"An unexplored region of space, full of potential discoveries and hidden dangers."}],"modifiers":[],"isUnderConstruction":false},{"systemSymbol":"X1-HN18","symbol":"X1-HN18-DB3Z","type":"ASTEROID","x":-28,"y":-779,"orbitals":[],"traits":[{"symbol":"UNCHARTED","name":"Uncharted","description":"An unexplored region of space, full of potential discoveries and hidden dangers."}],"modifiers":[],"isUnderConstruction":false},{"systemSymbol":"X1-HN18","symbol":"X1-HN18-F10F","type":"ASTEROID","x":-510,"y":-532,"orbitals":[],"traits":[{"symbol":"UNCHARTED","name":"Uncharted","description":"An unexplored region of space, full of potential discoveries and hidden dangers."}],"modifiers":[],"isUnderConstruction":false}],"meta":{"total":10,"page":1,"limit":10}}"#;
-        let waypoints: PaginatedList<WaypointDetailed> = serde_json::from_str(waypoint_json).unwrap();
+        let waypoints: PaginatedList<WaypointDetailed> =
+            serde_json::from_str(waypoint_json).unwrap();
         assert_eq!(
             waypoints.data[0].symbol,
             WaypointSymbol::new("X1-HN18-ZX1B")

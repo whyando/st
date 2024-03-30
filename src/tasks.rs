@@ -117,7 +117,8 @@ impl LogisticTaskManager {
         buy_ships: bool,
     ) -> Vec<Task> {
         let now = chrono::Utc::now();
-        let waypoints: Vec<WaypointDetailed> = self.universe.get_system_waypoints(system_symbol).await;
+        let waypoints: Vec<WaypointDetailed> =
+            self.universe.get_system_waypoints(system_symbol).await;
 
         let mut tasks = Vec::new();
 
