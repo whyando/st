@@ -136,8 +136,8 @@ CREATE TABLE public.systems (
     type text NOT NULL,
     x integer NOT NULL,
     y integer NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -175,8 +175,8 @@ CREATE TABLE public.waypoint_details (
     is_market boolean NOT NULL,
     is_shipyard boolean NOT NULL,
     is_uncharted boolean NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     is_under_construction boolean NOT NULL
 );
 
@@ -216,8 +216,8 @@ CREATE TABLE public.waypoints (
     type text NOT NULL,
     x integer NOT NULL,
     y integer NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -343,10 +343,10 @@ CREATE INDEX market_transactions_timestamp_idx ON public.market_transactions USI
 
 
 --
--- Name: systems_idx; Type: INDEX; Schema: public; Owner: postgres
+-- Name: systems_unique_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX systems_idx ON public.systems USING btree (reset_id, symbol);
+CREATE UNIQUE INDEX systems_unique_idx ON public.systems USING btree (reset_id, symbol);
 
 
 --

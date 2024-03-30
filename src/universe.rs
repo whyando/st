@@ -19,6 +19,7 @@ use diesel::GroupedBy as _;
 use diesel::QueryDsl as _;
 use diesel::SelectableHelper as _;
 use diesel_async::RunQueryDsl as _;
+use log::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -79,22 +80,38 @@ impl Universe {
     }
 
     pub async fn init_systems(&self) {
+        let query_start = std::time::Instant::now();
         let systems: Vec<db_models::System> = systems::table
             .filter(systems::reset_id.eq(self.db.reset_date()))
             .select(db_models::System::as_select())
             .load(&mut self.db.conn().await)
             .await
             .expect("DB Query error");
+        let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
+        info!("Loaded {} systems in {:.3}s", systems.len(), duration);
+
+        let query_start = std::time::Instant::now();
         let waypoints = db_models::Waypoint::belonging_to(&systems)
             .select(db_models::Waypoint::as_select())
             .load(&mut self.db.conn().await)
             .await
             .expect("DB Query error");
+        let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
+        info!("Loaded {} waypoints in {:.3}s", waypoints.len(), duration);
+
+        let query_start = std::time::Instant::now();
         let waypoint_details = db_models::WaypointDetails::belonging_to(&waypoints)
             .select(db_models::WaypointDetails::as_select())
             .load(&mut self.db.conn().await)
             .await
             .expect("DB Query error");
+        let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
+        info!(
+            "Loaded {} waypoint details in {:.3}s",
+            waypoint_details.len(),
+            duration
+        );
+
         let num_systems = systems.len();
         let grouped_details = waypoint_details.grouped_by(&waypoints);
         let waypoints = waypoints
@@ -154,20 +171,26 @@ impl Universe {
                     y: system.y as i32,
                 })
                 .collect::<Vec<_>>();
-            let system_ids: Vec<i64> = diesel::insert_into(systems::table)
-                .values(&system_inserts)
-                .returning(systems::id)
-                .on_conflict((systems::reset_id, systems::symbol))
-                .do_nothing()
-                // .do_update()
-                // .set((
-                //     // Use empty ON CONFLICT UPDATE set hack to return id
-                //     systems::symbol.eq(&system.symbol.as_str()),
-                // ))
-                .get_results(&mut self.db.conn().await)
-                .await
-                .expect("DB Insert error");
-            assert_eq!(system_ids.len(), systems.len());
+            info!("Inserting {} systems", system_inserts.len());
+            let mut system_ids: Vec<i64> = vec![];
+            for chunk in system_inserts.chunks(1000) {
+                let ids: Vec<i64> = diesel::insert_into(systems::table)
+                    .values(chunk)
+                    .returning(systems::id)
+                    .on_conflict((systems::reset_id, systems::symbol))
+                    .do_nothing()
+                    // .do_update()
+                    // .set((
+                    //     // Use empty ON CONFLICT UPDATE set hack to return id
+                    //     systems::symbol.eq(&system.symbol.as_str()),
+                    // ))
+                    .get_results(&mut self.db.conn().await)
+                    .await
+                    .expect("DB Insert error");
+                assert_eq!(chunk.len(), ids.len());
+                system_ids.extend(ids);
+            }
+            assert_eq!(system_ids.len(), system_inserts.len());
 
             let waypoint_inserts = std::iter::zip(system_ids, systems.iter())
                 .flat_map(|(system_id, system)| {
@@ -184,14 +207,20 @@ impl Universe {
                         })
                 })
                 .collect::<Vec<_>>();
-            let waypoint_ids: Vec<i64> = diesel::insert_into(waypoints::table)
-                .values(&waypoint_inserts)
-                .on_conflict((waypoints::reset_id, waypoints::symbol))
-                .do_nothing()
-                .returning(waypoints::id)
-                .get_results(&mut self.db.conn().await)
-                .await
-                .expect("DB Insert error");
+            info!("Inserting {} waypoints", waypoint_inserts.len());
+            let mut waypoint_ids: Vec<i64> = vec![];
+            for chunk in waypoint_inserts.chunks(1000) {
+                let ids: Vec<i64> = diesel::insert_into(waypoints::table)
+                    .values(chunk)
+                    .on_conflict((waypoints::reset_id, waypoints::symbol))
+                    .do_nothing()
+                    .returning(waypoints::id)
+                    .get_results(&mut self.db.conn().await)
+                    .await
+                    .expect("DB Insert error");
+                assert_eq!(chunk.len(), ids.len());
+                waypoint_ids.extend(ids);
+            }
             assert_eq!(waypoint_ids.len(), waypoint_inserts.len());
 
             let waypoint_id_map = std::iter::zip(waypoint_ids, waypoint_inserts)
@@ -220,6 +249,10 @@ impl Universe {
                 self.systems.insert(system.symbol.clone(), system);
             }
         }
+    }
+
+    pub fn systems(&self) -> Vec<System> {
+        self.systems.iter().map(|x| x.value().clone()).collect()
     }
 
     pub async fn get_market(
@@ -466,18 +499,6 @@ impl Universe {
             .into_iter()
             .find(|waypoint| &waypoint.symbol == symbol)
             .unwrap()
-    }
-
-    pub async fn all_systems(&self) -> Vec<api_models::System> {
-        let db_key = "systems.json";
-        match self.db.get_value(db_key).await {
-            Some(systems) => systems,
-            None => {
-                let systems: Vec<api_models::System> = self.api_client.get("systems.json").await;
-                self.db.set_value(db_key, &systems).await;
-                systems
-            }
-        }
     }
 
     pub async fn get_market_remote(&self, symbol: &WaypointSymbol) -> MarketRemoteView {
