@@ -2,6 +2,7 @@ use crate::api_client::api_models;
 use crate::api_client::api_models::WaypointDetailed;
 use crate::api_client::ApiClient;
 use crate::db::db_models;
+use crate::db::db_models::NewWaypointDetails;
 use crate::db::DbClient;
 use crate::models::WaypointDetails;
 use crate::models::{
@@ -121,6 +122,7 @@ impl Universe {
                             _ => panic!("Multiple details for waypoint"),
                         };
                         Waypoint {
+                            id: waypoint.id,
                             symbol: WaypointSymbol::new(&waypoint.symbol),
                             waypoint_type: waypoint.type_,
                             x: waypoint.x as i64,
@@ -142,39 +144,59 @@ impl Universe {
             }
         } else {
             let systems: Vec<api_models::System> = self.api_client.get("systems.json").await;
-            for system in systems.iter() {
-                let insert = db_models::NewSystem {
-                    symbol: system.symbol.to_string(),
-                    type_: system.system_type.to_string(),
+            let system_inserts = systems
+                .iter()
+                .map(|system| db_models::NewSystem {
+                    reset_id: self.db.reset_date(),
+                    symbol: system.symbol.as_str(),
+                    type_: &system.system_type,
                     x: system.x as i32,
                     y: system.y as i32,
-                };
-                // @@ handle insert conflicts
-                let system_id = diesel::insert_into(systems::table)
-                    .values(&insert)
-                    .returning(systems::id)
-                    .execute(&mut self.db.conn().await)
-                    .await
-                    .expect("DB Insert error");
-                // @@ handle insert conflicts
-                let waypoint_inserts = system
-                    .waypoints
-                    .iter()
-                    .map(|waypoint| db_models::NewWaypoint {
-                        reset_id: self.db.reset_date().to_string(),
-                        symbol: waypoint.symbol.to_string(),
-                        system_id: system_id as i64,
-                        type_: waypoint.waypoint_type.to_string(),
-                        x: waypoint.x as i32,
-                        y: waypoint.y as i32,
-                    })
-                    .collect::<Vec<_>>();
-                diesel::insert_into(waypoints::table)
-                    .values(&waypoint_inserts)
-                    .execute(&mut self.db.conn().await)
-                    .await
-                    .expect("DB Insert error");
-            }
+                })
+                .collect::<Vec<_>>();
+            let system_ids: Vec<i64> = diesel::insert_into(systems::table)
+                .values(&system_inserts)
+                .returning(systems::id)
+                .on_conflict((systems::reset_id, systems::symbol))
+                .do_nothing()
+                // .do_update()
+                // .set((
+                //     // Use empty ON CONFLICT UPDATE set hack to return id
+                //     systems::symbol.eq(&system.symbol.as_str()),
+                // ))
+                .get_results(&mut self.db.conn().await)
+                .await
+                .expect("DB Insert error");
+            assert_eq!(system_ids.len(), systems.len());
+
+            let waypoint_inserts = std::iter::zip(system_ids, systems.iter())
+                .flat_map(|(system_id, system)| {
+                    system
+                        .waypoints
+                        .iter()
+                        .map(move |waypoint| db_models::NewWaypoint {
+                            reset_id: self.db.reset_date(),
+                            symbol: waypoint.symbol.as_str(),
+                            system_id: system_id,
+                            type_: waypoint.waypoint_type.as_str(),
+                            x: waypoint.x as i32,
+                            y: waypoint.y as i32,
+                        })
+                })
+                .collect::<Vec<_>>();
+            let waypoint_ids: Vec<i64> = diesel::insert_into(waypoints::table)
+                .values(&waypoint_inserts)
+                .on_conflict((waypoints::reset_id, waypoints::symbol))
+                .do_nothing()
+                .returning(waypoints::id)
+                .get_results(&mut self.db.conn().await)
+                .await
+                .expect("DB Insert error");
+            assert_eq!(waypoint_ids.len(), waypoint_inserts.len());
+
+            let waypoint_id_map = std::iter::zip(waypoint_ids, waypoint_inserts)
+                .map(|(id, waypoint)| (waypoint.symbol.to_string(), id))
+                .collect::<std::collections::HashMap<_, _>>();
 
             for system in systems.into_iter() {
                 let system = System {
@@ -186,6 +208,7 @@ impl Universe {
                         .waypoints
                         .into_iter()
                         .map(|waypoint| Waypoint {
+                            id: waypoint_id_map[waypoint.symbol.as_str()],
                             symbol: waypoint.symbol.clone(),
                             waypoint_type: waypoint.waypoint_type,
                             x: waypoint.x,
@@ -313,12 +336,12 @@ impl Universe {
         let system = self.get_system(symbol).await;
         let waypoints: Option<Vec<WaypointDetailed>> = system
             .waypoints
-            .into_iter()
-            .map(|w| match w.details {
+            .iter()
+            .map(|w| match &w.details {
                 Some(details) => Some(WaypointDetailed {
                     system_symbol: symbol.clone(),
-                    symbol: w.symbol,
-                    waypoint_type: w.waypoint_type,
+                    symbol: w.symbol.clone(),
+                    waypoint_type: w.waypoint_type.clone(),
                     x: w.x,
                     y: w.y,
                     traits: vec![],
@@ -333,7 +356,26 @@ impl Universe {
             None => {
                 let waypoints: Vec<WaypointDetailed> =
                     self.api_client.get_system_waypoints(symbol).await;
-                // @@ save to database
+                assert_eq!(waypoints.len(), system.waypoints.len());
+                let inserts: Vec<_> = waypoints
+                    .iter()
+                    .zip(system.waypoints.iter())
+                    .map(|(waypoint, db_waypoint)| NewWaypointDetails {
+                        waypoint_id: db_waypoint.id,
+                        reset_id: self.db.reset_date(),
+                        is_market: waypoint.is_market(),
+                        is_shipyard: waypoint.is_shipyard(),
+                        is_uncharted: waypoint.is_uncharted(),
+                        is_under_construction: waypoint.is_under_construction,
+                    })
+                    .collect();
+                diesel::insert_into(waypoint_details::table)
+                    .values(inserts)
+                    .on_conflict(waypoint_details::waypoint_id)
+                    .do_nothing()
+                    .execute(&mut self.db.conn().await)
+                    .await
+                    .expect("DB Insert error");
                 waypoints
             }
         }

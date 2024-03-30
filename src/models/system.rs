@@ -2,6 +2,7 @@ use crate::models::{SystemSymbol, WaypointSymbol};
 
 #[derive(Debug, Clone)]
 pub struct Waypoint {
+    pub id: i64,
     pub symbol: WaypointSymbol,
     pub waypoint_type: String,
     pub x: i64,

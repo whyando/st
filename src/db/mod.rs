@@ -353,7 +353,7 @@ impl DbClient {
             .expect("DB Query error")
     }
 
-    pub async fn insert_systems(&self, systems: &Vec<db_models::NewSystem>) {
+    pub async fn insert_systems(&self, systems: &Vec<db_models::NewSystem<'_>>) {
         diesel::insert_into(systems::table)
             .values(systems)
             .execute(&mut self.conn().await)

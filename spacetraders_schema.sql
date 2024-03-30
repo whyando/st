@@ -353,7 +353,7 @@ CREATE INDEX systems_idx ON public.systems USING btree (reset_id, symbol);
 -- Name: waypoint_details_waypoint_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX waypoint_details_waypoint_idx ON public.waypoint_details USING btree (waypoint_id);
+CREATE UNIQUE INDEX waypoint_details_waypoint_idx ON public.waypoint_details USING btree (waypoint_id);
 
 
 --
@@ -364,17 +364,17 @@ CREATE INDEX waypoints_details_idx ON public.waypoint_details USING btree (reset
 
 
 --
--- Name: waypoints_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX waypoints_idx ON public.waypoints USING btree (reset_id, symbol);
-
-
---
 -- Name: waypoints_system_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX waypoints_system_idx ON public.waypoints USING btree (system_id);
+
+
+--
+-- Name: waypoints_unique_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX waypoints_unique_idx ON public.waypoints USING btree (reset_id, symbol);
 
 
 --

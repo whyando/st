@@ -6,9 +6,10 @@ use diesel::{
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = crate::schema::systems)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct NewSystem {
-    pub symbol: String,
-    pub type_: String,
+pub struct NewSystem<'a> {
+    pub reset_id: &'a str,
+    pub symbol: &'a str,
+    pub type_: &'a str,
     pub x: i32,
     pub y: i32,
 }
@@ -16,11 +17,11 @@ pub struct NewSystem {
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = crate::schema::waypoints)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct NewWaypoint {
-    pub reset_id: String,
-    pub symbol: String,
+pub struct NewWaypoint<'a> {
+    pub reset_id: &'a str,
+    pub symbol: &'a str,
     pub system_id: i64,
-    pub type_: String,
+    pub type_: &'a str,
     pub x: i32,
     pub y: i32,
 }
@@ -28,8 +29,8 @@ pub struct NewWaypoint {
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = crate::schema::waypoint_details)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct NewWaypointDetails {
-    pub reset_id: String,
+pub struct NewWaypointDetails<'a> {
+    pub reset_id: &'a str,
     pub waypoint_id: i64,
     pub is_market: bool,
     pub is_shipyard: bool,
