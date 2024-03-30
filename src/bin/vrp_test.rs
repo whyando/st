@@ -5,7 +5,8 @@ use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde_json::json;
-use st::models::{Market, MarketTradeGood, PaginatedList, Waypoint, WaypointSymbol};
+use st::api_client::api_models::WaypointDetailed;
+use st::models::{Market, MarketTradeGood, PaginatedList, WaypointSymbol};
 
 use vrp_pragmatic::checker::CheckerContext;
 use vrp_pragmatic::core::models::{Problem as CoreProblem, Solution as CoreSolution};
@@ -62,11 +63,11 @@ fn main() {
 
     // load market waypoints from ./test_data/waypoints_page_1.json and ./test_data/waypoints_page_2.json
     let waypoints = {
-        let waypoints1: PaginatedList<Waypoint> = serde_json::from_str(
+        let waypoints1: PaginatedList<WaypointDetailed> = serde_json::from_str(
             &std::fs::read_to_string("./test_data/waypoints_page_1.json").unwrap(),
         )
         .unwrap();
-        let waypoints2: PaginatedList<Waypoint> = serde_json::from_str(
+        let waypoints2: PaginatedList<WaypointDetailed> = serde_json::from_str(
             &std::fs::read_to_string("./test_data/waypoints_page_2.json").unwrap(),
         )
         .unwrap();
@@ -99,7 +100,7 @@ fn main() {
     #[allow(non_snake_case)]
     let TIME_LIMIT_MINUTES = 30;
     #[allow(non_snake_case)]
-    let START_WAYPOINT = waypoints[0].symbol();
+    let START_WAYPOINT = waypoints[0].symbol.clone();
 
     // ?! Add only 1 job for each good
     // we can't add multiple jobs for a (market, good) pair, because the act of completing one job will change the reward for the next job
@@ -198,7 +199,7 @@ fn main() {
             "start": {
                 "earliest": get_timestamp(0),
                 "location": {
-                    "index": waypoint_index(&mut locations, START_WAYPOINT),
+                    "index": waypoint_index(&mut locations, &START_WAYPOINT),
                 },
             },
             // "end": {
@@ -231,13 +232,10 @@ fn main() {
     let mut distances = vec![];
     for src_symbol in locations.iter() {
         for dest_symbol in locations.iter() {
-            let src = waypoints.iter().find(|w| w.symbol() == src_symbol).unwrap();
-            let dest = waypoints
-                .iter()
-                .find(|w| w.symbol() == dest_symbol)
-                .unwrap();
+            let src = waypoints.iter().find(|w| w.symbol == *src_symbol).unwrap();
+            let dest = waypoints.iter().find(|w| w.symbol == *dest_symbol).unwrap();
             // euclidean distance
-            let d2 = (src.x() - dest.x()).pow(2) + (src.y() - dest.y()).pow(2);
+            let d2 = (src.x - dest.x).pow(2) + (src.y - dest.y).pow(2);
             let d = (d2 as f64).sqrt();
             let duration = (15.0 + 25.0 / SPEED * d) as i64;
             travel_times.push(duration);

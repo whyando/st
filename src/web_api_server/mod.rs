@@ -1,7 +1,8 @@
 use crate::{
     agent_controller::{AgentController, Event},
+    api_client::api_models::WaypointDetailed,
     db::DbClient,
-    models::{Agent, Ship, Waypoint},
+    models::{Agent, Ship},
     universe::Universe,
 };
 use axum::{debug_handler, http::StatusCode};
@@ -24,6 +25,7 @@ struct AppState {
     agent_controller: AgentController,
     #[allow(dead_code)]
     db_client: DbClient,
+    #[allow(dead_code)]
     universe: Arc<Universe>,
 }
 
@@ -41,9 +43,10 @@ async fn ships_handler(State(state): State<Arc<AppState>>) -> axum::Json<Vec<Shi
 
 #[debug_handler]
 async fn waypoints_handler(
-    State(state): State<Arc<AppState>>,
-) -> Result<axum::Json<Vec<Waypoint>>, StatusCode> {
+    State(_state): State<Arc<AppState>>,
+) -> Result<axum::Json<Vec<WaypointDetailed>>, StatusCode> {
     return Ok(axum::Json(vec![]));
+    // ! disabled for now - because switched up system internal format
     // // todo: make this a parameter
     // let system_symbol = state.agent_controller.starting_system();
     // // let system_symbol = state.agent_controller.faction_capital().await;

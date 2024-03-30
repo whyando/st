@@ -23,7 +23,7 @@ async fn main() {
         usize::MAX
             - s.waypoints
                 .iter()
-                .filter(|w| w.waypoint_type() != "ASTEROID")
+                .filter(|w| w.waypoint_type != "ASTEROID")
                 .count()
     });
     for system in systems.iter().take(500) {
@@ -31,12 +31,12 @@ async fn main() {
         let num_non_asteroid = system
             .waypoints
             .iter()
-            .filter(|w| w.waypoint_type() != "ASTEROID")
+            .filter(|w| w.waypoint_type != "ASTEROID")
             .count();
         let num_en_asteroid = system
             .waypoints
             .iter()
-            .filter(|w| w.waypoint_type() == "ENGINEERED_ASTEROID")
+            .filter(|w| w.waypoint_type == "ENGINEERED_ASTEROID")
             .count();
         let shipyards = waypoints.iter().filter(|w| w.is_shipyard()).count();
         let markets = waypoints.iter().filter(|w| w.is_market()).count();

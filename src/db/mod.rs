@@ -7,8 +7,8 @@ use crate::schema::*;
 use crate::{
     logistics_planner::ShipSchedule,
     models::{
-        Market, MarketRemoteView, Shipyard, ShipyardRemoteView, System, SystemSymbol, Waypoint,
-        WaypointSymbol, WithTimestamp,
+        Market, MarketRemoteView, Shipyard, ShipyardRemoteView, SystemSymbol, WaypointSymbol,
+        WithTimestamp,
     },
 };
 use chrono::DateTime;
@@ -19,6 +19,7 @@ use diesel::ExpressionMethods as _;
 use diesel::OptionalExtension as _;
 use diesel::QueryDsl as _;
 use diesel::QueryableByName;
+use diesel::SelectableHelper as _;
 use diesel_async::pooled_connection::deadpool::Object;
 use diesel_async::pooled_connection::deadpool::Pool;
 use diesel_async::pooled_connection::AsyncDieselConnectionManager;
@@ -346,14 +347,7 @@ impl DbClient {
     pub async fn get_systems(&self) -> Vec<db_models::System> {
         systems::table
             .filter(systems::reset_id.eq(self.reset_date()))
-            .select((
-                systems::symbol,
-                systems::type_,
-                systems::x,
-                systems::y,
-                systems::created_at,
-                systems::updated_at,
-            ))
+            .select(db_models::System::as_select())
             .load(&mut self.conn().await)
             .await
             .expect("DB Query error")

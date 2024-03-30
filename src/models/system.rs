@@ -1,54 +1,25 @@
-use crate::api_client::api_models;
 use crate::models::{SystemSymbol, WaypointSymbol};
-use serde::{Deserialize, Serialize};
 
-///
-/// Simplified: output from systems.json, and for uncharted systems
-/// Detailed: output from /systems/:system_symbol}/waypoints
-///
-/// Main difference is traits.
-///
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Waypoint {
-    Simplified(api_models::WaypointSimplified),
-    Detailed(api_models::WaypointDetailed),
+#[derive(Debug, Clone)]
+pub struct Waypoint {
+    pub symbol: WaypointSymbol,
+    pub waypoint_type: String,
+    pub x: i64,
+    pub y: i64,
+    pub details: Option<WaypointDetails>,
 }
 
-impl Waypoint {
-    pub fn symbol(&self) -> &WaypointSymbol {
-        match self {
-            Waypoint::Simplified(w) => &w.symbol,
-            Waypoint::Detailed(w) => &w.symbol,
-        }
-    }
-
-    pub fn waypoint_type(&self) -> &str {
-        match self {
-            Waypoint::Simplified(w) => &w.waypoint_type,
-            Waypoint::Detailed(w) => &w.waypoint_type,
-        }
-    }
-
-    pub fn x(&self) -> i64 {
-        match self {
-            Waypoint::Simplified(w) => w.x,
-            Waypoint::Detailed(w) => w.x,
-        }
-    }
-
-    pub fn y(&self) -> i64 {
-        match self {
-            Waypoint::Simplified(w) => w.y,
-            Waypoint::Detailed(w) => w.y,
-        }
-    }
+#[derive(Debug, Clone)]
+pub struct WaypointDetails {
+    pub is_market: bool,
+    pub is_shipyard: bool,
+    pub is_uncharted: bool,
+    pub is_under_construction: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub struct System {
     pub symbol: SystemSymbol,
-    #[serde(rename = "type")]
     pub system_type: String,
     pub x: i64,
     pub y: i64,
@@ -59,6 +30,6 @@ impl System {
     pub fn is_starter_system(&self) -> bool {
         self.waypoints
             .iter()
-            .any(|w| w.waypoint_type() == "ENGINEERED_ASTEROID")
+            .any(|w| w.waypoint_type == "ENGINEERED_ASTEROID")
     }
 }

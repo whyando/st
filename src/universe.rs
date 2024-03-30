@@ -1,20 +1,24 @@
-use chrono::{DateTime, Utc};
-use dashmap::DashMap;
-use serde::{Deserialize, Serialize};
-
+use crate::api_client::api_models;
 use crate::api_client::api_models::WaypointDetailed;
 use crate::api_client::ApiClient;
 use crate::db::db_models;
 use crate::db::DbClient;
+use crate::models::WaypointDetails;
 use crate::models::{
     Construction, Faction, Market, MarketRemoteView, Shipyard, ShipyardRemoteView, System,
     SystemSymbol, Waypoint, WaypointSymbol, WithTimestamp,
 };
 use crate::pathfinding::{Pathfinding, Route};
 use crate::schema::*;
+use chrono::{DateTime, Utc};
+use dashmap::DashMap;
+use diesel::BelongingToDsl as _;
 use diesel::ExpressionMethods as _;
+use diesel::GroupedBy as _;
 use diesel::QueryDsl as _;
+use diesel::SelectableHelper as _;
 use diesel_async::RunQueryDsl as _;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -76,19 +80,55 @@ impl Universe {
     pub async fn init_systems(&self) {
         let systems: Vec<db_models::System> = systems::table
             .filter(systems::reset_id.eq(self.db.reset_date()))
-            .select((
-                systems::symbol,
-                systems::type_,
-                systems::x,
-                systems::y,
-                systems::created_at,
-                systems::updated_at,
-            ))
+            .select(db_models::System::as_select())
             .load(&mut self.db.conn().await)
             .await
             .expect("DB Query error");
-        if systems.len() != 0 {
-            for system in systems {
+        let waypoints = db_models::Waypoint::belonging_to(&systems)
+            .select(db_models::Waypoint::as_select())
+            .load(&mut self.db.conn().await)
+            .await
+            .expect("DB Query error");
+        let waypoint_details = db_models::WaypointDetails::belonging_to(&waypoints)
+            .select(db_models::WaypointDetails::as_select())
+            .load(&mut self.db.conn().await)
+            .await
+            .expect("DB Query error");
+        let num_systems = systems.len();
+        let grouped_details = waypoint_details.grouped_by(&waypoints);
+        let waypoints = waypoints
+            .into_iter()
+            .zip(grouped_details)
+            .grouped_by(&systems);
+
+        let system_iter = std::iter::zip(systems, waypoints);
+        if num_systems != 0 {
+            for (system, waypoints) in system_iter {
+                let waypoints = waypoints
+                    .into_iter()
+                    .map(|(waypoint, details)| {
+                        let details = match details.len() {
+                            0 => None,
+                            1 => {
+                                let details = details.into_iter().next().unwrap();
+                                Some(WaypointDetails {
+                                    is_under_construction: details.is_under_construction,
+                                    is_market: details.is_market,
+                                    is_shipyard: details.is_shipyard,
+                                    is_uncharted: details.is_uncharted,
+                                })
+                            }
+                            _ => panic!("Multiple details for waypoint"),
+                        };
+                        Waypoint {
+                            symbol: WaypointSymbol::new(&waypoint.symbol),
+                            waypoint_type: waypoint.type_,
+                            x: waypoint.x as i64,
+                            y: waypoint.y as i64,
+                            details,
+                        }
+                    })
+                    .collect();
                 self.systems.insert(
                     SystemSymbol::new(&system.symbol),
                     System {
@@ -96,27 +136,64 @@ impl Universe {
                         system_type: system.type_,
                         x: system.x as i64,
                         y: system.y as i64,
-                        waypoints: Vec::new(), // @@
+                        waypoints,
                     },
                 );
             }
         } else {
-            let systems: Vec<System> = self.api_client.get("systems.json").await;
-            let inserts = systems
-                .iter()
-                .map(|system| db_models::NewSystem {
+            let systems: Vec<api_models::System> = self.api_client.get("systems.json").await;
+            for system in systems.iter() {
+                let insert = db_models::NewSystem {
                     symbol: system.symbol.to_string(),
                     type_: system.system_type.to_string(),
                     x: system.x as i32,
                     y: system.y as i32,
-                })
-                .collect::<Vec<_>>();
-            diesel::insert_into(systems::table)
-                .values(&inserts)
-                .execute(&mut self.db.conn().await)
-                .await
-                .expect("DB Insert error");
+                };
+                // @@ handle insert conflicts
+                let system_id = diesel::insert_into(systems::table)
+                    .values(&insert)
+                    .returning(systems::id)
+                    .execute(&mut self.db.conn().await)
+                    .await
+                    .expect("DB Insert error");
+                // @@ handle insert conflicts
+                let waypoint_inserts = system
+                    .waypoints
+                    .iter()
+                    .map(|waypoint| db_models::NewWaypoint {
+                        reset_id: self.db.reset_date().to_string(),
+                        symbol: waypoint.symbol.to_string(),
+                        system_id: system_id as i64,
+                        type_: waypoint.waypoint_type.to_string(),
+                        x: waypoint.x as i32,
+                        y: waypoint.y as i32,
+                    })
+                    .collect::<Vec<_>>();
+                diesel::insert_into(waypoints::table)
+                    .values(&waypoint_inserts)
+                    .execute(&mut self.db.conn().await)
+                    .await
+                    .expect("DB Insert error");
+            }
+
             for system in systems.into_iter() {
+                let system = System {
+                    symbol: system.symbol.clone(),
+                    system_type: system.system_type,
+                    x: system.x,
+                    y: system.y,
+                    waypoints: system
+                        .waypoints
+                        .into_iter()
+                        .map(|waypoint| Waypoint {
+                            symbol: waypoint.symbol.clone(),
+                            waypoint_type: waypoint.waypoint_type,
+                            x: waypoint.x,
+                            y: waypoint.y,
+                            details: None,
+                        })
+                        .collect(),
+                };
                 self.systems.insert(system.symbol.clone(), system);
             }
         }
@@ -237,9 +314,18 @@ impl Universe {
         let waypoints: Option<Vec<WaypointDetailed>> = system
             .waypoints
             .into_iter()
-            .map(|w| match w {
-                Waypoint::Simplified(s) => None,
-                Waypoint::Detailed(d) => Some(d),
+            .map(|w| match w.details {
+                Some(details) => Some(WaypointDetailed {
+                    system_symbol: symbol.clone(),
+                    symbol: w.symbol,
+                    waypoint_type: w.waypoint_type,
+                    x: w.x,
+                    y: w.y,
+                    traits: vec![],
+                    faction: None,
+                    is_under_construction: details.is_under_construction,
+                }),
+                None => None,
             })
             .collect();
         match waypoints {
@@ -320,12 +406,12 @@ impl Universe {
             .unwrap()
     }
 
-    pub async fn all_systems(&self) -> Vec<System> {
+    pub async fn all_systems(&self) -> Vec<api_models::System> {
         let db_key = "systems.json";
         match self.db.get_value(db_key).await {
             Some(systems) => systems,
             None => {
-                let systems: Vec<System> = self.api_client.get("systems.json").await;
+                let systems: Vec<api_models::System> = self.api_client.get("systems.json").await;
                 self.db.set_value(db_key, &systems).await;
                 systems
             }

@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use crate::{
     api_client::api_models::WaypointDetailed,
-    models::{ShipFlightMode, System, Waypoint, WaypointSymbol},
+    models::{ShipFlightMode, System, WaypointSymbol},
 };
 use std::cmp::max;
 

@@ -33,13 +33,12 @@ pub struct WaypointDetailed {
     pub waypoint_type: String,
     pub x: i64,
     pub y: i64,
-    // orbitals
     pub traits: Vec<SymbolNameDescr>,
+    pub faction: Option<Symbol>,
+    pub is_under_construction: bool,
+    // orbitals
     // modifiers
     // chart
-    pub faction: Option<Symbol>,
-    // orbits
-    pub is_under_construction: bool,
 }
 
 impl WaypointDetailed {

@@ -51,7 +51,8 @@ diesel::table! {
 }
 
 diesel::table! {
-    systems (reset_id, symbol) {
+    systems (id) {
+        id -> Int8,
         reset_id -> Text,
         symbol -> Text,
         #[sql_name = "type"]
@@ -64,10 +65,25 @@ diesel::table! {
 }
 
 diesel::table! {
-    waypoints (reset_id, symbol) {
+    waypoint_details (id) {
+        id -> Int8,
+        reset_id -> Text,
+        waypoint_id -> Int8,
+        is_market -> Bool,
+        is_shipyard -> Bool,
+        is_uncharted -> Bool,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+        is_under_construction -> Bool,
+    }
+}
+
+diesel::table! {
+    waypoints (id) {
+        id -> Int8,
         reset_id -> Text,
         symbol -> Text,
-        system_symbol -> Text,
+        system_id -> Int8,
         #[sql_name = "type"]
         type_ -> Text,
         x -> Int4,
@@ -83,5 +99,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     market_transactions,
     surveys,
     systems,
+    waypoint_details,
     waypoints,
 );
