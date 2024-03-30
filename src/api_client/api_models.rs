@@ -1,5 +1,5 @@
-use super::{Symbol, SymbolNameDescr};
 use super::{SystemSymbol, WaypointSymbol};
+use crate::models::SymbolNameDescr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,7 +34,7 @@ pub struct WaypointDetailed {
     pub x: i64,
     pub y: i64,
     pub traits: Vec<SymbolNameDescr>,
-    pub faction: Option<Symbol>,
+    // pub faction: Option<Symbol>,
     pub is_under_construction: bool,
     // orbitals
     // modifiers

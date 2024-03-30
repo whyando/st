@@ -4,11 +4,11 @@ use crate::api_client::ApiClient;
 use crate::db::db_models;
 use crate::db::db_models::NewWaypointDetails;
 use crate::db::DbClient;
-use crate::models::WaypointDetails;
 use crate::models::{
     Construction, Faction, Market, MarketRemoteView, Shipyard, ShipyardRemoteView, System,
     SystemSymbol, Waypoint, WaypointSymbol, WithTimestamp,
 };
+use crate::models::{SymbolNameDescr, WaypointDetails};
 use crate::pathfinding::{Pathfinding, Route};
 use crate::schema::*;
 use chrono::{DateTime, Utc};
@@ -338,16 +338,36 @@ impl Universe {
             .waypoints
             .iter()
             .map(|w| match &w.details {
-                Some(details) => Some(WaypointDetailed {
-                    system_symbol: symbol.clone(),
-                    symbol: w.symbol.clone(),
-                    waypoint_type: w.waypoint_type.clone(),
-                    x: w.x,
-                    y: w.y,
-                    traits: vec![],
-                    faction: None,
-                    is_under_construction: details.is_under_construction,
-                }),
+                Some(details) => {
+                    let mut traits = vec![];
+                    if details.is_market {
+                        traits.push("MARKETPLACE".to_string());
+                    }
+                    if details.is_shipyard {
+                        traits.push("SHIPYARD".to_string());
+                    }
+                    if details.is_uncharted {
+                        traits.push("UNCHARTED".to_string());
+                    }
+                    let traits = traits
+                        .into_iter()
+                        .map(|symbol| SymbolNameDescr {
+                            symbol,
+                            name: String::new(),
+                            description: String::new(),
+                        })
+                        .collect();
+                    Some(WaypointDetailed {
+                        system_symbol: symbol.clone(),
+                        symbol: w.symbol.clone(),
+                        waypoint_type: w.waypoint_type.clone(),
+                        x: w.x,
+                        y: w.y,
+                        traits: traits,
+                        // faction: None,
+                        is_under_construction: details.is_under_construction,
+                    })
+                }
                 None => None,
             })
             .collect();
