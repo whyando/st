@@ -35,8 +35,11 @@ async fn main() -> io::Result<()> {
     }
     reachable_systems.sort_by_key(|(_system, (_, d))| *d);
 
-    for (system, (_pre, dist)) in &reachable_systems {
-        info!("{}: {}", system, dist);
+    for (system, (_pre, cd)) in &reachable_systems {
+        let cd_hours = cd / 3600;
+        let cd_minutes = (cd % 3600) / 60;
+        let cd_seconds = cd % 60;
+        info!("{}: {}h {}m {}s", system, cd_hours, cd_minutes, cd_seconds);
         // let path = build_path(&system, &reachables);
         // let route = path
         //     .iter()

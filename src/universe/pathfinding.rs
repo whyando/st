@@ -27,23 +27,23 @@ impl Universe {
                     .collect::<Vec<_>>();
                 match filtered.len() {
                     0 => None,
-                    1 => Some(filtered.first().unwrap().clone()),
+                    1 => Some((s, filtered.first().unwrap().clone())),
                     _ => panic!("Multiple jumpgates in system {}", s.symbol),
                 }
             })
             .collect::<Vec<_>>();
         let mut waypoints = BTreeMap::new();
-        for waypoint_symbol in &jumpgates {
+        for (system, waypoint_symbol) in &jumpgates {
             let waypoint = self.detailed_waypoint(&waypoint_symbol).await;
             if !waypoint.is_uncharted() {
                 let _gate = self.get_jumpgate_connections(&waypoint_symbol).await;
             }
-            waypoints.insert(waypoint_symbol, waypoint);
+            waypoints.insert(waypoint_symbol, (system, waypoint));
         }
 
         // Read connections from self.jumpgates (includes uncharted gates that we know the connections for)
         let mut graph: BTreeMap<WaypointSymbol, JumpGate> = BTreeMap::new();
-        for (&waypoint_symbol, waypoint) in waypoints.iter() {
+        for (&waypoint_symbol, (_s, waypoint)) in waypoints.iter() {
             let known_connections = self.jumpgates.contains_key(&waypoint_symbol);
             let gate = JumpGate {
                 active_connections: vec![],
@@ -54,16 +54,16 @@ impl Universe {
         }
         for kv in self.jumpgates.iter() {
             let (src_symbol, jump_info) = kv.pair();
-            let src_waypoint = waypoints.get(&src_symbol).unwrap();
+            let (src_system, src_waypoint) = waypoints.get(&src_symbol).unwrap();
             if src_waypoint.is_under_construction {
                 continue;
             }
             for dst_symbol in &jump_info.connections {
-                let dst_waypoint = waypoints.get(&dst_symbol).unwrap();
+                let (dst_system, dst_waypoint) = waypoints.get(&dst_symbol).unwrap();
                 if dst_waypoint.is_under_construction {
                     continue;
                 }
-                let distance = src_waypoint.distance(&dst_waypoint);
+                let distance = src_system.distance(&dst_system);
                 let cooldown = 60 + distance;
 
                 // src -> dst
