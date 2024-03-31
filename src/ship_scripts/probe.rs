@@ -37,7 +37,7 @@ pub async fn probe_multiple_locations(ship: ShipController, config: &ProbeScript
 
     let mut waypoints = vec![];
     for waypoint_symbol in &config.waypoints {
-        let waypoint = ship.universe.get_waypoint(waypoint_symbol).await;
+        let waypoint = ship.universe.detailed_waypoint(waypoint_symbol).await;
         waypoints.push(waypoint);
     }
 
@@ -90,7 +90,10 @@ pub async fn probe_single_location(ship_controller: ShipController, config: &Pro
         waypoint_symbol
     );
     ship_controller.wait_for_transit().await;
-    let waypoint = ship_controller.universe.get_waypoint(waypoint_symbol).await;
+    let waypoint = ship_controller
+        .universe
+        .detailed_waypoint(waypoint_symbol)
+        .await;
 
     if ship_controller.system() != waypoint.system_symbol {
         // Assume we can do a single jump to the correct system

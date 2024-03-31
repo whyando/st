@@ -1,6 +1,6 @@
 pub mod api_models;
 
-use crate::{models::*, universe::JumpGateInfo};
+use crate::models::*;
 use core::panic;
 use log::*;
 use reqwest::{self, Method, StatusCode};
@@ -179,8 +179,10 @@ impl ApiClient {
             symbol.system(),
             symbol
         );
-        let response: Vec<WaypointSymbol> = self.get(&path).await;
-        response
+        let mut response: Value = self.get(&path).await;
+        let connections: Vec<WaypointSymbol> =
+            serde_json::from_value(response["data"]["connections"].take()).unwrap();
+        connections
         // let path = format!(
         //     "/systems/{}/waypoints/{}/jump-gate",
         //     symbol.system(),

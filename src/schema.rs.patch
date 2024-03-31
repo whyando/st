@@ -1,19 +1,9 @@
 diff --git a/src/schema.rs b/src/schema.rs
-index d766d82..58e50b7 100644
+index 2afef93..d28bbdc 100644
 --- a/src/schema.rs
 +++ b/src/schema.rs
-@@ -10,13 +10,13 @@ diesel::table! {
- }
- 
- diesel::table! {
-     jumpgate_connections (reset_id, waypoint_symbol) {
-         reset_id -> Text,
+@@ -15,3 +15,3 @@ diesel::table! {
          waypoint_symbol -> Text,
 -        edges -> Array<Nullable<Text>>,
 +        edges -> Array<Text>,
          created_at -> Timestamptz,
-     }
- }
- 
- diesel::table! {
-     market_trades (id, timestamp) {

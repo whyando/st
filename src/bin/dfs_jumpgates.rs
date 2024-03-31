@@ -3,7 +3,6 @@ use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
 use st::db::DbClient;
 use st::models::WaypointSymbol;
-use st::universe::JumpGateConnections;
 use st::universe::Universe;
 use std::collections::HashMap;
 use std::env;
@@ -62,19 +61,23 @@ impl Dfs {
         if self.state.contains_key(&x) {
             return;
         }
-        let connections = self.universe.get_jumpgate_connections(&x).await;
-        match connections.connections {
-            JumpGateConnections::Charted(connections) => {
-                self.state.insert(x.clone(), connections.len() as i32);
-                for y in connections {
-                    self.explore(y).await;
-                }
-            }
-            JumpGateConnections::Uncharted => {
-                self.state.insert(x.clone(), 0);
-                log::debug!("Jumpgate {} is uncharted", x);
-            }
-        }
+        let _gate = self.universe.get_jumpgate_connections(&x).await;
+        // get_jumpgate_connections should now only be called on charted jumpgates
+        // todo: fix this with new interface
+        todo!();
+        // if let Some(gate) = connections {
+        //     self.state.insert(x.clone(), gate.connections.len() as i32);
+        //     if gate.is_constructed {
+        //         for y in gate.connections {
+        //             self.explore(y).await;
+        //         }
+        //     } else {
+        //         log::debug!("Jumpgate {} is under construction", x);
+        //     }
+        // } else {
+        //     self.state.insert(x.clone(), 0);
+        //     log::debug!("Jumpgate {} connections unknown", x);
+        // }
     }
 
     fn result(&self) {

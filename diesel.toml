@@ -1,4 +1,5 @@
 
 [print_schema]
 filter = { except_tables = [] }
-# patch_file = "src/schema.rs.patch"
+# git diff -U1 src/schema.rs > src/schema.rs.patch
+patch_file = "src/schema.rs.patch"

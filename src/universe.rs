@@ -11,7 +11,6 @@ use crate::models::{
 use crate::models::{SymbolNameDescr, WaypointDetails};
 use crate::pathfinding::{Pathfinding, Route};
 use crate::schema::*;
-use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use diesel::BelongingToDsl as _;
 use diesel::ExpressionMethods as _;
@@ -20,7 +19,6 @@ use diesel::QueryDsl as _;
 use diesel::SelectableHelper as _;
 use diesel_async::RunQueryDsl as _;
 use log::*;
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -37,6 +35,7 @@ pub enum WaypointFilter {
     JumpGate,
 }
 
+#[derive(Debug, Clone)]
 pub struct JumpGateInfo {
     pub is_constructed: bool,
     pub connections: Vec<WaypointSymbol>,
@@ -259,6 +258,20 @@ impl Universe {
             .expect("DB Query error");
         let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
         info!("Loaded {} jumpgates in {:.3}s", jumpgates.len(), duration);
+
+        for jumpgate in jumpgates {
+            self.jumpgates.insert(
+                WaypointSymbol::new(&jumpgate.waypoint_symbol),
+                JumpGateInfo {
+                    is_constructed: !jumpgate.is_under_construction,
+                    connections: jumpgate
+                        .edges
+                        .iter()
+                        .map(|symbol| WaypointSymbol::new(symbol))
+                        .collect(),
+                },
+            );
+        }
     }
 
     pub fn systems(&self) -> Vec<System> {
@@ -279,12 +292,9 @@ impl Universe {
     }
     pub fn waypoint(&self, symbol: &WaypointSymbol) -> Waypoint {
         let system_symbol = symbol.system();
-        let system = self
-            .systems
-            .get(&system_symbol)
-            .expect("System not found")
-            .value();
+        let system = self.systems.get(&system_symbol).expect("System not found");
         system
+            .value()
             .waypoints
             .iter()
             .find(|w| &w.symbol == symbol)
@@ -530,7 +540,7 @@ impl Universe {
         shipyards
     }
 
-    pub async fn get_waypoint(&self, symbol: &WaypointSymbol) -> WaypointDetailed {
+    pub async fn detailed_waypoint(&self, symbol: &WaypointSymbol) -> WaypointDetailed {
         let system_waypoints = self.get_system_waypoints(&symbol.system()).await;
         system_waypoints
             .into_iter()
@@ -720,26 +730,18 @@ impl Universe {
             .symbol
     }
 
+    // Get jumpgate connections for a charted system
     pub async fn get_jumpgate_connections(&self, symbol: &WaypointSymbol) -> JumpGateInfo {
-        todo!(); // @@
-        let db_jumpgate_key = format!("jumpgate/{}", symbol);
-
-        // Layer 1 - check cache
         if let Some(jumpgate_info) = &self.jumpgates.get(symbol) {
             return jumpgate_info.value().clone();
         }
-        // Layer 2 - check db
-        let jumpgate_info: Option<JumpGateInfo> = self.db.get_value(&db_jumpgate_key).await;
-        if let Some(jumpgate_info) = jumpgate_info {
-            // !! at this point we might want to do a freshness check on jumpgate_info.timestamp if uncharted
-            // in case it's been charted since we last fetched it
-            self.jumpgates.insert(symbol.clone(), jumpgate_info.clone());
-            return jumpgate_info;
-        }
-        // Layer 3 - fetch from api
-        let jumpgate_info = self.api_client.get_jumpgate_conns(symbol).await;
-        self.db.set_value(&db_jumpgate_key, &jumpgate_info).await;
-        self.jumpgates.insert(symbol.clone(), jumpgate_info.clone());
-        jumpgate_info
+        let waypoint = self.detailed_waypoint(symbol).await;
+        let connections = self.api_client.get_jumpgate_conns(symbol).await;
+        let info = JumpGateInfo {
+            is_constructed: !waypoint.is_under_construction,
+            connections,
+        };
+        self.jumpgates.insert(symbol.clone(), info.clone());
+        info
     }
 }

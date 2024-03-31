@@ -5,7 +5,7 @@ use quadtree_rs::{area::AreaBuilder, point::Point, Quadtree};
 use st::api_client::ApiClient;
 use st::db::DbClient;
 use st::models::SystemSymbol;
-use st::universe::{JumpGateConnections, Universe};
+use st::universe::Universe;
 use std::cmp::max;
 
 #[tokio::main]
@@ -31,37 +31,25 @@ async fn main() {
         .filter(|s| s.waypoints.iter().any(|w| w.waypoint_type == "JUMP_GATE"))
         .collect::<Vec<_>>();
     info!(
-        "Loaded {} systems, {} jumpgates",
+        "Warp graph on {} systems, {} jumpgates",
         systems.len(),
         jump_gate_systems.len()
     );
 
     let mut jumpgates = vec![];
     for jump_gate_system in jump_gate_systems.iter() {
-        let jumpgate = jump_gate_system
+        let waypoint_symbol = jump_gate_system
             .waypoints
             .iter()
             .find(|w| w.waypoint_type == "JUMP_GATE")
-            .unwrap();
-        let waypoints = universe
-            .get_system_waypoints(&jump_gate_system.symbol)
-            .await;
-        let jump_waypoint = waypoints
-            .iter()
-            .find(|w| w.waypoint_type == "JUMP_GATE")
-            .unwrap();
-        let conn = universe.get_jumpgate_connections(&jumpgate.symbol).await;
-        let conn_uncharted = match conn.connections {
-            JumpGateConnections::Charted(_) => false,
-            JumpGateConnections::Uncharted => true,
-        };
-        if jump_waypoint.is_uncharted() != conn_uncharted {
-            info!(
-                "Mismatch between jumpgate charted status and waypoint status: {}",
-                jump_gate_system.symbol
-            );
+            .unwrap()
+            .symbol
+            .clone();
+        let waypoint = universe.detailed_waypoint(&waypoint_symbol).await;
+        if !waypoint.is_uncharted() {
+            let gate = universe.get_jumpgate_connections(&waypoint_symbol).await;
+            jumpgates.push((jump_gate_system, gate.connections, gate.is_constructed));
         }
-        jumpgates.push((jump_gate_system, conn, jump_waypoint.is_under_construction));
     }
 
     // Pathfinding strategy 1:
@@ -163,23 +151,21 @@ async fn main() {
     }
 
     for (jump_gate_system, conn, _is_under_construction) in jumpgates.iter() {
-        if let JumpGateConnections::Charted(conn) = &conn.connections {
-            for conn in conn.iter() {
-                let dest_system = systems.iter().find(|s| s.symbol == conn.system()).unwrap();
-                let color = Rgb([0, 255, 255]);
-                draw_line_segment_mut(
-                    &mut img,
-                    (
-                        transform(jump_gate_system.x) as f32,
-                        transform(jump_gate_system.y) as f32,
-                    ),
-                    (
-                        transform(dest_system.x) as f32,
-                        transform(dest_system.y) as f32,
-                    ),
-                    color,
-                );
-            }
+        for conn in conn.iter() {
+            let dest_system = systems.iter().find(|s| s.symbol == conn.system()).unwrap();
+            let color = Rgb([0, 255, 255]);
+            draw_line_segment_mut(
+                &mut img,
+                (
+                    transform(jump_gate_system.x) as f32,
+                    transform(jump_gate_system.y) as f32,
+                ),
+                (
+                    transform(dest_system.x) as f32,
+                    transform(dest_system.y) as f32,
+                ),
+                color,
+            );
         }
     }
 
