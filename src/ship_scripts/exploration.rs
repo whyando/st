@@ -43,16 +43,25 @@ async fn tick(ship: &ShipController, state: &ExplorerState) -> Option<ExplorerSt
 
             // Plan route
             let graph = ship.universe.jumpgate_graph().await;
-            let (path, _duration) = dijkstra(
+            let (path, duration) = dijkstra(
                 &start_jumpgate,
                 |node| graph.get(node).unwrap().active_connections.clone(),
                 |node| node == target_jumpgate,
             )
             .expect("No path to target jumpgate");
+            let path_str = path
+                .iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<_>>()
+                .join(" -> ");
+            debug!(
+                "Navigating to {} in {}s via path {}",
+                target_jumpgate, duration, path_str
+            );
 
             // Execute route
             ship.goto_waypoint(&start_jumpgate).await;
-            for gate in path {
+            for gate in path.iter().skip(1) {
                 ship.jump(&gate).await;
             }
             // Get connections
