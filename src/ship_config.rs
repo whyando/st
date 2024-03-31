@@ -391,7 +391,7 @@ pub fn ship_config_capital_system(
     }
 
     // Charting
-    const NUM_JUMPGATE_PROBES: i64 = 24;
+    const NUM_JUMPGATE_PROBES: i64 = 50;
     for i in 0..NUM_JUMPGATE_PROBES {
         ships.push((
             (4.0, (i as f64) / (NUM_JUMPGATE_PROBES as f64)),

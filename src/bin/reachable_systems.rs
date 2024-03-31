@@ -21,7 +21,11 @@ async fn main() -> io::Result<()> {
     universe.init().await;
 
     let agent = api_client.get_agent_public(&callsign).await;
-    let system = agent.headquarters.system();
+    let system = universe
+        .get_faction(&agent.starting_faction)
+        .await
+        .headquarters
+        .unwrap();
     let start = universe.get_jumpgate(&system).await;
 
     let graph = universe.jumpgate_graph().await;
