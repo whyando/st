@@ -17,7 +17,9 @@ async fn main() {
     let status = api_client.status().await;
     let db = DbClient::new(&status.reset_date).await;
     let universe = Universe::new(&api_client, &db);
-    universe.init_systems().await;
+    universe.init().await;
+    assert_eq!(status.stats.systems, universe.num_systems() as i64);
+    assert_eq!(status.stats.waypoints, universe.num_waypoints() as i64);
 
     let systems = universe
         .systems()
@@ -48,7 +50,17 @@ async fn main() {
             .iter()
             .find(|w| w.waypoint_type == "JUMP_GATE")
             .unwrap();
-        let conn = universe.get_jumpgate_connections(&jumpgate.symbol).await;
+    let conn = universe.get_jumpgate_connections(&jumpgate.symbol).await;
+        let conn_uncharted = match conn.connections {
+            JumpGateConnections::Charted(_) => false,
+            JumpGateConnections::Uncharted => true,
+        };
+        if jump_waypoint.is_uncharted() != conn_uncharted {
+            info!(
+                "Mismatch between jumpgate charted status and waypoint status: {}",
+                jump_gate_system.symbol
+            );
+        }
         jumpgates.push((jump_gate_system, conn, jump_waypoint.is_under_construction));
     }
 

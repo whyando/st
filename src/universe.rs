@@ -37,16 +37,9 @@ pub enum WaypointFilter {
     JumpGate,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JumpGateInfo {
-    pub timestamp: DateTime<Utc>,
-    pub connections: JumpGateConnections,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum JumpGateConnections {
-    Charted(Vec<WaypointSymbol>),
-    Uncharted,
+    pub is_constructed: bool,
+    pub connections: Vec<WaypointSymbol>,
 }
 
 pub struct Universe {
@@ -79,7 +72,12 @@ impl Universe {
         }
     }
 
-    pub async fn init_systems(&self) {
+    pub async fn init(&self) {
+        self.init_systems().await;
+        self.init_jumpgates().await;
+    }
+
+    async fn init_systems(&self) {
         let query_start = std::time::Instant::now();
         let systems: Vec<db_models::System> = systems::table
             .filter(systems::reset_id.eq(self.db.reset_date()))
@@ -251,8 +249,26 @@ impl Universe {
         }
     }
 
+    async fn init_jumpgates(&self) {
+        let query_start = std::time::Instant::now();
+        let jumpgates: Vec<db_models::JumpGateConnections> = jumpgate_connections::table
+            .filter(jumpgate_connections::reset_id.eq(self.db.reset_date()))
+            .select(db_models::JumpGateConnections::as_select())
+            .load(&mut self.db.conn().await)
+            .await
+            .expect("DB Query error");
+        let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
+        info!("Loaded {} jumpgates in {:.3}s", jumpgates.len(), duration);
+    }
+
     pub fn systems(&self) -> Vec<System> {
         self.systems.iter().map(|x| x.value().clone()).collect()
+    }
+    pub fn num_systems(&self) -> usize {
+        self.systems.len()
+    }
+    pub fn num_waypoints(&self) -> usize {
+        self.systems.iter().map(|s| s.value().waypoints.len()).sum()
     }
 
     pub async fn get_market(
@@ -684,6 +700,7 @@ impl Universe {
     }
 
     pub async fn get_jumpgate_connections(&self, symbol: &WaypointSymbol) -> JumpGateInfo {
+        todo!(); // @@
         let db_jumpgate_key = format!("jumpgate/{}", symbol);
 
         // Layer 1 - check cache

@@ -5,3 +5,4 @@
 /.env.remote
 *.log
 *.txt
+*.png

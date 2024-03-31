@@ -38,6 +38,15 @@ pub struct NewWaypointDetails<'a> {
     pub is_under_construction: bool,
 }
 
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = crate::schema::jumpgate_connections)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct NewJumpgateConnections<'a> {
+    pub reset_id: &'a str,
+    pub waypoint_symbol: &'a str,
+    pub edges: Vec<&'a str>,
+}
+
 #[derive(Debug, Clone, Identifiable, Queryable, QueryableByName, Selectable)]
 #[diesel(table_name = crate::schema::systems)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
@@ -63,7 +72,6 @@ pub struct Waypoint {
     pub x: i32,
     pub y: i32,
     pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Identifiable, Queryable, QueryableByName, Selectable, Associations)]
@@ -77,4 +85,12 @@ pub struct WaypointDetails {
     pub is_shipyard: bool,
     pub is_uncharted: bool,
     pub is_under_construction: bool,
+}
+
+#[derive(Debug, Clone, Queryable, QueryableByName, Selectable)]
+#[diesel(table_name = crate::schema::jumpgate_connections)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct JumpGateConnections {
+    pub waypoint_symbol: String,
+    pub edges: Vec<String>,
 }

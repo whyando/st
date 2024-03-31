@@ -89,6 +89,20 @@ CREATE TABLE public.general_lookup (
 ALTER TABLE public.general_lookup OWNER TO postgres;
 
 --
+-- Name: jumpgate_connections; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.jumpgate_connections (
+    reset_id text NOT NULL,
+    waypoint_symbol text NOT NULL,
+    edges text[] NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+ALTER TABLE public.jumpgate_connections OWNER TO postgres;
+
+--
 -- Name: market_trades_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -216,8 +230,7 @@ CREATE TABLE public.waypoints (
     type text NOT NULL,
     x integer NOT NULL,
     y integer NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -278,6 +291,14 @@ ALTER TABLE ONLY public.waypoints ALTER COLUMN id SET DEFAULT nextval('public.wa
 
 ALTER TABLE ONLY public.general_lookup
     ADD CONSTRAINT general_lookup_pkey PRIMARY KEY (reset_id, key);
+
+
+--
+-- Name: jumpgate_connections jumpgate_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.jumpgate_connections
+    ADD CONSTRAINT jumpgate_connections_pkey PRIMARY KEY (reset_id, waypoint_symbol);
 
 
 --

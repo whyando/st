@@ -22,6 +22,16 @@ pub struct Status {
     pub status: String,
     pub version: String,
     pub reset_date: String,
+    pub stats: Stats,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Stats {
+    pub agents: i64,
+    pub ships: i64,
+    pub systems: i64,
+    pub waypoints: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

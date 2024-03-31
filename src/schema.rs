@@ -10,6 +10,15 @@ diesel::table! {
 }
 
 diesel::table! {
+    jumpgate_connections (reset_id, waypoint_symbol) {
+        reset_id -> Text,
+        waypoint_symbol -> Text,
+        edges -> Array<Nullable<Text>>,
+        created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     market_trades (id, timestamp) {
         id -> Int8,
         timestamp -> Timestamptz,
@@ -89,12 +98,12 @@ diesel::table! {
         x -> Int4,
         y -> Int4,
         created_at -> Timestamptz,
-        updated_at -> Timestamptz,
     }
 }
 
 diesel::allow_tables_to_appear_in_same_query!(
     general_lookup,
+    jumpgate_connections,
     market_trades,
     market_transactions,
     surveys,
