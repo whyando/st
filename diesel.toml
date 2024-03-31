@@ -1,4 +1,4 @@
 
 [print_schema]
 filter = { except_tables = [] }
-patch_file = "src/schema.rs.patch"
+# patch_file = "src/schema.rs.patch"

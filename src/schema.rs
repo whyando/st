@@ -13,8 +13,10 @@ diesel::table! {
     jumpgate_connections (reset_id, waypoint_symbol) {
         reset_id -> Text,
         waypoint_symbol -> Text,
-        edges -> Array<Text>,
+        edges -> Array<Nullable<Text>>,
         created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+        is_under_construction -> Bool,
     }
 }
 

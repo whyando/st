@@ -96,7 +96,9 @@ CREATE TABLE public.jumpgate_connections (
     reset_id text NOT NULL,
     waypoint_symbol text NOT NULL,
     edges text[] NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    is_under_construction boolean NOT NULL
 );
 
 

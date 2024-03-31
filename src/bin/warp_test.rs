@@ -50,7 +50,7 @@ async fn main() {
             .iter()
             .find(|w| w.waypoint_type == "JUMP_GATE")
             .unwrap();
-    let conn = universe.get_jumpgate_connections(&jumpgate.symbol).await;
+        let conn = universe.get_jumpgate_connections(&jumpgate.symbol).await;
         let conn_uncharted = match conn.connections {
             JumpGateConnections::Charted(_) => false,
             JumpGateConnections::Uncharted => true,

@@ -92,5 +92,6 @@ pub struct WaypointDetails {
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct JumpGateConnections {
     pub waypoint_symbol: String,
+    pub is_under_construction: bool,
     pub edges: Vec<String>,
 }

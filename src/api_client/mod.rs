@@ -1,9 +1,6 @@
 pub mod api_models;
 
-use crate::{
-    models::*,
-    universe::{JumpGateInfo},
-};
+use crate::{models::*, universe::JumpGateInfo};
 use core::panic;
 use log::*;
 use reqwest::{self, Method, StatusCode};

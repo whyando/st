@@ -270,6 +270,27 @@ impl Universe {
     pub fn num_waypoints(&self) -> usize {
         self.systems.iter().map(|s| s.value().waypoints.len()).sum()
     }
+    pub fn system(&self, symbol: &SystemSymbol) -> System {
+        self.systems
+            .get(symbol)
+            .expect("System not found")
+            .value()
+            .clone()
+    }
+    pub fn waypoint(&self, symbol: &WaypointSymbol) -> Waypoint {
+        let system_symbol = symbol.system();
+        let system = self
+            .systems
+            .get(&system_symbol)
+            .expect("System not found")
+            .value();
+        system
+            .waypoints
+            .iter()
+            .find(|w| &w.symbol == symbol)
+            .expect("Waypoint not found")
+            .clone()
+    }
 
     pub async fn get_market(
         &self,
