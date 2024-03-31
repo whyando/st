@@ -416,7 +416,7 @@ impl ShipController {
     pub async fn goto_waypoint(&self, target: &WaypointSymbol) {
         assert!(!self.is_in_transit(), "Ship is already in transit");
         if self.fuel_capacity() == 0 {
-            self.navigate(ShipFlightMode::Burn, target).await;
+            self.navigate(ShipFlightMode::Cruise, target).await;
             self.debug(&format!("Arrived at waypoint: {}", target));
             return;
         }
