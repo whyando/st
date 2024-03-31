@@ -41,10 +41,11 @@ pub struct NewWaypointDetails<'a> {
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = crate::schema::jumpgate_connections)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct NewJumpgateConnections<'a> {
+pub struct NewJumpGateConnections<'a> {
     pub reset_id: &'a str,
     pub waypoint_symbol: &'a str,
     pub edges: Vec<&'a str>,
+    pub is_under_construction: bool,
 }
 
 #[derive(Debug, Clone, Identifiable, Queryable, QueryableByName, Selectable)]

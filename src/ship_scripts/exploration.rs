@@ -10,8 +10,8 @@ enum ExplorerState {
     Exit,
 }
 
-pub async fn run_explorer(ship: ShipController, db: DbClient) {
-    info!("Starting script explorer for {}", ship.symbol());
+pub async fn run_jumpgate_probe(ship: ShipController, db: DbClient) {
+    info!("Starting script jumpgate probe for {}", ship.symbol());
     ship.wait_for_transit().await;
 
     let key = format!("explorer_state/{}", ship.symbol());

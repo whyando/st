@@ -48,6 +48,9 @@ impl WaypointSymbol {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+    pub fn as_string(&self) -> String {
+        self.0.clone()
+    }
 
     pub fn parse(s: &str) -> Result<WaypointSymbol, String> {
         let parts: Vec<&str> = s.split('-').collect();

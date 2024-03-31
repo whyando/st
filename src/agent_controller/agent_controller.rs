@@ -876,10 +876,11 @@ impl AgentController {
                             ship_scripts::construction::run_hauler(ship_controller, db).await;
                         })
                     }
-                    ShipBehaviour::Explorer => {
+                    ShipBehaviour::JumpgateProbe => {
                         let db = self.db.clone();
                         tokio::spawn(async move {
-                            ship_scripts::exploration::run_explorer(ship_controller, db).await;
+                            ship_scripts::exploration::run_jumpgate_probe(ship_controller, db)
+                                .await;
                         })
                     }
                 };

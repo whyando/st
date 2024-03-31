@@ -391,18 +391,18 @@ pub fn ship_config_capital_system(
     }
 
     // Charting
-    const NUM_EXPLORERS: i64 = 0; // @@
-    for i in 0..NUM_EXPLORERS {
+    const NUM_JUMPGATE_PROBES: i64 = 10;
+    for i in 0..NUM_JUMPGATE_PROBES {
         ships.push((
-            (4.0, (i as f64) / (NUM_EXPLORERS as f64)),
+            (4.0, (i as f64) / (NUM_JUMPGATE_PROBES as f64)),
             ShipConfig {
-                id: format!("{}/explorer/{}", system_waypoint, i),
-                ship_model: "SHIP_EXPLORER".to_string(),
+                id: format!("jumpgate_probe/{}/{}", system_waypoint, i),
+                ship_model: "SHIP_PROBE".to_string(),
                 purchase_criteria: PurchaseCriteria {
                     system_symbol: Some(system_waypoint.clone()),
                     ..PurchaseCriteria::default()
                 },
-                behaviour: ShipBehaviour::Explorer,
+                behaviour: ShipBehaviour::JumpgateProbe,
             },
         ));
     }

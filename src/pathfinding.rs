@@ -182,6 +182,9 @@ impl Pathfinding {
 
 impl WaypointDetailed {
     pub fn distance(&self, other: &WaypointDetailed) -> i64 {
+        if self.symbol == other.symbol {
+            return 0;
+        }
         let distance2 = (self.x - other.x).pow(2) + (self.y - other.y).pow(2);
         max(1, (distance2 as f64).sqrt().round() as i64)
     }
@@ -189,6 +192,9 @@ impl WaypointDetailed {
 
 impl System {
     pub fn distance(&self, other: &System) -> i64 {
+        if self.symbol == other.symbol {
+            return 0;
+        }
         let distance2 = (self.x - other.x).pow(2) + (self.y - other.y).pow(2);
         max(1, (distance2 as f64).sqrt().round() as i64)
     }

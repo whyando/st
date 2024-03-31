@@ -1,3 +1,5 @@
+pub mod pathfinding;
+
 use crate::api_client::api_models;
 use crate::api_client::api_models::WaypointDetailed;
 use crate::api_client::ApiClient;
@@ -735,12 +737,38 @@ impl Universe {
         if let Some(jumpgate_info) = &self.jumpgates.get(symbol) {
             return jumpgate_info.value().clone();
         }
+
+        // Otherwise fetch from API
         let waypoint = self.detailed_waypoint(symbol).await;
         let connections = self.api_client.get_jumpgate_conns(symbol).await;
         let info = JumpGateInfo {
             is_constructed: !waypoint.is_under_construction,
             connections,
         };
+        let insert = db_models::NewJumpGateConnections {
+            reset_id: self.db.reset_date(),
+            waypoint_symbol: symbol.as_str(),
+            is_under_construction: !info.is_constructed,
+            edges: info
+                .connections
+                .iter()
+                .map(|x| x.as_str())
+                .collect::<Vec<_>>(),
+        };
+        diesel::insert_into(jumpgate_connections::table)
+            .values(&insert)
+            .on_conflict((
+                jumpgate_connections::reset_id,
+                jumpgate_connections::waypoint_symbol,
+            ))
+            .do_update()
+            .set((
+                jumpgate_connections::is_under_construction.eq(&insert.is_under_construction),
+                jumpgate_connections::edges.eq(&insert.edges),
+            ))
+            .execute(&mut self.db.conn().await)
+            .await
+            .expect("DB Insert error");
         self.jumpgates.insert(symbol.clone(), info.clone());
         info
     }

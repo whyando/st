@@ -106,7 +106,7 @@ pub enum ShipBehaviour {
     MiningDrone,
     MiningShuttle,
     ConstructionHauler,
-    Explorer,
+    JumpgateProbe,
 }
 
 #[derive(Debug, Clone)]

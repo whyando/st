@@ -52,27 +52,6 @@ async fn main() {
         }
     }
 
-    // Pathfinding strategy 1:
-    // - CRUISE warp only
-    // - ignore fuel/markets
-    // - longest edge: 800 distance (explorer has 800 max fuel)
-    // note: explorer has 40 cargo, so 4000 extra fuel can be carried
-
-    let src = SystemSymbol::new("X1-YR70");
-    let _dest = SystemSymbol::new("X1-NS64");
-
-    // debug: closest systems to src
-    let src_system = systems.iter().find(|s| s.symbol == src).unwrap();
-    let mut s = systems
-        .iter()
-        .map(|s| (s.symbol.clone(), s.distance(src_system)))
-        .collect::<Vec<_>>();
-    s.sort_by_key(|(_, d)| *d);
-    info!("Closest systems to {}:", src);
-    for (s, d) in s.iter().take(10) {
-        info!("  {} {}", s, d);
-    }
-
     info!("Constructing quadtree");
     let mut qt = Quadtree::<i64, SystemSymbol>::new_with_anchor(
         Point {
@@ -170,6 +149,15 @@ async fn main() {
     }
 
     img.save("system_map.png").unwrap();
+
+    // Pathfinding strategy 1:
+    // - CRUISE warp only
+    // - ignore fuel/markets
+    // - longest edge: 800 distance (explorer has 800 max fuel)
+    // note: explorer has 40 cargo, so 4000 extra fuel can be carried
+
+    // let src = SystemSymbol::new("X1-YR70");
+    // let _dest = SystemSymbol::new("X1-NS64");
 
     // info!("Constructing graph");
     // const MAX_HOP_DISTANCE: i64 = 800;
