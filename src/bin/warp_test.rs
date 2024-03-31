@@ -105,20 +105,57 @@ async fn main() {
         x + (IMAGE_SZ as f64) / 2.0
     };
     let mut img = RgbImage::new(IMAGE_SZ as u32, IMAGE_SZ as u32);
+
+    // Draw connections first
+    for (symbol, (_pre, _dist)) in &reachable_systems {
+        let src_system = systems
+            .iter()
+            .find(|s| s.symbol == symbol.system())
+            .unwrap();
+        let connections = graph.get(symbol).unwrap().active_connections.clone();
+        for (conn, _cd) in connections.iter() {
+            let dest_system = systems.iter().find(|s| s.symbol == conn.system()).unwrap();
+            let color = Rgb([0, 255, 255]);
+            draw_line_segment_mut(
+                &mut img,
+                (
+                    transform(src_system.x) as f32,
+                    transform(src_system.y) as f32,
+                ),
+                (
+                    transform(dest_system.x) as f32,
+                    transform(dest_system.y) as f32,
+                ),
+                color,
+            );
+        }
+    }
+
+    // Draw systems
     for system in jump_gate_systems.iter() {
+        let jump_gate = system
+            .waypoints
+            .iter()
+            .find(|w| w.waypoint_type == "JUMP_GATE")
+            .unwrap();
         let reachable = reachable_systems
             .iter()
             .any(|(s, _)| s.system() == system.symbol);
+        let is_charted = graph.get(&jump_gate.symbol).unwrap().all_connections_known;
         let mut color = Rgb([255, 255, 255]);
         let mut size = 1;
-        if reachable {
-            color = Rgb([255, 255, 0]);
-            size = 5;
-        }
-        if system.is_starter_system() {
+        if is_charted && reachable {
             color = Rgb([255, 0, 0]);
             size = 5;
         }
+        if !is_charted && reachable {
+            color = Rgb([255, 165, 0]);
+            size = 5;
+        }
+        // if system.is_starter_system() {
+        //     color = Rgb([255, 0, 0]);
+        //     size = 5;
+        // }
         if system.symbol == start.system() {
             color = Rgb([255, 255, 255]);
             size = 10;
@@ -178,29 +215,6 @@ async fn main() {
     //         );
     //     }
     // }
-    for (symbol, (_pre, _dist)) in &reachable_systems {
-        let src_system = systems
-            .iter()
-            .find(|s| s.symbol == symbol.system())
-            .unwrap();
-        let connections = graph.get(symbol).unwrap().active_connections.clone();
-        for (conn, _cd) in connections.iter() {
-            let dest_system = systems.iter().find(|s| s.symbol == conn.system()).unwrap();
-            let color = Rgb([0, 255, 255]);
-            draw_line_segment_mut(
-                &mut img,
-                (
-                    transform(src_system.x) as f32,
-                    transform(src_system.y) as f32,
-                ),
-                (
-                    transform(dest_system.x) as f32,
-                    transform(dest_system.y) as f32,
-                ),
-                color,
-            );
-        }
-    }
 
     img.save("system_map.png").unwrap();
 
