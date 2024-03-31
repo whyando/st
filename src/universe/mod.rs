@@ -465,14 +465,20 @@ impl Universe {
                 assert_eq!(waypoints.len(), system.waypoints.len());
                 let inserts: Vec<_> = waypoints
                     .iter()
-                    .zip(system.waypoints.iter())
-                    .map(|(waypoint, db_waypoint)| NewWaypointDetails {
-                        waypoint_id: db_waypoint.id,
-                        reset_id: self.db.reset_date(),
-                        is_market: waypoint.is_market(),
-                        is_shipyard: waypoint.is_shipyard(),
-                        is_uncharted: waypoint.is_uncharted(),
-                        is_under_construction: waypoint.is_under_construction,
+                    .map(|waypoint| {
+                        let db_waypoint = system
+                            .waypoints
+                            .iter()
+                            .find(|w| &w.symbol == &waypoint.symbol)
+                            .expect("Waypoint not found");
+                        NewWaypointDetails {
+                            waypoint_id: db_waypoint.id,
+                            reset_id: self.db.reset_date(),
+                            is_market: waypoint.is_market(),
+                            is_shipyard: waypoint.is_shipyard(),
+                            is_uncharted: waypoint.is_uncharted(),
+                            is_under_construction: waypoint.is_under_construction,
+                        }
                     })
                     .collect();
                 diesel::insert_into(waypoint_details::table)
