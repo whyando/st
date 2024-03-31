@@ -1,0 +1,4 @@
+
+API gameplay bugs:
+- agent ship count includes scrapped ships
+- possible to spend more credits than you have if you make concurrent requests

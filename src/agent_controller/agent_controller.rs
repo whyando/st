@@ -19,6 +19,7 @@ use dashmap::DashMap;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use log::*;
+use pathfinding::directed::dijkstra::dijkstra_all;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::ops::Deref;
@@ -84,6 +85,7 @@ pub struct AgentController {
     ship_config: Arc<Mutex<Vec<ShipConfig>>>,
     job_assignments: Arc<DashMap<String, String>>,
     job_assignments_rev: Arc<DashMap<String, String>>,
+    probe_jumpgate_reservations: Arc<DashMap<String, WaypointSymbol>>,
     // ship_futs: Arc<Mutex<VecDeque<tokio::task::JoinHandle<()>>>>,
     hdls: Arc<JoinHandles>,
     pub task_manager: Arc<LogisticTaskManager>,
@@ -92,6 +94,7 @@ pub struct AgentController {
     pub ledger: Arc<Ledger>,
 
     try_buy_ships_mutex_guard: Arc<tokio::sync::Mutex<()>>,
+    probe_reserve_mutex_guard: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl TransferActor for AgentController {
@@ -226,6 +229,7 @@ impl AgentController {
                 (v.clone(), k.clone())
             })
             .collect();
+        let probe_jumpgate_reservations = db.get_probe_jumpgate_reservations(&callsign).await;
         let task_manager = LogisticTaskManager::new(universe, db, &system_symbol).await;
         let survey_manager = SurveyManager::new(db).await;
 
@@ -252,10 +256,12 @@ impl AgentController {
             ship_config: Arc::new(Mutex::new(vec![])),
             job_assignments: Arc::new(job_assignments),
             job_assignments_rev: Arc::new(job_assignments_rev),
+            probe_jumpgate_reservations: Arc::new(probe_jumpgate_reservations),
             task_manager: Arc::new(task_manager),
             cargo_broker: Arc::new(CargoBroker::new()),
             survey_manager: Arc::new(survey_manager),
             try_buy_ships_mutex_guard: Arc::new(tokio::sync::Mutex::new(())),
+            probe_reserve_mutex_guard: Arc::new(tokio::sync::Mutex::new(())),
             ledger: Arc::new(ledger),
         };
         agent_controller
@@ -876,13 +882,9 @@ impl AgentController {
                             ship_scripts::construction::run_hauler(ship_controller, db).await;
                         })
                     }
-                    ShipBehaviour::JumpgateProbe => {
-                        let db = self.db.clone();
-                        tokio::spawn(async move {
-                            ship_scripts::exploration::run_jumpgate_probe(ship_controller, db)
-                                .await;
-                        })
-                    }
+                    ShipBehaviour::JumpgateProbe => tokio::spawn(async move {
+                        ship_scripts::exploration::run_jumpgate_probe(ship_controller).await;
+                    }),
                 };
                 debug!("spawn_run_ship try push join_hdl");
                 self.hdls.push(join_hdl).await;
@@ -893,6 +895,68 @@ impl AgentController {
                 debug!("Warning. No job assigned to ship {}", ship_symbol);
             }
         }
+    }
+
+    pub async fn get_probe_jumpgate_reservation(
+        &self,
+        ship_symbol: &str,
+        ship_loc: &WaypointSymbol,
+    ) -> Option<WaypointSymbol> {
+        let existing = self.probe_jumpgate_reservations.get(ship_symbol);
+        if let Some(existing) = existing {
+            return Some(existing.value().clone());
+        }
+
+        // Choose a new jumpgate to reserve, closest to the ship's current location that is not already reserved
+        let _lock = self.probe_reserve_mutex_guard.lock().await;
+        let start = self.universe.get_jumpgate(&ship_loc.system()).await;
+        let graph = self.universe.jumpgate_graph().await;
+        let reachables = dijkstra_all(&start, |node| {
+            graph.get(node).unwrap().active_connections.clone()
+        });
+        let mut reachable_gates = Vec::new();
+        for (system, distance) in &reachables {
+            reachable_gates.push((system.clone(), distance));
+        }
+        reachable_gates.sort_by_key(|(_gate, (_pre, d))| *d);
+        // Find an reachable, uncharted, unreserved gate
+        let target = reachable_gates.iter().find(|(gate, (_pre, _d))| {
+            let is_charted = graph.get(gate).unwrap().all_connections_known;
+            if is_charted {
+                return false;
+            }
+            // Not especially efficient, but if there's <= 50 reservations, it's fine
+            let reserved = self
+                .probe_jumpgate_reservations
+                .iter()
+                .any(|x| x.value() == gate);
+            !reserved
+        });
+        match target {
+            Some((target, _)) => {
+                self.probe_jumpgate_reservations
+                    .insert(ship_symbol.to_string(), target.clone());
+                self.db
+                    .save_probe_jumpgate_reservations(
+                        &self.callsign,
+                        &self.probe_jumpgate_reservations,
+                    )
+                    .await;
+                Some(target.clone())
+            }
+            None => None,
+        }
+    }
+
+    pub async fn clear_probe_jumpgate_reservation(&self, ship_symbol: &str) {
+        {
+            let target = self.probe_jumpgate_reservations.get(ship_symbol).unwrap();
+            assert_eq!(self.universe.connections_known(target.value()), true);
+        }
+        self.probe_jumpgate_reservations.remove(ship_symbol);
+        self.db
+            .save_probe_jumpgate_reservations(&self.callsign, &self.probe_jumpgate_reservations)
+            .await;
     }
 }
 

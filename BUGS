@@ -1,6 +1,0 @@
-
-API bugs:
-- negative ship condition causes 500s
-- agent ship count includes sold ships
-- possible to spend more credits than you have if you make concurrent requests
-- you can obtain more for selling ships than you paid for them

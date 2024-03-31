@@ -276,6 +276,10 @@ impl Universe {
         }
     }
 
+    pub fn connections_known(&self, waypoint: &WaypointSymbol) -> bool {
+        self.jumpgates.contains_key(waypoint)
+    }
+
     pub fn systems(&self) -> Vec<System> {
         self.systems.iter().map(|x| x.value().clone()).collect()
     }

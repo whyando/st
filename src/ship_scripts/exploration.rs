@@ -1,41 +1,71 @@
-use crate::{db::DbClient, ship_controller::ShipController};
+use crate::{models::WaypointSymbol, ship_controller::ShipController};
 use log::*;
+use pathfinding::directed::dijkstra::dijkstra;
 use serde::{Deserialize, Serialize};
 use ExplorerState::*;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 enum ExplorerState {
     Init,
-    Exploring,
+    Exploring(WaypointSymbol),
     Exit,
 }
 
-pub async fn run_jumpgate_probe(ship: ShipController, db: DbClient) {
+pub async fn run_jumpgate_probe(ship: ShipController) {
     info!("Starting script jumpgate probe for {}", ship.symbol());
     ship.wait_for_transit().await;
 
-    let key = format!("explorer_state/{}", ship.symbol());
-    let mut state: ExplorerState = db.get_value(&key).await.unwrap_or(Init);
+    let mut state = Init;
 
     while state != Exit {
-        let next_state = tick(&ship, state).await;
+        let next_state = tick(&ship, &state).await;
         if let Some(next_state) = next_state {
             state = next_state;
-            db.set_value(&key, &state).await;
         }
     }
 }
 
-async fn tick(_ship: &ShipController, state: ExplorerState) -> Option<ExplorerState> {
+async fn tick(ship: &ShipController, state: &ExplorerState) -> Option<ExplorerState> {
     match state {
         Init => {
-            // allocate a target system to explore
-            todo!();
+            // Could be existing reservation, or a new one
+            let target = ship
+                .agent_controller
+                .get_probe_jumpgate_reservation(&ship.symbol(), &ship.waypoint())
+                .await;
+            match target {
+                Some(target) => Some(Exploring(target)),
+                None => Some(Exit),
+            }
         }
-        Exploring => {
-            // goto system, chart/scan until done
-            // mark as completed
-            todo!();
+        Exploring(target_jumpgate) => {
+            let start_jumpgate = ship.universe.get_jumpgate(&ship.system()).await;
+
+            // Plan route
+            let graph = ship.universe.jumpgate_graph().await;
+            let (path, _duration) = dijkstra(
+                &start_jumpgate,
+                |node| graph.get(node).unwrap().active_connections.clone(),
+                |node| node == target_jumpgate,
+            )
+            .expect("No path to target jumpgate");
+
+            // Execute route
+            ship.goto_waypoint(&start_jumpgate).await;
+            for gate in path {
+                ship.jump(&gate).await;
+            }
+            // Get connections
+            assert_eq!(ship.waypoint(), *target_jumpgate);
+            let _connections = ship
+                .universe
+                .get_jumpgate_connections(&target_jumpgate)
+                .await;
+
+            ship.agent_controller
+                .clear_probe_jumpgate_reservation(&ship.symbol())
+                .await;
+            Some(Init)
         }
         Exit => {
             panic!("Invalid state");

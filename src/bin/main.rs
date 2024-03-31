@@ -22,6 +22,7 @@ async fn main() {
     // Use the reset date on the status response as a unique identifier to partition data between resets
     let db = DbClient::new(&status.reset_date).await;
     let universe = Arc::new(Universe::new(&api_client, &db));
+    universe.init().await;
 
     // Startup Phase: register if not already registered, and load agent token
     let agent_token = match db.get_agent_token(&callsign).await {

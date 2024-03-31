@@ -295,6 +295,23 @@ impl DbClient {
         self.set_value(&key, construction).await
     }
 
+    pub async fn get_probe_jumpgate_reservations(
+        &self,
+        callsign: &str,
+    ) -> DashMap<String, WaypointSymbol> {
+        let key = format!("probe_jumpgate_reservations/{}", callsign);
+        self.get_value(&key).await.unwrap_or_default()
+    }
+
+    pub async fn save_probe_jumpgate_reservations(
+        &self,
+        callsign: &str,
+        reservations: &DashMap<String, WaypointSymbol>,
+    ) {
+        let key = format!("probe_jumpgate_reservations/{}", callsign);
+        self.set_value(&key, &reservations).await
+    }
+
     pub async fn insert_surveys(&self, surveys: &Vec<KeyedSurvey>) {
         let now = Utc::now();
         let inserts = surveys
