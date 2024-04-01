@@ -1,11 +1,25 @@
 use super::Universe;
-use crate::models::WaypointSymbol;
+use crate::models::{SystemSymbol, WaypointSymbol};
+use log::*;
+use quadtree_rs::area::AreaBuilder;
+use quadtree_rs::{point::Point, Quadtree};
+use std::cmp::max;
 use std::collections::BTreeMap;
 
 pub struct JumpGate {
     pub active_connections: Vec<(WaypointSymbol, i64)>,
     pub is_constructed: bool,
     pub all_connections_known: bool,
+}
+
+pub enum EdgeType {
+    Warp,
+    Jumpgate,
+}
+
+pub struct WarpEdge {
+    pub duration: i64,
+    pub edge_type: EdgeType,
 }
 
 impl Universe {
@@ -83,5 +97,107 @@ impl Universe {
         }
 
         graph
+    }
+
+    // Construct a map containing every system and its traversable connections
+    pub async fn warp_jump_graph(
+        &self,
+        warp_range: i64,
+        engine_speed: i64,
+    ) -> BTreeMap<SystemSymbol, BTreeMap<SystemSymbol, WarpEdge>> {
+        let jumpgate_graph = self.jumpgate_graph().await;
+
+        let systems = self
+            .systems()
+            .into_iter()
+            .filter(|s| !s.waypoints.is_empty())
+            .map(|s| {
+                let filtered = s
+                    .waypoints
+                    .iter()
+                    .filter(|w| w.waypoint_type == "JUMP_GATE")
+                    .map(|w| w.symbol.clone())
+                    .collect::<Vec<_>>();
+                let jumpgate = match filtered.len() {
+                    0 => None,
+                    1 => Some(filtered.first().unwrap().clone()),
+                    _ => panic!("Multiple jumpgates in system {}", s.symbol),
+                };
+                (s.symbol, s.x, s.y, jumpgate)
+            })
+            .collect::<Vec<_>>();
+
+        info!("Constructing quadtree");
+        let mut qt = Quadtree::<i64, SystemSymbol>::new_with_anchor(
+            Point {
+                // 2^18 = 262144
+                x: -262144,
+                y: -262144,
+            },
+            19,
+        );
+        for (symbol, x, y, _jumpgate) in systems.iter() {
+            qt.insert_pt(Point { x: *x, y: *y }, symbol.clone());
+        }
+        info!("Constructing quadtree done");
+
+        // Construct graph
+        let mut warp_graph: BTreeMap<SystemSymbol, BTreeMap<SystemSymbol, WarpEdge>> =
+            BTreeMap::new();
+        for (symbol, x, y, jumpgate) in systems.iter() {
+            let mut edges: BTreeMap<SystemSymbol, WarpEdge> = BTreeMap::new();
+
+            // Add warp edges
+            let neighbours = qt.query(
+                AreaBuilder::default()
+                    .anchor(Point {
+                        x: x - warp_range,
+                        y: y - warp_range,
+                    })
+                    .dimensions((2 * warp_range + 1, 2 * warp_range + 1))
+                    .build()
+                    .unwrap(),
+            );
+            for pt in neighbours {
+                let coords = pt.anchor();
+                let distance: i64 = {
+                    let distance2 = (x - coords.x).pow(2) + (y - coords.y).pow(2);
+                    max(1, (distance2 as f64).sqrt().round() as i64)
+                };
+                let duration =
+                    (15f64 + (distance as f64) * 50f64 / (engine_speed as f64)).round() as i64;
+                if distance <= warp_range {
+                    edges.insert(
+                        pt.value_ref().clone(),
+                        WarpEdge {
+                            duration,
+                            edge_type: EdgeType::Warp,
+                        },
+                    );
+                }
+            }
+
+            // Add jumpgate edges (overwrites warp edges if edge already exists)
+            if let Some(jumpgate) = jumpgate {
+                for conn in jumpgate_graph
+                    .get(jumpgate)
+                    .unwrap()
+                    .active_connections
+                    .iter()
+                {
+                    let (dest_symbol, cooldown) = conn;
+                    edges.insert(
+                        dest_symbol.system(),
+                        WarpEdge {
+                            duration: *cooldown,
+                            edge_type: EdgeType::Jumpgate,
+                        },
+                    );
+                }
+            }
+            warp_graph.insert(symbol.clone(), edges);
+        }
+
+        warp_graph
     }
 }
