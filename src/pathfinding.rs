@@ -81,6 +81,14 @@ impl Pathfinding {
         fuel_capacity: i64,
     ) -> Route {
         use pathfinding::directed::dijkstra::dijkstra;
+        // log::debug!(
+        //     "Finding route from {} to {} sp: {} sf: {} fc: {}",
+        //     src_symbol,
+        //     dest_symbol,
+        //     speed,
+        //     start_fuel,
+        //     fuel_capacity
+        // );
 
         let src = self.waypoints.get(src_symbol).unwrap();
         let dst = self.waypoints.get(dest_symbol).unwrap();

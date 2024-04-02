@@ -444,6 +444,9 @@ impl ShipController {
             self.debug(&format!("Arrived at waypoint: {}", target));
             return;
         }
+        if self.waypoint() == *target {
+            return;
+        }
         let route = self
             .universe
             .get_route(
