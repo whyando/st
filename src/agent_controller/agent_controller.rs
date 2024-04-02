@@ -3,7 +3,9 @@ use crate::api_client::api_models::WaypointDetailed;
 use crate::broker::{CargoBroker, TransferActor};
 use crate::config::CONFIG;
 use crate::models::{ShipNavStatus::*, *};
-use crate::ship_config::{ship_config_capital_system, ship_config_starter_system};
+use crate::ship_config::{
+    ship_config_capital_system, ship_config_lategame, ship_config_starter_system,
+};
 use crate::survey_manager::SurveyManager;
 use crate::universe::WaypointFilter;
 use crate::{
@@ -25,6 +27,7 @@ use serde_json::{json, Value};
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use strum::EnumString;
 use tokio::sync::mpsc::Sender;
 
 #[derive(Clone, Debug)]
@@ -45,7 +48,7 @@ enum BuyShipResult {
     FailedNoPurchaser(Option<WaypointSymbol>),
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, EnumString)]
 pub enum AgentEra {
     // Initial era, where the agent has two ships
     StartingSystem1,
@@ -55,6 +58,9 @@ pub enum AgentEra {
 
     // Jumpgate is completed, agent has access to the capital system
     InterSystem1,
+
+    // Final era
+    InterSystem2,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -86,7 +92,8 @@ pub struct AgentController {
     job_assignments: Arc<DashMap<String, String>>,
     job_assignments_rev: Arc<DashMap<String, String>>,
     probe_jumpgate_reservations: Arc<DashMap<String, WaypointSymbol>>,
-    // ship_futs: Arc<Mutex<VecDeque<tokio::task::JoinHandle<()>>>>,
+    explorer_reservations: Arc<DashMap<String, SystemSymbol>>,
+
     hdls: Arc<JoinHandles>,
     pub task_manager: Arc<LogisticTaskManager>,
     pub survey_manager: Arc<SurveyManager>,
@@ -95,6 +102,7 @@ pub struct AgentController {
 
     try_buy_ships_mutex_guard: Arc<tokio::sync::Mutex<()>>,
     probe_reserve_mutex_guard: Arc<tokio::sync::Mutex<()>>,
+    explorer_reserve_mutex_guard: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl TransferActor for AgentController {
@@ -230,6 +238,7 @@ impl AgentController {
             })
             .collect();
         let probe_jumpgate_reservations = db.get_probe_jumpgate_reservations(&callsign).await;
+        let explorer_reservations = db.get_explorer_reservations(&callsign).await;
         let task_manager = LogisticTaskManager::new(universe, db, &system_symbol).await;
         let survey_manager = SurveyManager::new(db).await;
 
@@ -257,11 +266,13 @@ impl AgentController {
             job_assignments: Arc::new(job_assignments),
             job_assignments_rev: Arc::new(job_assignments_rev),
             probe_jumpgate_reservations: Arc::new(probe_jumpgate_reservations),
+            explorer_reservations: Arc::new(explorer_reservations),
             task_manager: Arc::new(task_manager),
             cargo_broker: Arc::new(CargoBroker::new()),
             survey_manager: Arc::new(survey_manager),
             try_buy_ships_mutex_guard: Arc::new(tokio::sync::Mutex::new(())),
             probe_reserve_mutex_guard: Arc::new(tokio::sync::Mutex::new(())),
+            explorer_reserve_mutex_guard: Arc::new(tokio::sync::Mutex::new(())),
             ledger: Arc::new(ledger),
         };
         agent_controller
@@ -326,6 +337,17 @@ impl AgentController {
     }
 
     pub async fn check_era_advance(&self) {
+        if let Some(era_override) = CONFIG.era_override {
+            let state = self.state();
+            if era_override != state.era {
+                info!(
+                    "Agent {} advancing to era {:?} (override)",
+                    self.callsign, era_override
+                );
+                self.update_era(era_override).await;
+            }
+            return;
+        }
         loop {
             let current_era = self.state().era;
             let next_era = match current_era {
@@ -348,6 +370,7 @@ impl AgentController {
                     }
                 }
                 AgentEra::InterSystem1 => None,
+                AgentEra::InterSystem2 => None,
             };
             match next_era {
                 None => break,
@@ -606,6 +629,14 @@ impl AgentController {
 
     pub async fn generate_ship_config(&self) -> Vec<ShipConfig> {
         let era = self.state().era;
+
+        if era == AgentEra::InterSystem2 {
+            let capital = self.faction_capital().await;
+            let waypoints: Vec<WaypointDetailed> =
+                self.universe.get_system_waypoints(&capital).await;
+            return ship_config_lategame(&capital, &waypoints);
+        }
+
         let start_system = self.starting_system();
         let waypoints: Vec<WaypointDetailed> =
             self.universe.get_system_waypoints(&start_system).await;
@@ -616,7 +647,6 @@ impl AgentController {
             .await;
 
         let mut ships = vec![];
-
         let use_nonstatic_probes = true;
         let incl_outer_probes_and_siphons = match era {
             AgentEra::StartingSystem1 => false,
@@ -792,7 +822,9 @@ impl AgentController {
     pub async fn spawn_run_ship(&self, ship_symbol: String) {
         debug!("Spawning task for {}", ship_symbol);
 
-        if CONFIG.scrap_all_ships {
+        let job_id_opt = self.job_assignments_rev.get(&ship_symbol);
+        let scrap = CONFIG.scrap_all_ships || (job_id_opt.is_none() && CONFIG.scrap_unassigned);
+        if scrap {
             let ship_controller = self.ship_controller(&ship_symbol);
             let join_hdl = tokio::spawn(async move {
                 ship_scripts::scrap::run(ship_controller).await;
@@ -801,7 +833,7 @@ impl AgentController {
             return;
         }
 
-        match self.job_assignments_rev.get(&ship_symbol) {
+        match job_id_opt {
             Some(job_id) => {
                 let ship_config = self.get_ship_config();
                 let job_spec = ship_config
@@ -883,7 +915,10 @@ impl AgentController {
                         })
                     }
                     ShipBehaviour::JumpgateProbe => tokio::spawn(async move {
-                        ship_scripts::exploration::run_jumpgate_probe(ship_controller).await;
+                        ship_scripts::probe_exploration::run_jumpgate_probe(ship_controller).await;
+                    }),
+                    ShipBehaviour::Explorer => tokio::spawn(async move {
+                        ship_scripts::exploration::run_explorer(ship_controller).await;
                     }),
                 };
                 debug!("spawn_run_ship try push join_hdl");
@@ -957,6 +992,64 @@ impl AgentController {
         self.db
             .save_probe_jumpgate_reservations(&self.callsign, &self.probe_jumpgate_reservations)
             .await;
+    }
+
+    pub async fn get_explorer_reservation(
+        &self,
+        ship_symbol: &str,
+        ship_loc: &SystemSymbol,
+    ) -> Option<SystemSymbol> {
+        let existing = self.explorer_reservations.get(ship_symbol);
+        if let Some(existing) = existing {
+            return Some(existing.value().clone());
+        }
+
+        // Choose a new system to reserve, closest to the ship's current location that is not already reserved
+        let _lock = self.explorer_reserve_mutex_guard.lock().await;
+        const EXPLORER_FUEL_CAPACITY: i64 = 800;
+        const EXPLORER_SPEED: i64 = 30;
+        let graph = self
+            .universe
+            .warp_jump_graph(EXPLORER_FUEL_CAPACITY, EXPLORER_SPEED)
+            .await;
+        let reachables = dijkstra_all(ship_loc, |node| {
+            graph
+                .get(node)
+                .unwrap()
+                .iter()
+                .map(|(s, d)| (s.clone(), d.duration))
+        });
+        let mut starter_systems = vec![];
+        for system in self.universe.systems() {
+            if !system.is_starter_system() {
+                continue;
+            }
+            let system_symbol = system.symbol.clone();
+            if let Some((_pre, cd)) = reachables.get(&system_symbol) {
+                starter_systems.push((system_symbol, cd));
+            }
+        }
+        starter_systems.sort_by_key(|(_system, d)| *d);
+
+        let target = starter_systems.iter().find(|(system, _d)| {
+            let reserved = self
+                .explorer_reservations
+                .iter()
+                .any(|x| x.value() == system);
+            !reserved
+        });
+
+        match target {
+            Some((target, _)) => {
+                self.explorer_reservations
+                    .insert(ship_symbol.to_string(), target.clone());
+                self.db
+                    .save_explorer_reservations(&self.callsign, &self.explorer_reservations)
+                    .await;
+                Some(target.clone())
+            }
+            None => None,
+        }
     }
 }
 

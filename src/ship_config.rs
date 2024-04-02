@@ -410,3 +410,61 @@ pub fn ship_config_capital_system(
     ships.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     ships.into_iter().map(|(_, c)| c).collect()
 }
+
+pub fn ship_config_lategame(
+    system_waypoint: &SystemSymbol,
+    waypoints: &Vec<WaypointDetailed>,
+) -> Vec<ShipConfig> {
+    let mut ships = vec![];
+
+    let all_market_waypoints = market_waypoints(waypoints, None);
+
+    // Send probes to all shipyards
+    let mut probe_locations = BTreeMap::new();
+    for w in waypoints
+        .iter()
+        .filter(|w| all_market_waypoints.contains(&w.symbol))
+        .filter(|w| w.is_shipyard())
+    {
+        let loc = w.symbol.to_string();
+        let e = probe_locations.entry(loc).or_insert_with(|| {
+            let dist = ((w.x * w.x + w.y * w.y) as f64).sqrt() as i64;
+            (vec![], w.is_shipyard(), dist)
+        });
+        e.0.push(w.symbol.clone());
+    }
+    for (loc, (waypoints, _, _)) in probe_locations {
+        let config = ProbeScriptConfig { waypoints };
+        ships.push((
+            (1.0, 0.0),
+            ShipConfig {
+                id: format!("probe/{}", loc),
+                ship_model: "SHIP_PROBE".to_string(),
+                behaviour: ShipBehaviour::Probe(config),
+                purchase_criteria: PurchaseCriteria {
+                    never_purchase: true,
+                    ..PurchaseCriteria::default()
+                },
+            },
+        ));
+    }
+
+    const NUM_EXPLORERS: i64 = 10;
+    for i in 0..NUM_EXPLORERS {
+        ships.push((
+            (2.0, (i as f64) / (NUM_EXPLORERS as f64)),
+            ShipConfig {
+                id: format!("settler/{}", i),
+                ship_model: "SHIP_EXPLORER".to_string(),
+                purchase_criteria: PurchaseCriteria {
+                    system_symbol: Some(system_waypoint.clone()),
+                    ..PurchaseCriteria::default()
+                },
+                behaviour: ShipBehaviour::Explorer,
+            },
+        ));
+    }
+
+    ships.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    ships.into_iter().map(|(_, c)| c).collect()
+}

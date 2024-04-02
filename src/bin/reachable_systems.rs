@@ -1,7 +1,7 @@
 use pathfinding::prelude::*;
 use st::api_client::ApiClient;
 use st::db::DbClient;
-use st::universe::pathfinding::EdgeType;
+// use st::universe::pathfinding::EdgeType;
 use st::universe::Universe;
 use std::env;
 use std::fs::File;
@@ -62,13 +62,14 @@ async fn main() -> io::Result<()> {
         Some((cd, _path)) => *cd,
         None => &i64::MAX,
     });
+    starter_systems = starter_systems.into_iter().take(50).collect();
 
     // output to ./starter_systems.txt
     let mut f = File::create("starter_systems.txt")?;
     use std::io::Write as _;
     for (system, data) in starter_systems {
         match data {
-            Some((&cd, path)) => {
+            Some((&cd, _path)) => {
                 let cd_hours = cd / 3600;
                 let cd_minutes = (cd % 3600) / 60;
                 let cd_seconds = cd % 60;
@@ -77,16 +78,16 @@ async fn main() -> io::Result<()> {
                     "{}: {}h {}m {}s",
                     system, cd_hours, cd_minutes, cd_seconds
                 )?;
-                for pair in path.windows(2) {
-                    let s = &pair[0];
-                    let t = &pair[1];
-                    let edge = &graph[s][t];
-                    let type_ = match edge.edge_type {
-                        EdgeType::Warp => "W",
-                        EdgeType::Jumpgate => "J",
-                    };
-                    writeln!(&mut f, "\t{} {} {}", type_, t, edge.duration)?
-                }
+                // for pair in path.windows(2) {
+                //     let s = &pair[0];
+                //     let t = &pair[1];
+                //     let edge = &graph[s][t];
+                //     let type_ = match edge.edge_type {
+                //         EdgeType::Warp => "W",
+                //         EdgeType::Jumpgate => "J",
+                //     };
+                //     writeln!(&mut f, "\t{} {} {}", type_, t, edge.duration)?
+                // }
             }
             None => {
                 writeln!(&mut f, "{}: unreachable", system)?;

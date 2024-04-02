@@ -733,13 +733,22 @@ impl Universe {
         self.factions.get(faction).unwrap().clone()
     }
 
-    pub async fn get_jumpgate(&self, symbol: &SystemSymbol) -> WaypointSymbol {
+    pub async fn get_jumpgate_opt(&self, symbol: &SystemSymbol) -> Option<WaypointSymbol> {
         let waypoints = self.get_system_waypoints(symbol).await;
         waypoints
             .into_iter()
             .find(|waypoint| waypoint.is_jump_gate())
-            .unwrap()
-            .symbol
+            .map(|waypoint| waypoint.symbol)
+    }
+
+    pub async fn get_jumpgate(&self, symbol: &SystemSymbol) -> WaypointSymbol {
+        self.get_jumpgate_opt(symbol)
+            .await
+            .expect("No jumpgate found")
+    }
+
+    pub async fn first_waypoint(&self, symbol: &SystemSymbol) -> WaypointSymbol {
+        self.get_system_waypoints(&symbol).await[0].symbol.clone()
     }
 
     // Get jumpgate connections for a charted system

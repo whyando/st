@@ -26,7 +26,13 @@ pub async fn run(ship: ShipController) {
         let w = waypoints.iter().find(|w| w.symbol == s.symbol).unwrap();
         (current_waypoint.x - w.x).pow(2) + (current_waypoint.y - w.y).pow(2)
     });
-    let shipyard = shipyard.unwrap();
+    let shipyard = match shipyard {
+        Some(s) => s,
+        None => {
+            info!("No shipyard in system. Failed to scrap {}", ship.symbol());
+            return;
+        }
+    };
 
     ship.goto_waypoint(&shipyard.symbol).await;
     ship.scrap().await;

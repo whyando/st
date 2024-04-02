@@ -1,4 +1,8 @@
-use crate::{models::WaypointSymbol, ship_controller::ShipController};
+use crate::{
+    models::{ShipFlightMode, SystemSymbol},
+    ship_controller::ShipController,
+    universe::pathfinding::EdgeType,
+};
 use log::*;
 use pathfinding::directed::dijkstra::dijkstra;
 use serde::{Deserialize, Serialize};
@@ -7,12 +11,13 @@ use ExplorerState::*;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 enum ExplorerState {
     Init,
-    Exploring(WaypointSymbol),
+    Navigating(SystemSymbol),
+    Trading(SystemSymbol),
     Exit,
 }
 
-pub async fn run_jumpgate_probe(ship: ShipController) {
-    info!("Starting script jumpgate probe for {}", ship.symbol());
+pub async fn run_explorer(ship: ShipController) {
+    info!("Starting script explorer for {}", ship.symbol());
     ship.wait_for_transit().await;
 
     let mut state = Init;
@@ -31,50 +36,100 @@ async fn tick(ship: &ShipController, state: &ExplorerState) -> Option<ExplorerSt
             // Could be existing reservation, or a new one
             let target = ship
                 .agent_controller
-                .get_probe_jumpgate_reservation(&ship.symbol(), &ship.waypoint())
+                .get_explorer_reservation(&ship.symbol(), &&ship.system())
                 .await;
             match target {
-                Some(target) => Some(Exploring(target)),
+                Some(target) => Some(Navigating(target)),
                 None => Some(Exit),
             }
         }
-        Exploring(target_jumpgate) => {
-            let start_jumpgate = ship.universe.get_jumpgate(&ship.system()).await;
+        Navigating(target) => {
+            if &ship.system() == target {
+                // might need to empty cargo before starting trading state
+                return Some(Trading(target.clone()));
+            }
 
             // Plan route
-            let graph = ship.universe.jumpgate_graph().await;
+            const EXPLORER_FUEL_CAPACITY: i64 = 800;
+            const EXPLORER_SPEED: i64 = 30;
+            let graph = ship
+                .universe
+                .warp_jump_graph(EXPLORER_FUEL_CAPACITY, EXPLORER_SPEED)
+                .await;
+            let start = ship.system();
             let (path, duration) = dijkstra(
-                &start_jumpgate,
-                |node| graph.get(node).unwrap().active_connections.clone(),
-                |node| node == target_jumpgate,
+                &start,
+                |node| {
+                    graph
+                        .get(node)
+                        .unwrap()
+                        .iter()
+                        .map(|(s, d)| (s.clone(), d.duration))
+                },
+                |node| node == target,
             )
-            .expect("No path to target jumpgate");
+            .expect("No path to target");
+
             let path_str = path
-                .iter()
-                .map(|n| n.to_string())
+                .windows(2)
+                .map(|pair| {
+                    let s = &pair[0];
+                    let t = &pair[1];
+                    let edge = &graph[s][t];
+                    let type_ = match edge.edge_type {
+                        EdgeType::Jumpgate => "JUMP",
+                        EdgeType::Warp => "WARP",
+                    };
+                    format!("{} {} -> {}", type_, s, t)
+                })
                 .collect::<Vec<_>>()
-                .join(" -> ");
+                .join(", ");
             debug!(
                 "Navigating to {} in {}s via path {}",
-                target_jumpgate, duration, path_str
+                target, duration, path_str
             );
 
             // Execute route
-            ship.goto_waypoint(&start_jumpgate).await;
-            for gate in path.iter().skip(1) {
-                ship.jump(&gate).await;
-            }
-            // Get connections
-            assert_eq!(ship.waypoint(), *target_jumpgate);
-            let _connections = ship
-                .universe
-                .get_jumpgate_connections(&target_jumpgate)
-                .await;
+            for pair in path.windows(2) {
+                let s = &pair[0];
+                let t = &pair[1];
+                let edge = &graph[s][t];
+                match edge.edge_type {
+                    EdgeType::Jumpgate => {
+                        let src_gate = ship.universe.get_jumpgate(&s).await;
+                        let dst_gate = ship.universe.get_jumpgate(&t).await;
+                        ship.goto_waypoint(&src_gate).await;
+                        ship.jump(&dst_gate).await;
+                    }
+                    EdgeType::Warp => {
+                        // if market: Refuel to max fuel + fill cargo with fuel
+                        // if not-market: fill fuel fromCargo
+                        // if not enough fuel: exit failed
+                        info!("Explorer prep for warp to {}", t);
 
-            ship.agent_controller
-                .clear_probe_jumpgate_reservation(&ship.symbol())
-                .await;
-            Some(Init)
+                        // @@ todo
+                        return Some(Exit);
+
+                        // target waypoint:
+                        // if jumpgate in target system: warp to jumpgate
+                        // otherwise: warp to any waypoint in target system
+                        let warp_target = match ship.universe.get_jumpgate_opt(&t).await {
+                            Some(jumpgate) => jumpgate,
+                            None => ship.universe.first_waypoint(&t).await,
+                        };
+                        ship.warp(ShipFlightMode::Cruise, &warp_target).await;
+                    }
+                }
+            }
+
+            // might need to empty cargo before starting trading state
+            Some(Trading(target.clone()))
+        }
+        Trading(system) => {
+            assert_eq!(&ship.system(), system);
+            // @@ todo Implement trading
+
+            Some(Exit)
         }
         Exit => {
             panic!("Invalid state");

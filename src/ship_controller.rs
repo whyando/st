@@ -392,6 +392,30 @@ impl ShipController {
         self.set_orbit_status().await;
     }
 
+    pub async fn warp(&self, flight_mode: ShipFlightMode, waypoint: &WaypointSymbol) {
+        assert!(!self.is_in_transit(), "Ship is already in transit");
+        if self.waypoint() == *waypoint {
+            return;
+        }
+        assert_eq!(self.waypoint().system(), waypoint.system());
+        self.set_flight_mode(flight_mode).await;
+        self.orbit().await;
+        self.debug(&format!("Warp to waypoint: {}", waypoint));
+        let uri = format!("/my/ships/{}/warp", self.ship_symbol);
+        let mut response: Value = self
+            .api_client
+            .post(&uri, &json!({ "waypointSymbol": waypoint }))
+            .await;
+        let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
+        let fuel = serde_json::from_value(response["data"]["fuel"].take()).unwrap();
+        // let events = serde_json::from_value(response["data"]["events"].take()).unwrap();
+        // self.handle_ship_condition_events(&events);
+        self.update_nav(nav).await;
+        self.update_fuel(fuel).await;
+        self.wait_for_transit().await;
+        self.set_orbit_status().await;
+    }
+
     pub async fn jump(&self, waypoint: &WaypointSymbol) {
         assert!(!self.is_in_transit(), "Ship is in transit");
         self.wait_for_cooldown().await;

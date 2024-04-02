@@ -2,7 +2,7 @@ use imageproc::drawing::*;
 use imageproc::image::{Rgb, RgbImage};
 use log::*;
 use pathfinding::directed::dijkstra::dijkstra_all;
-use quadtree_rs::{area::AreaBuilder, point::Point, Quadtree};
+use quadtree_rs::{point::Point, Quadtree};
 use st::api_client::ApiClient;
 use st::db::DbClient;
 use st::models::SystemSymbol;

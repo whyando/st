@@ -312,6 +312,20 @@ impl DbClient {
         self.set_value(&key, &reservations).await
     }
 
+    pub async fn get_explorer_reservations(&self, callsign: &str) -> DashMap<String, SystemSymbol> {
+        let key = format!("explorer_reservations/{}", callsign);
+        self.get_value(&key).await.unwrap_or_default()
+    }
+
+    pub async fn save_explorer_reservations(
+        &self,
+        callsign: &str,
+        reservations: &DashMap<String, SystemSymbol>,
+    ) {
+        let key = format!("explorer_reservations/{}", callsign);
+        self.set_value(&key, &reservations).await
+    }
+
     pub async fn insert_surveys(&self, surveys: &Vec<KeyedSurvey>) {
         let now = Utc::now();
         let inserts = surveys
