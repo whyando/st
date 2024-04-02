@@ -13,7 +13,7 @@ const BURN_NAV_MODIFIER: f64 = 12.5;
 #[derive(Debug)]
 pub struct Pathfinding {
     waypoints: Arc<BTreeMap<WaypointSymbol, WaypointDetailed>>,
-    closest_market: BTreeMap<WaypointSymbol, (WaypointSymbol, i64)>,
+    closest_market: BTreeMap<WaypointSymbol, Option<(WaypointSymbol, i64)>>,
 }
 
 pub struct Route {
@@ -25,22 +25,22 @@ pub struct Route {
 impl Pathfinding {
     pub fn new(waypoints: Vec<WaypointDetailed>) -> Pathfinding {
         let mut waypoint_map: BTreeMap<WaypointSymbol, WaypointDetailed> = BTreeMap::new();
-        let mut closest_market: BTreeMap<WaypointSymbol, (WaypointSymbol, i64)> = BTreeMap::new();
+        let mut closest_market: BTreeMap<WaypointSymbol, Option<(WaypointSymbol, i64)>> =
+            BTreeMap::new();
         for waypoint in &waypoints {
             waypoint_map.insert(waypoint.symbol.clone(), waypoint.clone());
             if waypoint.is_market() {
                 continue;
             }
-            let closest = waypoints
+            let closest_opt = waypoints
                 .iter()
                 .filter(|w| w.is_market())
                 .map(|w| {
                     let dist = waypoint.distance(w);
                     (w.symbol.clone(), dist)
                 })
-                .min_by_key(|(_symbol, distance)| *distance)
-                .unwrap();
-            closest_market.insert(waypoint.symbol.clone(), closest);
+                .min_by_key(|(_symbol, distance)| *distance);
+            closest_market.insert(waypoint.symbol.clone(), closest_opt);
         }
         Pathfinding {
             waypoints: Arc::new(waypoint_map),
@@ -87,7 +87,12 @@ impl Pathfinding {
         let dest_is_market = dst.is_market();
         let src_is_market = src.is_market();
         let req_escape_fuel = if !dst.is_market() {
-            let closest = self.closest_market.get(dest_symbol).unwrap();
+            let closest = self
+                .closest_market
+                .get(dest_symbol)
+                .unwrap()
+                .as_ref()
+                .expect("No market");
             closest.1 // assumes CRUISE
         } else {
             0
