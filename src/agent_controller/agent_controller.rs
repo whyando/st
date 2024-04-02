@@ -1006,12 +1006,7 @@ impl AgentController {
 
         // Choose a new system to reserve, closest to the ship's current location that is not already reserved
         let _lock = self.explorer_reserve_mutex_guard.lock().await;
-        const EXPLORER_FUEL_CAPACITY: i64 = 800;
-        const EXPLORER_SPEED: i64 = 30;
-        let graph = self
-            .universe
-            .warp_jump_graph(EXPLORER_FUEL_CAPACITY, EXPLORER_SPEED)
-            .await;
+        let graph = self.universe.warp_jump_graph().await;
         let reachables = dijkstra_all(ship_loc, |node| {
             graph
                 .get(node)

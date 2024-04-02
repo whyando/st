@@ -28,11 +28,7 @@ async fn main() -> io::Result<()> {
         .headquarters
         .unwrap();
 
-    const EXPLORER_FUEL_CAPACITY: i64 = 800;
-    const EXPLORER_SPEED: i64 = 30;
-    let graph = universe
-        .warp_jump_graph(EXPLORER_FUEL_CAPACITY, EXPLORER_SPEED)
-        .await;
+    let graph = universe.warp_jump_graph().await;
 
     let reachables = dijkstra_all(&start, |node| {
         graph

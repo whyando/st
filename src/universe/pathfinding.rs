@@ -12,11 +12,13 @@ pub struct JumpGate {
     pub all_connections_known: bool,
 }
 
+#[derive(Debug, Clone)]
 pub enum EdgeType {
     Warp,
     Jumpgate,
 }
 
+#[derive(Debug, Clone)]
 pub struct WarpEdge {
     pub duration: i64,
     pub edge_type: EdgeType,
@@ -99,8 +101,21 @@ impl Universe {
         graph
     }
 
-    // Construct a map containing every system and its traversable connections
     pub async fn warp_jump_graph(
+        &self,
+    ) -> BTreeMap<SystemSymbol, BTreeMap<SystemSymbol, WarpEdge>> {
+        self.warp_jump_graph
+            .get_with((), async {
+                const EXPLORER_FUEL_CAPACITY: i64 = 800;
+                const EXPLORER_SPEED: i64 = 30;
+                self._warp_jump_graph(EXPLORER_FUEL_CAPACITY, EXPLORER_SPEED)
+                    .await
+            })
+            .await
+    }
+
+    // Construct a map containing every system and its traversable connections
+    pub async fn _warp_jump_graph(
         &self,
         warp_range: i64,
         engine_speed: i64,

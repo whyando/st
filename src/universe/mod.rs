@@ -21,8 +21,11 @@ use diesel::QueryDsl as _;
 use diesel::SelectableHelper as _;
 use diesel_async::RunQueryDsl as _;
 use log::*;
+use moka::future::Cache;
 use std::collections::BTreeMap;
 use std::sync::Arc;
+
+use self::pathfinding::WarpEdge;
 
 pub enum WaypointFilter {
     Imports(String),
@@ -55,6 +58,9 @@ pub struct Universe {
     shipyards: DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Shipyard>>>>,
     factions: DashMap<String, Faction>,
     jumpgates: DashMap<WaypointSymbol, JumpGateInfo>,
+
+    // cache
+    warp_jump_graph: Cache<(), BTreeMap<SystemSymbol, BTreeMap<SystemSymbol, WarpEdge>>>,
 }
 
 impl Universe {
@@ -70,6 +76,7 @@ impl Universe {
             shipyards: DashMap::new(),
             factions: DashMap::new(),
             jumpgates: DashMap::new(),
+            warp_jump_graph: Cache::new(1),
         }
     }
 

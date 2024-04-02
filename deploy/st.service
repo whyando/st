@@ -8,7 +8,7 @@ Group=root
 ExecStart=/opt/st/main 2>&1
 WorkingDirectory=/opt/st
 Restart=always
-RestartSec=15
+RestartSec=30
 StandardOutput=append:/opt/st/run.log
 
 [Install]

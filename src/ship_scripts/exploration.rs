@@ -50,12 +50,7 @@ async fn tick(ship: &ShipController, state: &ExplorerState) -> Option<ExplorerSt
             }
 
             // Plan route
-            const EXPLORER_FUEL_CAPACITY: i64 = 800;
-            const EXPLORER_SPEED: i64 = 30;
-            let graph = ship
-                .universe
-                .warp_jump_graph(EXPLORER_FUEL_CAPACITY, EXPLORER_SPEED)
-                .await;
+            let graph = ship.universe.warp_jump_graph().await;
             let start = ship.system();
             let (path, duration) = dijkstra(
                 &start,
