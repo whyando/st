@@ -539,7 +539,7 @@ impl LogisticTaskManager {
             Ok(guard) => guard,
             Err(_e) => {
                 debug!("LogisticTaskManager::take_tasks is already running");
-                let timeout = tokio::time::Duration::from_secs(30);
+                let timeout = tokio::time::Duration::from_secs(5 * 60);
                 match tokio::time::timeout(timeout, self.take_tasks_mutex_guard.lock()).await {
                     Ok(guard) => {
                         debug!("LogisticTaskManager::take_tasks lock acquired");

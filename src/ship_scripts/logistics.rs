@@ -33,6 +33,11 @@ pub async fn run(
         let (schedule, progress) = if resume_saved {
             (schedule_opt.unwrap(), progress_opt.unwrap())
         } else {
+            // sell fuel if we have fuel in cargo, after warps
+            let fuel_units = ship_controller.cargo_good_count("FUEL");
+            if fuel_units > 0 {
+                ship_controller.sell_goods("FUEL", fuel_units, false).await;
+            }
             assert!(ship_controller.cargo_empty());
 
             // Generate new schedule
