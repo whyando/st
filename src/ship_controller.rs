@@ -346,7 +346,7 @@ impl ShipController {
         let current = self.current_fuel();
         let capacity = self.fuel_capacity();
         let max_refuel_units = match from_cargo {
-            true => self.cargo_good_count("FUEL"),
+            true => 100 * self.cargo_good_count("FUEL"),
             false => i64::MAX,
         };
         if max_refuel_units == 0 {
