@@ -11,6 +11,7 @@ use serde_json::{json, Value};
 use std::cmp::min;
 use std::sync::{Arc, Mutex};
 
+#[derive(Clone)]
 pub struct ShipController {
     pub ship_symbol: String,
     ship: Arc<Mutex<Ship>>,
@@ -65,6 +66,10 @@ impl ShipController {
     pub fn cargo_capacity(&self) -> i64 {
         let ship = self.ship.lock().unwrap();
         ship.cargo.capacity
+    }
+    pub fn cargo_units(&self) -> i64 {
+        let ship = self.ship.lock().unwrap();
+        ship.cargo.units
     }
     pub fn waypoint(&self) -> WaypointSymbol {
         let ship = self.ship.lock().unwrap();
@@ -325,20 +330,30 @@ impl ShipController {
 
     // Fuel is bought in multiples of 100, so refuel as the highest multiple of 100
     // or to full if that wouldn't reach the required_fuel amount
-    pub async fn refuel(&self, required_fuel: i64) {
+    //
+    // If from_cargo is true, refuel from cargo, and we must check after the refuel whether the refuel suceeded
+    // Whereas if buying from market, we can safely assume we can obtain the required amount
+    pub async fn refuel(&self, required_fuel: i64, from_cargo: bool) {
         assert!(!self.is_in_transit(), "Ship is in transit");
-        assert!(
-            required_fuel > self.current_fuel(),
-            "Ship already has enough fuel"
-        );
         assert!(
             required_fuel <= self.fuel_capacity(),
             "Ship can't hold that much fuel"
         );
+        if self.current_fuel() >= required_fuel {
+            return;
+        }
 
         let current = self.current_fuel();
         let capacity = self.fuel_capacity();
-        let units = {
+        let max_refuel_units = match from_cargo {
+            true => self.cargo_good_count("FUEL"),
+            false => i64::MAX,
+        };
+        if max_refuel_units == 0 {
+            self.debug("No fuel in cargo to refuel");
+            return;
+        }
+        let mut units = {
             let missing_fuel = capacity - current;
             // round down to the nearest 100, so we don't buy more than we need
             let units = (missing_fuel / 100) * 100;
@@ -348,6 +363,7 @@ impl ShipController {
                 units
             }
         };
+        units = min(units, max_refuel_units);
         self.dock().await;
         self.debug(&format!(
             "Refueling {} to {}/{}",
@@ -358,7 +374,7 @@ impl ShipController {
         let uri = format!("/my/ships/{}/refuel", self.ship_symbol);
         let body = json!({
             "units": units,
-            "fromCargo": false,
+            "fromCargo": from_cargo,
         });
         let mut response: Value = self.api_client.post(&uri, &body).await;
         let fuel = serde_json::from_value(response["data"]["fuel"].take()).unwrap();
@@ -366,6 +382,17 @@ impl ShipController {
         // let transaction: Transaction = serde_json::from_value(response["data"]["transaction"].take()).unwrap();
         self.update_fuel(fuel).await;
         self.agent_controller.update_agent(agent).await;
+    }
+
+    pub async fn full_load_cargo(&self, good: &str) {
+        let cargo_units = self.cargo_good_count(good);
+        assert_eq!(cargo_units, self.cargo_units());
+
+        let buy_units = self.cargo_capacity() - cargo_units;
+        if buy_units > 0 {
+            // Makes assumptions about the TV of the good
+            self.buy_goods(good, buy_units, false).await;
+        }
     }
 
     async fn navigate(&self, flight_mode: ShipFlightMode, waypoint: &WaypointSymbol) {
@@ -397,7 +424,7 @@ impl ShipController {
         if self.waypoint() == *waypoint {
             return;
         }
-        assert_eq!(self.waypoint().system(), waypoint.system());
+        assert_ne!(self.waypoint().system(), waypoint.system());
         self.set_flight_mode(flight_mode).await;
         self.orbit().await;
         self.debug(&format!("Warp to waypoint: {}", waypoint));
@@ -467,7 +494,7 @@ impl ShipController {
             };
             if self.current_fuel() < required_fuel {
                 assert!(a_market);
-                self.refuel(required_fuel).await;
+                self.refuel(required_fuel, false).await;
             }
             self.navigate(edge.flight_mode, &waypoint).await;
             self.debug(&format!("Arrived at waypoint: {}", waypoint));

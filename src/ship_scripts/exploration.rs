@@ -1,5 +1,7 @@
 use crate::{
-    models::{ShipFlightMode, SystemSymbol},
+    db::DbClient,
+    models::{LogisticsScriptConfig, ShipFlightMode, SystemSymbol},
+    ship_config::market_waypoints,
     ship_controller::ShipController,
     universe::pathfinding::EdgeType,
 };
@@ -16,7 +18,7 @@ enum ExplorerState {
     Exit,
 }
 
-pub async fn run_explorer(ship: ShipController) {
+pub async fn run_explorer(ship: ShipController, db: DbClient) {
     info!("Starting script explorer for {}", ship.symbol());
     ship.wait_for_transit().await;
 
@@ -27,6 +29,26 @@ pub async fn run_explorer(ship: ShipController) {
         if let Some(next_state) = next_state {
             state = next_state;
         }
+        if let Trading(_) = state {
+            break;
+        }
+    }
+
+    if let Trading(system) = state {
+        assert_eq!(ship.system(), system);
+        info!("Explorer trading in target system {}", system);
+
+        let task_manager = ship.agent_controller.task_manager.clone();
+        let waypoints = ship.universe.get_system_waypoints(&system).await;
+        let inner_market_waypoints = market_waypoints(&waypoints, Some(200));
+        let config = LogisticsScriptConfig {
+            use_planner: true,
+            waypoint_allowlist: Some(inner_market_waypoints.clone()),
+            allow_shipbuying: false,
+            allow_market_refresh: true,
+            allow_construction: false,
+        };
+        crate::ship_scripts::logistics::run(ship.clone(), db, task_manager, config).await;
     }
 }
 
@@ -97,13 +119,19 @@ async fn tick(ship: &ShipController, state: &ExplorerState) -> Option<ExplorerSt
                         ship.jump(&dst_gate).await;
                     }
                     EdgeType::Warp => {
-                        // if market: Refuel to max fuel + fill cargo with fuel
-                        // if not-market: fill fuel fromCargo
-                        // if not enough fuel: exit failed
-                        info!("Explorer prep for warp to {}", t);
+                        let waypoint = ship.universe.waypoint(&ship.waypoint());
+                        if waypoint.is_market() {
+                            ship.refuel(ship.fuel_capacity(), false).await;
+                            ship.full_load_cargo("FUEL").await;
+                        } else {
+                            let required_fuel = edge.fuel;
+                            ship.refuel(required_fuel, true).await;
+                        }
 
-                        // @@ todo
-                        return Some(Exit);
+                        if ship.current_fuel() < edge.fuel {
+                            info!("Not enough fuel to warp to {}", t);
+                            return Some(Exit);
+                        }
 
                         // target waypoint:
                         // if jumpgate in target system: warp to jumpgate
@@ -120,11 +148,8 @@ async fn tick(ship: &ShipController, state: &ExplorerState) -> Option<ExplorerSt
             // might need to empty cargo before starting trading state
             Some(Trading(target.clone()))
         }
-        Trading(system) => {
-            assert_eq!(&ship.system(), system);
-            // @@ todo Implement trading
-
-            Some(Exit)
+        Trading(_system) => {
+            panic!("Invalid state");
         }
         Exit => {
             panic!("Invalid state");

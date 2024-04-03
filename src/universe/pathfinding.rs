@@ -22,6 +22,7 @@ pub enum EdgeType {
 pub struct WarpEdge {
     pub duration: i64,
     pub edge_type: EdgeType,
+    pub fuel: i64,
 }
 
 impl Universe {
@@ -187,6 +188,7 @@ impl Universe {
                         WarpEdge {
                             duration,
                             edge_type: EdgeType::Warp,
+                            fuel: distance,
                         },
                     );
                 }
@@ -206,6 +208,7 @@ impl Universe {
                         WarpEdge {
                             duration: *cooldown,
                             edge_type: EdgeType::Jumpgate,
+                            fuel: 0,
                         },
                     );
                 }

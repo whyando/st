@@ -76,6 +76,13 @@ pub async fn run(
         expected_cargo.retain(|_, &mut v| v != 0);
         let cargo_correct = expected_cargo == ship_controller.cargo_map();
 
+        let cargo_without_fuel = {
+            let mut m = ship_controller.cargo_map();
+            m.remove("FUEL");
+            m
+        };
+        let cargo_correct_except_fuel = expected_cargo == cargo_without_fuel;
+
         let next_action = schedule.actions.get(progress).unwrap();
         if let Some((good, amount)) = next_action.action.net_cargo() {
             *expected_cargo.entry(good).or_insert(0) += amount;
@@ -98,6 +105,13 @@ pub async fn run(
                     next_action
                 );
                 actions_to_skip = 1;
+            } else if cargo_correct_except_fuel {
+                info!(
+                    "Ship {} cargo would be correct after dropping excess fuel.",
+                    ship_controller.symbol(),
+                );
+                let units = ship_controller.cargo_good_count("FUEL");
+                ship_controller.sell_goods("FUEL", units, false).await;
             } else {
                 // ship_controller.sell_goods("FABRICS", 4).await; // manual fix
                 panic!("Couldn't recover cargo state");

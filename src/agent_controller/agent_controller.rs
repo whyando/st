@@ -917,9 +917,12 @@ impl AgentController {
                     ShipBehaviour::JumpgateProbe => tokio::spawn(async move {
                         ship_scripts::probe_exploration::run_jumpgate_probe(ship_controller).await;
                     }),
-                    ShipBehaviour::Explorer => tokio::spawn(async move {
-                        ship_scripts::exploration::run_explorer(ship_controller).await;
-                    }),
+                    ShipBehaviour::Explorer => {
+                        let db = self.db.clone();
+                        tokio::spawn(async move {
+                            ship_scripts::exploration::run_explorer(ship_controller, db).await;
+                        })
+                    }
                 };
                 debug!("spawn_run_ship try push join_hdl");
                 self.hdls.push(join_hdl).await;
