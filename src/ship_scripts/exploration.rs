@@ -39,15 +39,16 @@ pub async fn run_explorer(ship: ShipController, db: DbClient) {
         info!("Explorer trading in target system {}", system);
 
         let task_manager = ship.agent_controller.task_manager.clone();
-        let waypoints = ship.universe.get_system_waypoints(&system).await;
-        let inner_market_waypoints = market_waypoints(&waypoints, Some(200));
+        // let waypoints = ship.universe.get_system_waypoints(&system).await;
+        // let inner_market_waypoints = market_waypoints(&waypoints, Some(200));
         let config = LogisticsScriptConfig {
             use_planner: true,
-            waypoint_allowlist: Some(inner_market_waypoints.clone()),
+            // waypoint_allowlist: Some(inner_market_waypoints.clone()),
+            waypoint_allowlist: None,
             allow_shipbuying: false,
             allow_market_refresh: true,
             allow_construction: false,
-            min_profit: 2000,
+            min_profit: 5000,
         };
         crate::ship_scripts::logistics::run(ship.clone(), db, task_manager, config).await;
     }

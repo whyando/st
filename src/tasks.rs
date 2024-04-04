@@ -394,7 +394,7 @@ impl LogisticTaskManager {
         for (market_remote, market_opt) in &markets {
             let requires_visit = match market_opt {
                 Some(market) => {
-                    now.signed_duration_since(market.timestamp) >= Duration::try_hours(1).unwrap()
+                    now.signed_duration_since(market.timestamp) >= Duration::try_hours(3).unwrap()
                 }
                 None => true,
             };
