@@ -89,6 +89,7 @@ pub struct LogisticsScriptConfig {
     pub allow_construction: bool,
     pub allow_market_refresh: bool,
     pub waypoint_allowlist: Option<Vec<WaypointSymbol>>,
+    pub min_profit: i64,
 }
 
 #[derive(Debug, Clone)]

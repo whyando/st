@@ -52,6 +52,7 @@ pub fn ship_config_starter_system(
                 allow_shipbuying: true,
                 allow_market_refresh: true,
                 allow_construction: false,
+                min_profit: 1,
             }),
         },
     ));
@@ -181,6 +182,7 @@ pub fn ship_config_starter_system(
                         allow_shipbuying: false,
                         allow_market_refresh: false,
                         allow_construction: false,
+                        min_profit: 1,
                     }),
                 },
             ));
@@ -289,6 +291,7 @@ pub fn ship_config_capital_system(
                 allow_shipbuying: false,
                 allow_market_refresh: false,
                 allow_construction: false,
+                min_profit: 1,
             }),
         },
     ));
@@ -309,6 +312,7 @@ pub fn ship_config_capital_system(
                     allow_shipbuying: false,
                     allow_market_refresh: false,
                     allow_construction: false,
+                    min_profit: 1,
                 }),
             },
         ));

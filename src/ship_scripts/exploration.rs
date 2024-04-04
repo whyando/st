@@ -47,6 +47,7 @@ pub async fn run_explorer(ship: ShipController, db: DbClient) {
             allow_shipbuying: false,
             allow_market_refresh: true,
             allow_construction: false,
+            min_profit: 2000,
         };
         crate::ship_scripts::logistics::run(ship.clone(), db, task_manager, config).await;
     }

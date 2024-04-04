@@ -115,6 +115,7 @@ impl LogisticTaskManager {
         system_symbol: &SystemSymbol,
         capacity_cap: i64,
         buy_ships: bool,
+        min_profit: i64,
     ) -> Vec<Task> {
         let now = chrono::Utc::now();
         let waypoints: Vec<WaypointDetailed> =
@@ -507,7 +508,7 @@ impl LogisticTaskManager {
             let profit =
                 (sell_trade_good.1.sell_price - buy_trade_good.1.purchase_price) * (units as i64);
             let can_afford = true; // logistic ships reserve their credits beforehand
-            if profit > 0 && can_afford {
+            if profit >= min_profit && can_afford {
                 debug!(
                     "{}: buy {} @ {} for ${}, sell @ {} for ${}, profit: ${}",
                     good,
@@ -571,7 +572,7 @@ impl LogisticTaskManager {
         // Cleanup in_progress_tasks for this ship
         self.in_progress_tasks.retain(|_k, v| v.1 != ship_symbol);
         let all_tasks = self
-            .generate_task_list(system_symbol, cargo_capacity, true)
+            .generate_task_list(system_symbol, cargo_capacity, true, config.min_profit)
             .await;
         self.agent_controller()
             .ledger

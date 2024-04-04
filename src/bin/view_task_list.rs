@@ -33,7 +33,7 @@ async fn main() {
     dbg!(agent_controller.task_manager.in_progress_tasks());
     let task_list = agent_controller
         .task_manager
-        .generate_task_list(&system_symbol, 10000, false)
+        .generate_task_list(&system_symbol, 10000, false, 1)
         .await;
     println!("Generated: {} tasks", task_list.len());
     for task in task_list {
