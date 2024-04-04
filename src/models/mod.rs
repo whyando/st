@@ -95,6 +95,7 @@ pub struct LogisticsScriptConfig {
 #[derive(Debug, Clone)]
 pub struct ProbeScriptConfig {
     pub waypoints: Vec<WaypointSymbol>,
+    pub refresh_market: bool,
 }
 
 #[derive(Debug, Clone)]

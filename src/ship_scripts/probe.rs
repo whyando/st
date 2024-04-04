@@ -22,6 +22,8 @@ pub async fn run(ship_controller: ShipController, config: &ProbeScriptConfig) {
 // - uses extra api requests to move between waypoints
 // Additionally, cannot be used to buy ships
 pub async fn probe_multiple_locations(ship: ShipController, config: &ProbeScriptConfig) {
+    assert_eq!(config.refresh_market, true);
+
     let waypoint_symbols = config
         .waypoints
         .iter()
@@ -113,6 +115,10 @@ pub async fn probe_single_location(ship_controller: ShipController, config: &Pro
 
     ship_controller.goto_waypoint(waypoint_symbol).await;
     ship_controller.dock().await; // don't need to dock, but do so anyway to clear 'InTransit' status
+
+    if !config.refresh_market {
+        return;
+    }
 
     // Random sleep for a gentler startup
     let rand_start_sleep = rand::random::<u64>() % 60;

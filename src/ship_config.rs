@@ -77,7 +77,10 @@ pub fn ship_config_starter_system(
         e.0.push(w.symbol.clone());
     }
     for (loc, (waypoints, has_shipyard, dist)) in probe_locations {
-        let config = ProbeScriptConfig { waypoints };
+        let config = ProbeScriptConfig {
+            waypoints,
+            refresh_market: true,
+        };
         if !use_nonstatic_probes {
             assert_eq!(config.waypoints.len(), 1);
         }
@@ -155,6 +158,7 @@ pub fn ship_config_starter_system(
         {
             let config = ProbeScriptConfig {
                 waypoints: vec![w.symbol.clone()],
+                refresh_market: true,
             };
             ships.push((
                 (5.0, 0.0),
@@ -251,7 +255,10 @@ pub fn ship_config_capital_system(
         e.0.push(w.symbol.clone());
     }
     for (loc, (waypoints, has_shipyard, dist)) in probe_locations {
-        let config = ProbeScriptConfig { waypoints };
+        let config = ProbeScriptConfig {
+            waypoints,
+            refresh_market: true,
+        };
         if use_nonstatic_probes {
             assert_eq!(config.waypoints.len(), 1);
         }
@@ -441,7 +448,12 @@ pub fn ship_config_lategame(
         e.0.push(w.symbol.clone());
     }
     for (loc, (waypoints, _, _)) in probe_locations {
-        let config = ProbeScriptConfig { waypoints };
+        // refresh_market=false (purely idle with the purpose of having a ship present)
+        // should this be a separate behaviour script?
+        let config = ProbeScriptConfig {
+            waypoints,
+            refresh_market: false,
+        };
         ships.push((
             (1.0, 0.0),
             ShipConfig {
