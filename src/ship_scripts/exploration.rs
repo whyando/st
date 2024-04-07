@@ -1,7 +1,7 @@
 use crate::{
     db::DbClient,
     models::{LogisticsScriptConfig, ShipFlightMode, SystemSymbol},
-    ship_config::market_waypoints,
+    // ship_config::market_waypoints,
     ship_controller::ShipController,
     universe::pathfinding::EdgeType,
 };

@@ -147,8 +147,8 @@ async fn tick(
                     }
                 }
             }
-            // cargo not full and nothing to buy, retry in 60 seconds
-            if incomplete_materials == 0 || ship.cargo_space_available() <= 10 {
+            // cargo not full and nothing to buy: retry in 60 seconds
+            if incomplete_materials == 0 || ship.cargo_units() != 0 {
                 return Some(Delivering);
             }
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
