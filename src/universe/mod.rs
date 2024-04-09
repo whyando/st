@@ -427,6 +427,7 @@ impl Universe {
 
     pub async fn get_system_waypoints(&self, symbol: &SystemSymbol) -> Vec<WaypointDetailed> {
         let system = self.get_system(symbol).await;
+        // Collect Vec<Option<_>> to Option<Vec<_>>
         let waypoints: Option<Vec<WaypointDetailed>> = system
             .waypoints
             .iter()
@@ -495,6 +496,22 @@ impl Universe {
                     .execute(&mut self.db.conn().await)
                     .await
                     .expect("DB Insert error");
+                // load to memory (self.systems)
+                let mut s = self.systems.get_mut(symbol).unwrap();
+                let s = s.value_mut();
+                assert_eq!(s.waypoints.len(), waypoints.len());
+                for w in s.waypoints.iter_mut() {
+                    let waypoint = waypoints
+                        .iter()
+                        .find(|w2| &w2.symbol == &w.symbol)
+                        .expect("Waypoint not found");
+                    w.details = Some(WaypointDetails {
+                        is_market: waypoint.is_market(),
+                        is_shipyard: waypoint.is_shipyard(),
+                        is_uncharted: waypoint.is_uncharted(),
+                        is_under_construction: waypoint.is_under_construction,
+                    });
+                }
                 waypoints
             }
         }
