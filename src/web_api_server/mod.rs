@@ -42,22 +42,21 @@ async fn ships_handler(State(state): State<Arc<AppState>>) -> axum::Json<Vec<Shi
 }
 
 #[debug_handler]
-async fn waypoints_handler(
-    State(_state): State<Arc<AppState>>,
+async fn starting_waypoints_handler(
+    State(state): State<Arc<AppState>>,
 ) -> Result<axum::Json<Vec<WaypointDetailed>>, StatusCode> {
-    return Ok(axum::Json(vec![]));
-    // ! disabled for now - because switched up system internal format
-    // // todo: make this a parameter
-    // let system_symbol = state.agent_controller.starting_system();
-    // // let system_symbol = state.agent_controller.faction_capital().await;
-    // let waypoints_opt = state
-    //     .universe
-    //     .get_system_waypoints_no_fetch(&system_symbol)
-    //     .await;
-    // match waypoints_opt {
-    //     Some(waypoints) => Ok(axum::Json(waypoints)),
-    //     None => Err(StatusCode::NOT_FOUND),
-    // }
+    let system_symbol = state.agent_controller.starting_system();
+    let waypoints = state.universe.get_system_waypoints(&system_symbol).await;
+    Ok(axum::Json(waypoints))
+}
+
+#[debug_handler]
+async fn capital_waypoints_handler(
+    State(state): State<Arc<AppState>>,
+) -> Result<axum::Json<Vec<WaypointDetailed>>, StatusCode> {
+    let system_symbol = state.agent_controller.faction_capital().await;
+    let waypoints = state.universe.get_system_waypoints(&system_symbol).await;
+    Ok(axum::Json(waypoints))
 }
 
 #[debug_handler]
@@ -130,7 +129,14 @@ impl WebApiServer {
         let app = axum::Router::new()
             .route("/api/agent", get(agent_handler))
             .route("/api/ships", get(ships_handler))
-            .route("/api/waypoints", get(waypoints_handler))
+            .route(
+                "/api/starter_system/waypoints",
+                get(starting_waypoints_handler),
+            )
+            .route(
+                "/api/capital_system/waypoints",
+                get(capital_waypoints_handler),
+            )
             .route("/api/events", get(handler).layer(socketio_layer))
             .with_state(shared_state)
             .layer(CorsLayer::permissive());
