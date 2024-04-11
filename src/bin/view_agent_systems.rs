@@ -20,11 +20,7 @@ async fn main() -> std::io::Result<()> {
     pretty_env_logger::init_timed();
 
     // output to ./all_agents.txt
-    let mut f = File::options()
-        .write(true)
-        .create(true)
-        .open("all_agents.txt")
-        .unwrap();
+    let mut f = File::create("all_agents.txt")?;
     use std::io::Write as _;
 
     let api_client = ApiClient::new();

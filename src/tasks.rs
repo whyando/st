@@ -290,6 +290,10 @@ impl LogisticTaskManager {
                             .insert((fab_mat_market.clone(), "IRON".to_string()), 120);
                     }
                     "ADVANCED_CIRCUITRY" => {
+                        // empty list: do not allow any market to import ADVANCED_CIRCUITRY
+                        good_import_permits
+                            .entry("ADVANCED_CIRCUITRY".to_string())
+                            .or_default();
                         // adv_circuit_market
                         good_import_permits
                             .entry("ELECTRONICS".to_string())
