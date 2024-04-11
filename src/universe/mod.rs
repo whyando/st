@@ -86,6 +86,7 @@ impl Universe {
     }
 
     async fn init_systems(&self) {
+        let status = self.api_client.status().await;
         let query_start = std::time::Instant::now();
         let systems: Vec<db_models::System> = systems::table
             .filter(systems::reset_id.eq(self.db.reset_date()))
@@ -118,7 +119,7 @@ impl Universe {
             duration
         );
 
-        let num_systems = systems.len();
+        let num_systems = systems.len() as i64;
         let grouped_details = waypoint_details.grouped_by(&waypoints);
         let waypoints = waypoints
             .into_iter()
@@ -126,7 +127,7 @@ impl Universe {
             .grouped_by(&systems);
 
         let system_iter = std::iter::zip(systems, waypoints);
-        if num_systems != 0 {
+        if num_systems == status.stats.systems {
             for (system, waypoints) in system_iter {
                 let waypoints = waypoints
                     .into_iter()
