@@ -14,6 +14,7 @@ use crate::models::{SymbolNameDescr, WaypointDetails};
 use crate::pathfinding::{Pathfinding, Route};
 use crate::schema::*;
 use dashmap::DashMap;
+use diesel::upsert::excluded;
 use diesel::BelongingToDsl as _;
 use diesel::ExpressionMethods as _;
 use diesel::GroupedBy as _;
@@ -185,12 +186,12 @@ impl Universe {
                     .values(chunk)
                     .returning(systems::id)
                     .on_conflict((systems::reset_id, systems::symbol))
-                    .do_nothing()
-                    // .do_update()
-                    // .set((
-                    //     // Use empty ON CONFLICT UPDATE set hack to return id
-                    //     systems::symbol.eq(&system.symbol.as_str()),
-                    // ))
+                    .do_update()
+                    .set((
+                        // Use empty ON CONFLICT UPDATE set hack to return id
+                        // yes it's a hack, and empty updates have consequences, but it's okay here
+                        systems::symbol.eq(excluded(systems::symbol)),
+                    ))
                     .get_results(&mut self.db.conn().await)
                     .await
                     .expect("DB Insert error");
@@ -220,7 +221,12 @@ impl Universe {
                 let ids: Vec<i64> = diesel::insert_into(waypoints::table)
                     .values(chunk)
                     .on_conflict((waypoints::reset_id, waypoints::symbol))
-                    .do_nothing()
+                    .do_update()
+                    .set((
+                        // as above, use empty ON CONFLICT UPDATE set hack to return id
+                        // yes it's a hack, and empty updates have consequences, but it's okay here
+                        waypoints::symbol.eq(excluded(waypoints::symbol)),
+                    ))
                     .returning(waypoints::id)
                     .get_results(&mut self.db.conn().await)
                     .await
