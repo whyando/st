@@ -742,7 +742,10 @@ impl AgentController {
         }
 
         // load/refresh ledger - important to do this before starting ship scripts or buying more ships
-        self.ledger.reserve_credits("FUEL", 10000);
+        self.ledger.reserve_credits("FUEL", 10_000);
+        if self.is_jumpgate_finished().await {
+            self.ledger.reserve_credits("JUMPGATE_COSTS", 500_000);
+        }
         for ship_config in ship_config {
             if let Some(ship_symbol) = &self.job_assignments.get(&ship_config.id) {
                 let ship_symbol: &String = ship_symbol.value();
