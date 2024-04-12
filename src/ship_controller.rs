@@ -381,6 +381,18 @@ impl ShipController {
         let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
         // let transaction: Transaction = serde_json::from_value(response["data"]["transaction"].take()).unwrap();
         self.update_fuel(fuel).await;
+        if from_cargo {
+            let cargo_units = (units + 99) / 100;
+            let mut ship = self.ship.lock().unwrap();
+            let fuel_item = ship
+                .cargo
+                .inventory
+                .iter_mut()
+                .find(|x| x.symbol == "FUEL")
+                .unwrap();
+            assert!(fuel_item.units >= cargo_units);
+            fuel_item.units -= cargo_units;
+        }
         self.agent_controller.update_agent(agent).await;
     }
 
