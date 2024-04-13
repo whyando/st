@@ -58,12 +58,12 @@ async fn main() -> io::Result<()> {
         Some((cd, _path)) => *cd,
         None => &i64::MAX,
     });
-    starter_systems = starter_systems.into_iter().take(50).collect();
+    starter_systems = starter_systems.into_iter().take(100).collect();
 
     // output to ./starter_systems.txt
     let mut f = File::create("starter_systems.txt")?;
     use std::io::Write as _;
-    for (system, data) in starter_systems {
+    for (idx, (system, data)) in starter_systems.iter().enumerate() {
         match data {
             Some((&cd, path)) => {
                 let cd_hours = cd / 3600;
@@ -71,8 +71,8 @@ async fn main() -> io::Result<()> {
                 let cd_seconds = cd % 60;
                 writeln!(
                     &mut f,
-                    "{}: {}h {}m {}s",
-                    system, cd_hours, cd_minutes, cd_seconds
+                    "{}. {}: {}h {}m {}s",
+                    idx, system, cd_hours, cd_minutes, cd_seconds
                 )?;
                 for pair in path.windows(2) {
                     let s = &pair[0];
@@ -82,7 +82,11 @@ async fn main() -> io::Result<()> {
                         EdgeType::Warp => "W",
                         EdgeType::Jumpgate => "J",
                     };
-                    writeln!(&mut f, "\t{} {} {}", type_, t, edge.duration)?
+                    writeln!(
+                        &mut f,
+                        "\t{} {} {}f {}s",
+                        type_, t, edge.fuel, edge.duration
+                    )?
                 }
             }
             None => {
