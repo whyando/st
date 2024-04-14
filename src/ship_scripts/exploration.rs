@@ -37,6 +37,7 @@ pub async fn run_explorer(ship: ShipController, db: DbClient) {
     if let Trading(system) = state {
         assert_eq!(ship.system(), system);
         info!("Explorer trading in target system {}", system);
+        ship.set_state_description(&format!("Trading in {}", system));
 
         let task_manager = ship.agent_controller.task_manager.clone();
         // let waypoints = ship.universe.get_system_waypoints(&system).await;
