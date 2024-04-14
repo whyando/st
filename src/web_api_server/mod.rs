@@ -2,12 +2,13 @@ use crate::{
     agent_controller::{AgentController, Event},
     api_client::api_models::WaypointDetailed,
     db::DbClient,
-    models::{Agent, Ship},
+    models::Agent,
     universe::Universe,
 };
 use axum::{debug_handler, http::StatusCode};
 use axum::{extract::State, routing::get};
 use log::*;
+use serde_json::json;
 use socketioxide::{
     extract::{Data, SocketRef},
     SocketIo, TransportType,
@@ -36,8 +37,21 @@ async fn agent_handler(State(state): State<Arc<AppState>>) -> axum::Json<Agent> 
 }
 
 #[debug_handler]
-async fn ships_handler(State(state): State<Arc<AppState>>) -> axum::Json<Vec<Ship>> {
+async fn ships_handler(State(state): State<Arc<AppState>>) -> axum::Json<Vec<serde_json::Value>> {
     let ships = state.agent_controller.ships();
+    let ships = ships
+        .into_iter()
+        .map(|(symbol, ship, job_id, desc)| {
+            json!(
+                {
+                    "symbol": symbol,
+                    "ship": ship,
+                    "job_id": job_id,
+                    "desc": desc
+                }
+            )
+        })
+        .collect();
     axum::Json(ships)
 }
 

@@ -91,6 +91,7 @@ pub struct AgentController {
     ship_config: Arc<Mutex<Vec<ShipConfig>>>,
     job_assignments: Arc<DashMap<String, String>>,
     job_assignments_rev: Arc<DashMap<String, String>>,
+    ship_state_description: Arc<DashMap<String, String>>,
     probe_jumpgate_reservations: Arc<DashMap<String, WaypointSymbol>>,
     explorer_reservations: Arc<DashMap<String, SystemSymbol>>,
 
@@ -129,10 +130,28 @@ impl AgentController {
     pub fn state(&self) -> AgentState {
         self.state.lock().unwrap().clone()
     }
-    pub fn ships(&self) -> Vec<Ship> {
+    pub fn ships(&self) -> Vec<(String, Ship, String, String)> {
+        // self.ships
+        //     .iter()
+        //     .map(|x| x.value().lock().unwrap().clone())
+        //     .collect()
         self.ships
             .iter()
-            .map(|x| x.value().lock().unwrap().clone())
+            .map(|x| {
+                let ship_symbol = x.key().clone();
+                let ship = x.value().lock().unwrap().clone();
+                let job_id = self
+                    .job_assignments_rev
+                    .get(&ship_symbol)
+                    .map(|x| x.value().clone())
+                    .unwrap_or_default();
+                let descr = self
+                    .ship_state_description
+                    .get(&ship_symbol)
+                    .map(|x| x.value().clone())
+                    .unwrap_or_default();
+                (ship_symbol, ship, job_id, descr)
+            })
             .collect()
     }
 
@@ -265,6 +284,7 @@ impl AgentController {
             ship_config: Arc::new(Mutex::new(vec![])),
             job_assignments: Arc::new(job_assignments),
             job_assignments_rev: Arc::new(job_assignments_rev),
+            ship_state_description: Arc::new(DashMap::new()),
             probe_jumpgate_reservations: Arc::new(probe_jumpgate_reservations),
             explorer_reservations: Arc::new(explorer_reservations),
             task_manager: Arc::new(task_manager),
