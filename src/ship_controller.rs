@@ -797,4 +797,9 @@ impl ShipController {
             self.debug(&format!("ENCOUNTERED SHIP EVENT: {:?}", e));
         }
     }
+
+    pub fn set_state_description(&self, desc: &str) {
+        self.agent_controller
+            .set_state_description(&self.ship_symbol, desc)
+    }
 }

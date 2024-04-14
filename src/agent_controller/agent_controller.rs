@@ -1072,6 +1072,11 @@ impl AgentController {
             None => None,
         }
     }
+
+    pub fn set_state_description(&self, ship_symbol: &str, desc: &str) {
+        self.ship_state_description
+            .insert(ship_symbol.to_string(), desc.to_string());
+    }
 }
 
 // ! todo: replace JoinHandles with TaskTracker from tokio-util (or tokio::task::join_set::JoinSet also from tokio-util)

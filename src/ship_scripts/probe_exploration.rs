@@ -33,6 +33,11 @@ async fn tick(ship: &ShipController, state: &ExplorerState) -> Option<ExplorerSt
                 .agent_controller
                 .get_probe_jumpgate_reservation(&ship.symbol(), &ship.waypoint())
                 .await;
+            let desc = match &target {
+                Some(target) => format!("Exploring jumpgate {}", target),
+                None => "No target".to_string(),
+            };
+            ship.set_state_description(&desc);
             match target {
                 Some(target) => Some(Exploring(target)),
                 None => Some(Exit),
@@ -54,10 +59,12 @@ async fn tick(ship: &ShipController, state: &ExplorerState) -> Option<ExplorerSt
                 .map(|n| n.to_string())
                 .collect::<Vec<_>>()
                 .join(" -> ");
-            debug!(
+            let desc = format!(
                 "Navigating to {} in {}s via path {}",
                 target_jumpgate, duration, path_str
             );
+            debug!("{}", desc);
+            ship.set_state_description(&desc);
 
             // Execute route
             ship.goto_waypoint(&start_jumpgate).await;

@@ -62,6 +62,11 @@ async fn tick(ship: &ShipController, state: &ExplorerState) -> Option<ExplorerSt
                 .agent_controller
                 .get_explorer_reservation(&ship.symbol(), &&ship.system())
                 .await;
+            let desc = match &target {
+                Some(target) => format!("Navigating to {}", target),
+                None => "No target".to_string(),
+            };
+            ship.set_state_description(&desc);
             match target {
                 Some(target) => Some(Navigating(target)),
                 None => Some(Exit),
@@ -103,10 +108,12 @@ async fn tick(ship: &ShipController, state: &ExplorerState) -> Option<ExplorerSt
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-            debug!(
+            let desc = format!(
                 "Navigating to {} in {}s via path {}",
                 target, duration, path_str
             );
+            debug!("{}", desc);
+            ship.set_state_description(&desc);
 
             // Execute route
             for pair in path.windows(2) {
