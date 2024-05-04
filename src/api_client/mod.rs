@@ -1,5 +1,6 @@
 pub mod api_models;
 
+use crate::config::CONFIG;
 use crate::models::*;
 use core::panic;
 use log::*;
@@ -36,7 +37,7 @@ impl ApiClient {
             .unwrap();
         ApiClient {
             client,
-            base_url: "https://api.spacetraders.io/v2".to_string(),
+            base_url: CONFIG.api_base_url.to_string(),
             agent_token: Arc::new(RwLock::new(None)),
             next_request_ts: Arc::new(Mutex::new(None)),
         }

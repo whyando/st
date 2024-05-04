@@ -1,9 +1,11 @@
 use lazy_static::lazy_static;
 use regex::Regex;
+use reqwest::Url;
 
 use crate::agent_controller::AgentEra;
 
 pub struct Config {
+    pub api_base_url: Url,
     pub job_id_filter: Regex,
     pub override_construction_supply_check: bool,
     pub scrap_all_ships: bool,
@@ -13,6 +15,10 @@ pub struct Config {
 
 lazy_static! {
     pub static ref CONFIG: Config = {
+        let api_base_url = std::env::var("API_BASE_URL")
+            .expect("API_BASE_URL env var not set")
+            .parse()
+            .expect("Invalid API_BASE_URL");
         let job_id_filter = match std::env::var("JOB_ID_FILTER") {
             Ok(val) if val.is_empty() => None,
             Ok(val) => Some(val),
@@ -38,6 +44,7 @@ lazy_static! {
             Err(_) => None,
         };
         Config {
+            api_base_url,
             job_id_filter,
             override_construction_supply_check,
             scrap_all_ships,
