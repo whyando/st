@@ -12,6 +12,7 @@ use vrp_pragmatic::checker::CheckerContext;
 use vrp_pragmatic::core::models::{Problem as CoreProblem, Solution as CoreSolution};
 use vrp_pragmatic::core::prelude::*;
 use vrp_pragmatic::core::solver::get_default_telemetry_mode;
+use vrp_pragmatic::core::solver::VrpConfigBuilder;
 use vrp_pragmatic::format::problem::{Matrix, PragmaticProblem, Problem};
 use vrp_pragmatic::format::solution::{deserialize_solution, write_pragmatic, Solution};
 use vrp_pragmatic::format::Location;
@@ -257,9 +258,9 @@ fn main() {
         core_problem.unwrap_or_else(|errors| panic!("cannot read pragmatic problem: {errors}")),
     );
 
-    let environment = Arc::new(Environment::default());
-    let telemetry_mode = get_default_telemetry_mode(environment.logger.clone());
-    let config = create_default_config_builder(core_problem.clone(), environment, telemetry_mode)
+    let config = VrpConfigBuilder::new(core_problem.clone())
+        .prebuild()
+        .unwrap()
         .with_max_generations(Some(3000))
         .build()
         .unwrap_or_else(|err| panic!("cannot build default solver configuration: {err}"));

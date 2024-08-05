@@ -5,9 +5,9 @@ use log::*;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use vrp_pragmatic::core::models::{Problem as CoreProblem, Solution as CoreSolution};
-use vrp_pragmatic::core::solver::create_default_config_builder;
 use vrp_pragmatic::core::solver::get_default_telemetry_mode;
 use vrp_pragmatic::core::solver::Solver;
+use vrp_pragmatic::core::solver::VrpConfigBuilder;
 use vrp_pragmatic::core::utils::Environment;
 use vrp_pragmatic::core::utils::InfoLogger;
 use vrp_pragmatic::format::problem::*;
@@ -222,16 +222,9 @@ pub fn run_planner(
         core_problem.unwrap_or_else(|errors| panic!("cannot read pragmatic problem: {errors}")),
     );
 
-    let environment = {
-        let mut env = Environment::default();
-        let info_logger: InfoLogger = Arc::new(|msg: &str| {
-            trace!("{}", msg);
-        });
-        env.logger = info_logger;
-        Arc::new(env)
-    };
-    let telemetry_mode = get_default_telemetry_mode(environment.logger.clone());
-    let config = create_default_config_builder(core_problem.clone(), environment, telemetry_mode)
+    let config = VrpConfigBuilder::new(core_problem.clone())
+        .prebuild()
+        .unwrap()
         .with_max_generations(Some(3000))
         .with_max_time(Some(constraints.max_compute_time.num_seconds() as usize))
         .build()
