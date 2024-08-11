@@ -25,6 +25,7 @@ async fn main() -> io::Result<()> {
     let agent_token = db.get_agent_token(&callsign).await.unwrap();
     api_client.set_agent_token(&agent_token);
     let universe = Arc::new(Universe::new(&api_client, &db));
+    universe.init().await;
 
     let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
     let system_symbol = agent_controller.starting_system();
