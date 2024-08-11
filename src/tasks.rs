@@ -1,5 +1,6 @@
 use crate::agent_controller::AgentController;
 use crate::api_client::api_models::WaypointDetailed;
+use crate::config::CONFIG;
 use crate::db::DbClient;
 use crate::logistics_planner::plan::task_to_scheduled_action;
 use crate::logistics_planner::{
@@ -189,11 +190,15 @@ impl LogisticTaskManager {
         let mut market_capped_import = BTreeMap::<(WaypointSymbol, String), i64>::new();
 
         let construction = self.universe.get_construction(&jump_gate.symbol).await;
-        let construction = match &construction.data {
+        let mut construction = match &construction.data {
             Some(c) if c.is_complete => None,
             None => None,
             Some(c) => Some(c),
         };
+        if CONFIG.no_gate_mode {
+            construction = None;
+        }
+
         if let Some(construction) = &construction {
             let fab_mat_market = self
                 .universe
