@@ -4,6 +4,7 @@ use reqwest::Url;
 
 use crate::agent_controller::AgentEra;
 
+#[derive(Debug, Clone)]
 pub struct Config {
     pub api_base_url: Url,
     pub job_id_filter: Regex,

@@ -404,6 +404,7 @@ impl ShipController {
         if buy_units > 0 {
             // Makes assumptions about the TV of the good
             self.buy_goods(good, buy_units, false).await;
+            self.refresh_market().await;
         }
     }
 

@@ -1,5 +1,7 @@
+use log::*;
 use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
+use st::config::CONFIG;
 use st::db::DbClient;
 use st::universe::Universe;
 use st::web_api_server::WebApiServer;
@@ -15,6 +17,9 @@ async fn main() {
     let callsign = env::var("AGENT_CALLSIGN")
         .expect("AGENT_CALLSIGN env var not set")
         .to_ascii_uppercase();
+
+    info!("Starting agent {} for faction {}", callsign, faction);
+    info!("Loaded config: {:?}", *CONFIG);
 
     let api_client = ApiClient::new();
     let status = api_client.status().await;

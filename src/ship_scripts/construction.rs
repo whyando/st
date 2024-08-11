@@ -143,6 +143,7 @@ async fn tick(
                             return None;
                         }
                         ship.buy_goods(&good.symbol, units, false).await;
+                        ship.refresh_market().await;
                         return None;
                     }
                 }
