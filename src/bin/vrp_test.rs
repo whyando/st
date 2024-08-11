@@ -11,7 +11,6 @@ use st::models::{Market, MarketTradeGood, PaginatedList, WaypointSymbol};
 use vrp_pragmatic::checker::CheckerContext;
 use vrp_pragmatic::core::models::{Problem as CoreProblem, Solution as CoreSolution};
 use vrp_pragmatic::core::prelude::*;
-use vrp_pragmatic::core::solver::get_default_telemetry_mode;
 use vrp_pragmatic::core::solver::VrpConfigBuilder;
 use vrp_pragmatic::format::problem::{Matrix, PragmaticProblem, Problem};
 use vrp_pragmatic::format::solution::{deserialize_solution, write_pragmatic, Solution};

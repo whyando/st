@@ -1,15 +1,11 @@
 use super::*;
 use chrono::DateTime;
 use chrono::Utc;
-use log::*;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use vrp_pragmatic::core::models::{Problem as CoreProblem, Solution as CoreSolution};
-use vrp_pragmatic::core::solver::get_default_telemetry_mode;
 use vrp_pragmatic::core::solver::Solver;
 use vrp_pragmatic::core::solver::VrpConfigBuilder;
-use vrp_pragmatic::core::utils::Environment;
-use vrp_pragmatic::core::utils::InfoLogger;
 use vrp_pragmatic::format::problem::*;
 use vrp_pragmatic::format::solution::*;
 use vrp_pragmatic::format::Location;
