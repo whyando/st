@@ -4,7 +4,8 @@ use crate::broker::{CargoBroker, TransferActor};
 use crate::config::CONFIG;
 use crate::models::{ShipNavStatus::*, *};
 use crate::ship_config::{
-    ship_config_capital_system, ship_config_lategame, ship_config_starter_system,
+    ship_config_capital_system, ship_config_lategame, ship_config_no_gate,
+    ship_config_starter_system,
 };
 use crate::survey_manager::SurveyManager;
 use crate::universe::WaypointFilter;
@@ -672,6 +673,14 @@ impl AgentController {
             AgentEra::StartingSystem1 => false,
             _ => true,
         };
+        if CONFIG.no_gate_mode {
+            return ship_config_no_gate(
+                &waypoints,
+                use_nonstatic_probes,
+                incl_outer_probes_and_siphons,
+            );
+        }
+
         ships.append(&mut ship_config_starter_system(
             &waypoints,
             &markets,

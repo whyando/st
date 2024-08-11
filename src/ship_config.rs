@@ -504,3 +504,128 @@ pub fn ship_config_lategame(
     ships.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     ships.into_iter().map(|(_, c)| c).collect()
 }
+
+///
+/// Ship config, but with no construction, no mining,
+///
+pub fn ship_config_no_gate(
+    waypoints: &Vec<WaypointDetailed>,
+    use_nonstatic_probes: bool,
+    incl_outer_and_siphons: bool,
+) -> Vec<ShipConfig> {
+    let mut ships = vec![];
+
+    let inner_market_waypoints = market_waypoints(waypoints, Some(200));
+    let all_market_waypoints = market_waypoints(waypoints, None);
+
+    // Command frigate trades on logistics planner, but is restricted to 200 units from origin
+    ships.push((
+        (1.0, 0.0),
+        ShipConfig {
+            id: "cmd".to_string(),
+            ship_model: "SHIP_COMMAND_FRIGATE".to_string(),
+            purchase_criteria: PurchaseCriteria {
+                never_purchase: true,
+                ..PurchaseCriteria::default()
+            },
+            behaviour: ShipBehaviour::Logistics(LogisticsScriptConfig {
+                use_planner: true,
+                waypoint_allowlist: Some(inner_market_waypoints.clone()),
+                allow_shipbuying: true,
+                allow_market_refresh: true,
+                allow_construction: false,
+                min_profit: 1,
+            }),
+        },
+    ));
+
+    // Send probes to all inner markets with shipyards getting priority
+    // probes rotate through all waypoints at a location
+    let mut probe_locations = BTreeMap::new();
+    for w in waypoints
+        .iter()
+        .filter(|w| inner_market_waypoints.contains(&w.symbol))
+    {
+        let loc = if !w.is_shipyard() && use_nonstatic_probes {
+            // use coordinate-grouped probe
+            format!("({},{})", w.x, w.y)
+        } else {
+            w.symbol.to_string()
+        };
+        let e = probe_locations.entry(loc).or_insert_with(|| {
+            let dist = ((w.x * w.x + w.y * w.y) as f64).sqrt() as i64;
+            (vec![], w.is_shipyard(), dist)
+        });
+        e.0.push(w.symbol.clone());
+    }
+    for (loc, (waypoints, has_shipyard, dist)) in probe_locations {
+        let config = ProbeScriptConfig {
+            waypoints,
+            refresh_market: true,
+        };
+        if !use_nonstatic_probes {
+            assert_eq!(config.waypoints.len(), 1);
+        }
+        let order = -10000.0 * (has_shipyard as i64 as f64) + (dist as f64);
+        ships.push((
+            (2.0, order),
+            ShipConfig {
+                id: format!("probe/{}", loc),
+                ship_model: "SHIP_PROBE".to_string(),
+                behaviour: ShipBehaviour::Probe(config),
+                purchase_criteria: PurchaseCriteria {
+                    allow_logistic_task: true,
+                    require_cheapest: false,
+                    ..PurchaseCriteria::default()
+                },
+            },
+        ));
+    }
+
+    if incl_outer_and_siphons {
+        // Add probes for the remaining markets - should we convert the old ones to static probes everywhere??
+        for w in waypoints
+            .iter()
+            .filter(|w| all_market_waypoints.contains(&w.symbol))
+            .filter(|w| !inner_market_waypoints.contains(&w.symbol))
+        {
+            let config = ProbeScriptConfig {
+                waypoints: vec![w.symbol.clone()],
+                refresh_market: true,
+            };
+            ships.push((
+                (5.0, 0.0),
+                ShipConfig {
+                    id: format!("probe/{}", w.symbol),
+                    ship_model: "SHIP_PROBE".to_string(),
+                    behaviour: ShipBehaviour::Probe(config),
+                    purchase_criteria: PurchaseCriteria::default(),
+                },
+            ));
+        }
+
+        // Add 2 logistics haulers - not using planner
+        const NUM_LHAULERS: i64 = 2;
+        for i in 0..NUM_LHAULERS {
+            ships.push((
+                (6.0, (i as f64) / (NUM_LHAULERS as f64)),
+                ShipConfig {
+                    id: format!("logistics_lhauler/{}", i),
+                    ship_model: "SHIP_LIGHT_HAULER".to_string(),
+                    purchase_criteria: PurchaseCriteria::default(),
+                    behaviour: ShipBehaviour::Logistics(LogisticsScriptConfig {
+                        use_planner: false,
+                        waypoint_allowlist: None,
+                        allow_shipbuying: false,
+                        allow_market_refresh: false,
+                        allow_construction: false,
+                        min_profit: 1,
+                    }),
+                },
+            ));
+        }
+    }
+
+    ships.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    ships.into_iter().map(|(_, c)| c).collect()
+}
