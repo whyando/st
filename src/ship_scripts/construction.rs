@@ -67,6 +67,10 @@ pub async fn run_hauler(ship: ShipController, db: DbClient) {
     let key = format!("construction_state/{}", ship.symbol());
     let mut state: ConstructionHaulerState = db.get_value(&key).await.unwrap_or(Buying);
 
+    if state == TerminalState {
+        ship.refresh_shipyard().await;
+    }
+
     while state != TerminalState {
         let next_state = tick(
             &ship,
@@ -203,6 +207,7 @@ async fn tick(
                 ship.jump(&jumpgate_dest).await;
             }
             ship.goto_waypoint(&shipyard).await;
+            ship.refresh_shipyard().await;
             ship.debug(
                 "Jumpgate is completed + navigating to shipyard complete. Entering terminal state.",
             );
