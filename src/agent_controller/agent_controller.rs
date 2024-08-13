@@ -423,6 +423,7 @@ impl AgentController {
     // Waypoints that are probed, and the probe never leaves that single waypoint
     pub fn statically_probed_waypoints(&self) -> Vec<(String, WaypointSymbol)> {
         let ship_config = self.ship_config.lock().unwrap();
+        let starting_system = self.starting_system();
         ship_config
             .iter()
             .filter_map(|job| {
@@ -439,6 +440,16 @@ impl AgentController {
                             && ship.nav.waypoint_symbol == *waypoint_symbol
                         {
                             return Some((ship.symbol.clone(), waypoint_symbol.clone()));
+                        }
+                    }
+                } else if let ShipBehaviour::ConstructionHauler = &job.behaviour {
+                    if let Some(assignment) = self.job_assignments.get(&job.id) {
+                        // Construction Hauler ship terminates at a shipyard so it can be used to buy ships
+                        let ship = self.ships.get(assignment.value()).unwrap();
+                        let ship = ship.lock().unwrap();
+                        if ship.nav.status != InTransit && ship.nav.system_symbol != starting_system
+                        {
+                            return Some((ship.symbol.clone(), ship.nav.waypoint_symbol.clone()));
                         }
                     }
                 }
