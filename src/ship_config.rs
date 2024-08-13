@@ -225,7 +225,7 @@ pub fn ship_config_starter_system(
 
 pub fn ship_config_capital_system(
     system_waypoint: &SystemSymbol,
-    seed_system: &SystemSymbol,
+    _seed_system: &SystemSymbol,
     waypoints: &Vec<WaypointDetailed>,
     _markets: &Vec<MarketRemoteView>,
     _shipyards: &Vec<ShipyardRemoteView>,
@@ -263,11 +263,13 @@ pub fn ship_config_capital_system(
             assert_eq!(config.waypoints.len(), 1);
         }
         let order = -10000.0 * (has_shipyard as i64 as f64) + (dist as f64);
-        let purchase_location = if has_shipyard {
-            Some(seed_system.clone())
-        } else {
-            Some(system_waypoint.clone())
-        };
+        // Test only buying probes in the target system
+        let purchase_location = Some(system_waypoint.clone());
+        // let purchase_location = if has_shipyard {
+        //     Some(seed_system.clone())
+        // } else {
+        //     Some(system_waypoint.clone())
+        // };
         ships.push((
             (2.0, order),
             ShipConfig {

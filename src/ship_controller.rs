@@ -150,7 +150,7 @@ impl ShipController {
             .collect()
     }
 
-    fn debug(&self, msg: &str) {
+    pub fn debug(&self, msg: &str) {
         debug!("[{}] {}", self.ship_symbol, msg);
     }
 

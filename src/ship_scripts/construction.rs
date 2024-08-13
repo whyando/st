@@ -21,21 +21,31 @@ use ConstructionHaulerState::*;
 
 pub async fn get_export_market(ship: &ShipController, good: &str) -> WaypointSymbol {
     let filters = vec![WaypointFilter::Exports(good.to_string())];
-    let waypoints = ship
-        .universe
-        .search_waypoints(&ship.system(), &filters)
-        .await;
+    let system = ship.agent_controller.starting_system();
+    let waypoints = ship.universe.search_waypoints(&system, &filters).await;
     assert!(waypoints.len() == 1);
     waypoints[0].symbol.clone()
 }
 
 pub async fn get_jump_gate(ship: &ShipController) -> WaypointSymbol {
+    let system = ship.agent_controller.starting_system();
     let waypoints = ship
         .universe
-        .search_waypoints(&ship.system(), &vec![WaypointFilter::JumpGate])
+        .search_waypoints(&system, &vec![WaypointFilter::JumpGate])
         .await;
     assert!(waypoints.len() == 1);
     waypoints[0].symbol.clone()
+}
+
+pub async fn get_probe_shipyard(ship: &ShipController) -> WaypointSymbol {
+    let system = ship.agent_controller.faction_capital().await;
+    let shipyards = ship.universe.get_system_shipyards_remote(&system).await;
+    let filtered = shipyards
+        .iter()
+        .filter(|sy| sy.ship_types.iter().any(|st| st.ship_type == "SHIP_PROBE"))
+        .collect::<Vec<_>>();
+    assert!(filtered.len() >= 1);
+    filtered[0].symbol.clone()
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -43,6 +53,7 @@ enum ConstructionHaulerState {
     Buying,
     Delivering,
     Completed,
+    TerminalState,
 }
 
 pub async fn run_hauler(ship: ShipController, db: DbClient) {
@@ -56,7 +67,7 @@ pub async fn run_hauler(ship: ShipController, db: DbClient) {
     let key = format!("construction_state/{}", ship.symbol());
     let mut state: ConstructionHaulerState = db.get_value(&key).await.unwrap_or(Buying);
 
-    while state != Completed {
+    while state != TerminalState {
         let next_state = tick(
             &ship,
             state,
@@ -79,14 +90,14 @@ async fn tick(
     fab_mat_market: &WaypointSymbol,
     adv_circuit_market: &WaypointSymbol,
 ) -> Option<ConstructionHaulerState> {
-    let construction = ship.universe.get_construction(&jump_gate_symbol).await;
-    let construction: &Construction = match &construction.data {
-        None => return Some(Completed),
-        Some(x) if x.is_complete => return Some(Completed),
-        Some(x) => x,
-    };
     match state {
         Buying => {
+            let construction = ship.universe.get_construction(&jump_gate_symbol).await;
+            let construction: &Construction = match &construction.data {
+                None => return Some(Completed),
+                Some(x) if x.is_complete => return Some(Completed),
+                Some(x) => x,
+            };
             if ship.cargo_space_available() == 0 {
                 return Some(Delivering);
             }
@@ -152,6 +163,14 @@ async fn tick(
             if incomplete_materials == 0 || ship.cargo_units() != 0 {
                 return Some(Delivering);
             }
+
+            // Nothing to buy right now: reposition ship
+            if ship.waypoint() != *fab_mat_market && ship.waypoint() != *adv_circuit_market {
+                ship.debug("Repositioning to FAB_MAT market");
+                ship.goto_waypoint(&fab_mat_market).await;
+                return None;
+            }
+
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
             return None;
         }
@@ -168,6 +187,28 @@ async fn tick(
             None
         }
         Completed => {
+            // After completing the gate, navigate through the gate to the capital system
+            let shipyard = get_probe_shipyard(ship).await;
+            ship.debug(&format!(
+                "Jumpgate is completed. Navigating to shipyard {}",
+                shipyard
+            ));
+            if ship.system() != shipyard.system() {
+                // Assume we can do a single jump to the correct system
+                // nav to jumpgate
+                let jumpgate_src = ship.universe.get_jumpgate(&ship.system()).await;
+                let jumpgate_dest = ship.universe.get_jumpgate(&shipyard.system()).await;
+                ship.goto_waypoint(&jumpgate_src).await;
+                // jump to correct system
+                ship.jump(&jumpgate_dest).await;
+            }
+            ship.goto_waypoint(&shipyard).await;
+            ship.debug(
+                "Jumpgate is completed + navigating to shipyard complete. Entering terminal state.",
+            );
+            return Some(TerminalState);
+        }
+        TerminalState => {
             panic!("Invalid state");
         }
     }
