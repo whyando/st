@@ -278,6 +278,7 @@ pub fn ship_config_capital_system(
                 behaviour: ShipBehaviour::Probe(config),
                 purchase_criteria: PurchaseCriteria {
                     system_symbol: purchase_location,
+                    require_cheapest: false,
                     ..PurchaseCriteria::default()
                 },
             },
