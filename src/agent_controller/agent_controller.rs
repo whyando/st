@@ -1066,6 +1066,9 @@ impl AgentController {
                 continue;
             }
             let system_symbol = system.symbol.clone();
+            if system_symbol == *ship_loc {
+                starter_systems.push((system_symbol.clone(), &0));
+            }
             if let Some((_pre, cd)) = reachables.get(&system_symbol) {
                 starter_systems.push((system_symbol, cd));
             }

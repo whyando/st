@@ -28,7 +28,8 @@ async fn main() -> io::Result<()> {
     universe.init().await;
 
     let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
-    let system_symbol = agent_controller.starting_system();
+    let system_symbol = agent_controller.faction_capital().await;
+    // let system_symbol = agent_controller.starting_system();
     // let system_symbol = st::models::SystemSymbol("X1-JY8".to_string());
 
     let waypoints: Vec<WaypointDetailed> = universe.get_system_waypoints(&system_symbol).await;
