@@ -336,6 +336,7 @@ impl ApiClient {
     {
         self.wait_rate_limit().await;
         let url = format!("{}{}", self.base_url, path);
+        debug!("!! {} {}", method, url);
         let mut request = self.client.request(method.clone(), &url);
         if let Some(body) = json_body {
             request = request.json(body);

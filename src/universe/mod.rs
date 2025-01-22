@@ -168,7 +168,7 @@ impl Universe {
                 );
             }
         } else {
-            let systems: Vec<api_models::System> = self.api_client.get("systems.json").await;
+            let systems: Vec<api_models::System> = self.api_client.get("/systems.json").await;
             let system_inserts = systems
                 .iter()
                 .map(|system| db_models::NewSystem {
