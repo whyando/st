@@ -1,12 +1,11 @@
 use lazy_static::lazy_static;
 use regex::Regex;
-use reqwest::Url;
 
 use crate::agent_controller::AgentEra;
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub api_base_url: Url,
+    pub api_base_url: String,
     pub job_id_filter: Regex,
     pub override_construction_supply_check: bool,
     pub scrap_all_ships: bool,

@@ -335,7 +335,7 @@ impl ApiClient {
         U: Serialize,
     {
         self.wait_rate_limit().await;
-        let url = format!("{}/{}", self.base_url, path);
+        let url = format!("{}{}", self.base_url, path);
         let mut request = self.client.request(method.clone(), &url);
         if let Some(body) = json_body {
             request = request.json(body);
