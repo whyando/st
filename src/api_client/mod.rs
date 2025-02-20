@@ -59,7 +59,7 @@ impl ApiClient {
         self.agent_token.read().unwrap().clone()
     }
 
-    pub async fn register(&self, faction: &str, callsign: &str) -> String {
+    pub async fn register(&self, faction: &str, callsign: &str, email: Option<String>) -> String {
         let faction = match faction {
             "" => {
                 let factions: Vec<Faction> = self.get_all_pages("/factions").await;
@@ -79,15 +79,14 @@ impl ApiClient {
             "Registering new agent {} with faction {}",
             callsign, faction
         );
-        let mut body: Value = self
-            .post(
-                "/register",
-                &json!({
-                    "faction": faction,
-                    "symbol": callsign,
-                }),
-            )
-            .await;
+        let mut req_body = json!({
+            "faction": faction,
+            "symbol": callsign,
+        });
+        if let Some(email) = email {
+            req_body["email"] = json!(email);
+        }
+        let mut body: Value = self.post("/register", &req_body).await;
         let _agent: Agent = serde_json::from_value(body["data"]["agent"].take()).unwrap();
         let _contract: Contract = serde_json::from_value(body["data"]["contract"].take()).unwrap();
         let _faction: Faction = serde_json::from_value(body["data"]["faction"].take()).unwrap();
