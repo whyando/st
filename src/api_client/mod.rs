@@ -336,12 +336,17 @@ impl ApiClient {
     {
         self.wait_rate_limit().await;
         let url = format!("{}{}", self.base_url, path);
-        debug!("!! {} {}", method, url);
+        // debug!("!! {} {}", method, url);
         let mut request = self.client.request(method.clone(), &url);
         if let Some(body) = json_body {
             request = request.json(body);
         }
-        if let Some(token) = self.agent_token() {
+        // override auth type for /register
+        if path == "/register" {
+            let account_token = std::env::var("ACCOUNT_TOKEN")
+                .expect("ACCOUNT_TOKEN env var must be set to register");
+            request = request.header("Authorization", format!("Bearer {}", account_token));
+        } else if let Some(token) = self.agent_token() {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
         let response = request.send().await.expect("Failed to send request");
