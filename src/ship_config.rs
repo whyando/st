@@ -471,7 +471,7 @@ pub fn ship_config_lategame(
         ));
     }
 
-    const NUM_EXPLORERS: i64 = 100;
+    const NUM_EXPLORERS: i64 = 25;
     for i in 0..NUM_EXPLORERS {
         ships.push((
             (2.0, (i as f64) / (NUM_EXPLORERS as f64)),
