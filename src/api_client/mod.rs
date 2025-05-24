@@ -65,8 +65,8 @@ impl ApiClient {
                 let factions: Vec<Faction> = self.get_all_pages("/factions").await;
                 let factions: Vec<Faction> =
                     factions.into_iter().filter(|f| f.is_recruiting).collect();
-                use rand::prelude::SliceRandom as _;
-                let faction = factions.choose(&mut rand::thread_rng()).unwrap();
+                use rand::prelude::IndexedRandom as _;
+                let faction = factions.choose(&mut rand::rng()).unwrap();
                 faction.symbol.clone()
             }
             _ => faction.to_string(),

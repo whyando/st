@@ -80,10 +80,10 @@ async fn background_task(io: SocketIo, mut rx: tokio::sync::mpsc::Receiver<Event
     while let Some(event) = rx.recv().await {
         match event {
             Event::ShipUpdate(ship) => {
-                io.of("/").unwrap().emit("ship_upd", ship).unwrap();
+                io.of("/").unwrap().emit("ship_upd", &ship).await.unwrap();
             }
             Event::AgentUpdate(agent) => {
-                io.of("/").unwrap().emit("agent_upd", agent).unwrap();
+                io.of("/").unwrap().emit("agent_upd", &agent).await.unwrap();
             }
         }
     }
@@ -118,7 +118,7 @@ impl WebApiServer {
             s.emit("hello", "world").ok();
             s.on("ping", |s: SocketRef, Data::<i64>(data)| {
                 info!("ping received {}", data);
-                s.emit("pong", data).unwrap();
+                s.emit("pong", &data).unwrap();
             });
 
             s.on_disconnect(|_s: SocketRef| {
