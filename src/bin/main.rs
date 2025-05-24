@@ -17,7 +17,6 @@ async fn main() {
     let callsign = env::var("AGENT_CALLSIGN")
         .expect("AGENT_CALLSIGN env var not set")
         .to_ascii_uppercase();
-    let email = env::var("AGENT_EMAIL").ok();
 
     info!("Starting agent {} for faction {}", callsign, faction);
     info!("Loaded config: {:?}", *CONFIG);
@@ -34,7 +33,7 @@ async fn main() {
     let agent_token = match db.get_agent_token(&callsign).await {
         Some(token) => token,
         None => {
-            let token = api_client.register(&faction, &callsign, email).await;
+            let token = api_client.register(&faction, &callsign).await;
             db.save_agent_token(&callsign, &token).await;
             token
         }
