@@ -90,7 +90,6 @@ impl Universe {
         let status = self.api_client.status().await;
         let query_start = std::time::Instant::now();
         let systems: Vec<db_models::System> = systems::table
-            .filter(systems::reset_id.eq(self.db.reset_date()))
             .select(db_models::System::as_select())
             .load(&mut self.db.conn().await)
             .await
@@ -172,7 +171,6 @@ impl Universe {
             let system_inserts = systems
                 .iter()
                 .map(|system| db_models::NewSystem {
-                    reset_id: self.db.reset_date(),
                     symbol: system.symbol.as_str(),
                     type_: &system.system_type,
                     x: system.x as i32,
@@ -185,7 +183,7 @@ impl Universe {
                 let ids: Vec<i64> = diesel::insert_into(systems::table)
                     .values(chunk)
                     .returning(systems::id)
-                    .on_conflict((systems::reset_id, systems::symbol))
+                    .on_conflict(systems::symbol)
                     .do_update()
                     .set((
                         // Use empty ON CONFLICT UPDATE set hack to return id
@@ -206,7 +204,6 @@ impl Universe {
                         .waypoints
                         .iter()
                         .map(move |waypoint| db_models::NewWaypoint {
-                            reset_id: self.db.reset_date(),
                             symbol: waypoint.symbol.as_str(),
                             system_id: system_id,
                             type_: waypoint.waypoint_type.as_str(),
@@ -220,7 +217,7 @@ impl Universe {
             for chunk in waypoint_inserts.chunks(1000) {
                 let ids: Vec<i64> = diesel::insert_into(waypoints::table)
                     .values(chunk)
-                    .on_conflict((waypoints::reset_id, waypoints::symbol))
+                    .on_conflict(waypoints::symbol)
                     .do_update()
                     .set((
                         // as above, use empty ON CONFLICT UPDATE set hack to return id
@@ -267,7 +264,6 @@ impl Universe {
     async fn init_jumpgates(&self) {
         let query_start = std::time::Instant::now();
         let jumpgates: Vec<db_models::JumpGateConnections> = jumpgate_connections::table
-            .filter(jumpgate_connections::reset_id.eq(self.db.reset_date()))
             .select(db_models::JumpGateConnections::as_select())
             .load(&mut self.db.conn().await)
             .await
@@ -488,7 +484,6 @@ impl Universe {
                             .expect("Waypoint not found");
                         NewWaypointDetails {
                             waypoint_id: db_waypoint.id,
-                            reset_id: self.db.reset_date(),
                             is_market: waypoint.is_market(),
                             is_shipyard: waypoint.is_shipyard(),
                             is_uncharted: waypoint.is_uncharted(),
@@ -796,7 +791,6 @@ impl Universe {
             connections,
         };
         let insert = db_models::NewJumpGateConnections {
-            reset_id: self.db.reset_date(),
             waypoint_symbol: symbol.as_str(),
             is_under_construction: !info.is_constructed,
             edges: info
@@ -807,10 +801,7 @@ impl Universe {
         };
         diesel::insert_into(jumpgate_connections::table)
             .values(&insert)
-            .on_conflict((
-                jumpgate_connections::reset_id,
-                jumpgate_connections::waypoint_symbol,
-            ))
+            .on_conflict(jumpgate_connections::waypoint_symbol)
             .do_update()
             .set((
                 jumpgate_connections::is_under_construction.eq(&insert.is_under_construction),

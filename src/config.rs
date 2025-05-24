@@ -16,10 +16,10 @@ pub struct Config {
 
 lazy_static! {
     pub static ref CONFIG: Config = {
-        let api_base_url = std::env::var("API_BASE_URL")
-            .expect("API_BASE_URL env var not set")
+        let api_base_url = std::env::var("SPACETRADERS_API_URL")
+            .expect("SPACETRADERS_API_URL env var not set")
             .parse()
-            .expect("Invalid API_BASE_URL");
+            .expect("Invalid SPACETRADERS_API_URL");
         let job_id_filter = match std::env::var("JOB_ID_FILTER") {
             Ok(val) if val.is_empty() => None,
             Ok(val) => Some(val),

@@ -13,6 +13,7 @@ async fn main() {
     dotenvy::dotenv().ok();
     pretty_env_logger::init_timed();
 
+    let spacetraders_env = env::var("SPACETRADERS_ENV").unwrap();
     let faction = env::var("AGENT_FACTION").unwrap_or("".to_string());
     let callsign = env::var("AGENT_CALLSIGN")
         .expect("AGENT_CALLSIGN env var not set")
@@ -24,8 +25,12 @@ async fn main() {
     let api_client = ApiClient::new();
     let status = api_client.status().await;
 
+    info!("Spacetraders env: {:?}", spacetraders_env);
+    info!("Reset date: {:?}", status.reset_date);
+
     // Use the reset date on the status response as a unique identifier to partition data between resets
-    let db = DbClient::new(&status.reset_date).await;
+    let db = DbClient::new(&spacetraders_env, &status.reset_date).await;
+
     let universe = Arc::new(Universe::new(&api_client, &db));
     universe.init().await;
 

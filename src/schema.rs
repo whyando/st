@@ -1,17 +1,16 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    general_lookup (reset_id, key) {
-        reset_id -> Text,
+    generic_lookup (key) {
         key -> Text,
         value -> Json,
-        inserted_at -> Timestamptz,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
     }
 }
 
 diesel::table! {
-    jumpgate_connections (reset_id, waypoint_symbol) {
-        reset_id -> Text,
+    jumpgate_connections (waypoint_symbol) {
         waypoint_symbol -> Text,
         edges -> Array<Text>,
         created_at -> Timestamptz,
@@ -21,23 +20,8 @@ diesel::table! {
 }
 
 diesel::table! {
-    market_trades (id, timestamp) {
+    market_transaction_log (id) {
         id -> Int8,
-        timestamp -> Timestamptz,
-        market_symbol -> Text,
-        symbol -> Text,
-        trade_volume -> Int4,
-        #[sql_name = "type"]
-        type_ -> Text,
-        supply -> Text,
-        activity -> Nullable<Text>,
-        purchase_price -> Int4,
-        sell_price -> Int4,
-    }
-}
-
-diesel::table! {
-    market_transactions (market_symbol, timestamp) {
         timestamp -> Timestamptz,
         market_symbol -> Text,
         symbol -> Text,
@@ -51,8 +35,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    surveys (reset_id, uuid) {
-        reset_id -> Text,
+    surveys (uuid) {
         uuid -> Uuid,
         survey -> Json,
         asteroid_symbol -> Text,
@@ -64,7 +47,6 @@ diesel::table! {
 diesel::table! {
     systems (id) {
         id -> Int8,
-        reset_id -> Text,
         symbol -> Text,
         #[sql_name = "type"]
         type_ -> Text,
@@ -78,7 +60,6 @@ diesel::table! {
 diesel::table! {
     waypoint_details (id) {
         id -> Int8,
-        reset_id -> Text,
         waypoint_id -> Int8,
         is_market -> Bool,
         is_shipyard -> Bool,
@@ -92,7 +73,6 @@ diesel::table! {
 diesel::table! {
     waypoints (id) {
         id -> Int8,
-        reset_id -> Text,
         symbol -> Text,
         system_id -> Int8,
         #[sql_name = "type"]
@@ -104,10 +84,9 @@ diesel::table! {
 }
 
 diesel::allow_tables_to_appear_in_same_query!(
-    general_lookup,
+    generic_lookup,
     jumpgate_connections,
-    market_trades,
-    market_transactions,
+    market_transaction_log,
     surveys,
     systems,
     waypoint_details,

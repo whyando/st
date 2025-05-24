@@ -1,0 +1,87 @@
+-- Create schema
+CREATE SCHEMA IF NOT EXISTS ___SCHEMA___;
+
+-- generic_lookup
+CREATE TABLE IF NOT EXISTS ___SCHEMA___.generic_lookup (
+    key text NOT NULL,
+    value json NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    PRIMARY KEY (key)
+);
+
+-- market_transaction_log
+CREATE TABLE IF NOT EXISTS ___SCHEMA___.market_transaction_log (
+    id bigint NOT NULL,
+    "timestamp" timestamp with time zone NOT NULL,
+    market_symbol text NOT NULL,
+    symbol text NOT NULL,
+    ship_symbol text NOT NULL,
+    type text NOT NULL,
+    units integer NOT NULL,
+    price_per_unit integer NOT NULL,
+    total_price integer NOT NULL,
+    PRIMARY KEY (id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS market_transaction_log_idx ON ___SCHEMA___.market_transaction_log USING btree (market_symbol, "timestamp");
+
+-- jumpgate_connections
+CREATE TABLE IF NOT EXISTS ___SCHEMA___.jumpgate_connections (
+    waypoint_symbol text NOT NULL,
+    edges text[] NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    is_under_construction boolean NOT NULL,
+    PRIMARY KEY (waypoint_symbol)
+);
+
+-- surveys
+CREATE TABLE IF NOT EXISTS ___SCHEMA___.surveys (
+    uuid uuid NOT NULL,
+    survey json NOT NULL,
+    asteroid_symbol text NOT NULL,
+    inserted_at timestamp with time zone NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    PRIMARY KEY (uuid)
+);
+
+-- systems
+CREATE TABLE IF NOT EXISTS ___SCHEMA___.systems (
+    id BIGSERIAL NOT NULL,
+    symbol text NOT NULL,
+    type text NOT NULL,
+    x integer NOT NULL,
+    y integer NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    PRIMARY KEY (id)
+);
+
+-- waypoint_details
+CREATE TABLE IF NOT EXISTS ___SCHEMA___.waypoint_details (
+    id BIGSERIAL NOT NULL,
+    waypoint_id bigint NOT NULL,
+    is_market boolean NOT NULL,
+    is_shipyard boolean NOT NULL,
+    is_uncharted boolean NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    is_under_construction boolean NOT NULL,
+    PRIMARY KEY (id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS waypoint_details_waypoint_idx ON ___SCHEMA___.waypoint_details USING btree (waypoint_id);
+
+-- waypoints
+CREATE TABLE IF NOT EXISTS ___SCHEMA___.waypoints (
+    id BIGSERIAL NOT NULL,
+    symbol text NOT NULL,
+    system_id bigint NOT NULL,
+    type text NOT NULL,
+    x integer NOT NULL,
+    y integer NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS waypoints_system_idx ON ___SCHEMA___.waypoints USING btree (system_id);
+CREATE UNIQUE INDEX IF NOT EXISTS waypoints_unique_idx ON ___SCHEMA___.waypoints USING btree (symbol);
+

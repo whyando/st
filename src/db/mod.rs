@@ -14,7 +14,7 @@ use crate::{
 use chrono::DateTime;
 use chrono::Utc;
 use dashmap::DashMap;
-use diesel::sql_types::Integer;
+use diesel::sql_types::{Integer, Text};
 use diesel::ExpressionMethods as _;
 use diesel::OptionalExtension as _;
 use diesel::QueryDsl as _;
@@ -29,19 +29,23 @@ use log::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
-use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct DbClient {
     db: Pool<AsyncPgConnection>,
-    reset_id: Arc<String>,
 }
 
 impl DbClient {
-    pub async fn new(reset_identifier: &str) -> DbClient {
-        let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    pub async fn new(spacetraders_env: &str, reset_date: &str) -> DbClient {
+        let database_url = std::env::var("POSTGRES_URI").expect("POSTGRES_URI must be set");
+        let schema_name = format!("{}_{}", spacetraders_env, reset_date.replace("-", ""));
+        info!("Using schema: {}", schema_name);
         let db = {
+            let database_url = format!(
+                "{}?options=-c%20search_path%3D{}",
+                database_url, schema_name
+            );
             let manager = AsyncDieselConnectionManager::<AsyncPgConnection>::new(database_url);
             Pool::builder(manager).max_size(5).build().unwrap()
         };
@@ -59,16 +63,38 @@ impl DbClient {
                 .unwrap();
             assert_eq!(result.len(), 1);
             assert_eq!(result[0].value, 1);
+
+            #[derive(QueryableByName)]
+            struct SearchPathRet {
+                #[diesel(sql_type = Text)]
+                search_path: String,
+            }
+
+            let result: Vec<SearchPathRet> = diesel::sql_query("SHOW search_path")
+                .load(&mut conn)
+                .await
+                .unwrap();
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0].search_path, schema_name);
             info!("Successfully connected to database");
         }
-        DbClient {
-            db,
-            reset_id: Arc::new(reset_identifier.to_string()),
-        }
+        let db = DbClient { db };
+        db.create_schema(&schema_name).await;
+        db
     }
 
+    async fn create_schema(&self, schema_name: &str) {
+        let sql = include_str!("../../spacetraders_schema.sql.template")
+            .replace("___SCHEMA___", schema_name);
+
+        let mut conn = self.conn().await;
+        use diesel_async::SimpleAsyncConnection as _;
+        conn.batch_execute(&sql).await.unwrap();
+    }
+
+    // @@ TODO: remove this
     pub fn reset_date(&self) -> &str {
-        self.reset_id.as_str()
+        ""
     }
 
     pub async fn conn(&self) -> Object<AsyncPgConnection> {
@@ -83,10 +109,9 @@ impl DbClient {
         T: Sized + DeserializeOwned,
     {
         debug!("db get: {}", key);
-        let value_opt: Option<Value> = general_lookup::table
-            .select(general_lookup::value)
-            .filter(general_lookup::reset_id.eq(self.reset_date()))
-            .filter(general_lookup::key.eq(key))
+        let value_opt: Option<Value> = generic_lookup::table
+            .select(generic_lookup::value)
+            .filter(generic_lookup::key.eq(key))
             .first(&mut self.conn().await)
             .await
             .optional()
@@ -100,15 +125,14 @@ impl DbClient {
     {
         debug!("db set: {}", key);
         let value: Value = serde_json::to_value(value).unwrap();
-        diesel::insert_into(general_lookup::table)
+        diesel::insert_into(generic_lookup::table)
             .values((
-                general_lookup::reset_id.eq(self.reset_date()),
-                general_lookup::key.eq(key),
-                general_lookup::value.eq(&value),
+                generic_lookup::key.eq(key),
+                generic_lookup::value.eq(&value),
             ))
-            .on_conflict((general_lookup::reset_id, general_lookup::key))
+            .on_conflict(generic_lookup::key)
             .do_update()
-            .set(general_lookup::value.eq(&value))
+            .set(generic_lookup::value.eq(&value))
             .execute(&mut self.conn().await)
             .await
             .expect("DB Query error");
@@ -175,31 +199,32 @@ impl DbClient {
         self.set_value(&key, &market).await;
     }
 
-    pub async fn insert_market_trades(&self, market: &WithTimestamp<Market>) {
-        let inserts = market
-            .data
-            .trade_goods
-            .iter()
-            .map(|trade| {
-                let activity = trade.activity.as_ref().map(|a| a.to_string());
-                (
-                    market_trades::timestamp.eq(market.timestamp),
-                    market_trades::market_symbol.eq(market.data.symbol.to_string()),
-                    market_trades::symbol.eq(&trade.symbol),
-                    market_trades::trade_volume.eq(trade.trade_volume as i32),
-                    market_trades::type_.eq(trade._type.to_string()),
-                    market_trades::supply.eq(trade.supply.to_string()),
-                    market_trades::activity.eq(activity),
-                    market_trades::purchase_price.eq(trade.purchase_price as i32),
-                    market_trades::sell_price.eq(trade.sell_price as i32),
-                )
-            })
-            .collect::<Vec<_>>();
-        diesel::insert_into(market_trades::table)
-            .values(&inserts)
-            .execute(&mut self.conn().await)
-            .await
-            .expect("DB Query error");
+    pub async fn insert_market_trades(&self, _market: &WithTimestamp<Market>) {
+        return;
+        // let inserts = market
+        //     .data
+        //     .trade_goods
+        //     .iter()
+        //     .map(|trade| {
+        //         let activity = trade.activity.as_ref().map(|a| a.to_string());
+        //         (
+        //             market_trades::timestamp.eq(market.timestamp),
+        //             market_trades::market_symbol.eq(market.data.symbol.to_string()),
+        //             market_trades::symbol.eq(&trade.symbol),
+        //             market_trades::trade_volume.eq(trade.trade_volume as i32),
+        //             market_trades::type_.eq(trade._type.to_string()),
+        //             market_trades::supply.eq(trade.supply.to_string()),
+        //             market_trades::activity.eq(activity),
+        //             market_trades::purchase_price.eq(trade.purchase_price as i32),
+        //             market_trades::sell_price.eq(trade.sell_price as i32),
+        //         )
+        //     })
+        //     .collect::<Vec<_>>();
+        // diesel::insert_into(market_trades::table)
+        //     .values(&inserts)
+        //     .execute(&mut self.conn().await)
+        //     .await
+        //     .expect("DB Query error");
     }
 
     pub async fn upsert_market_transactions(&self, market: &WithTimestamp<Market>) {
@@ -209,22 +234,22 @@ impl DbClient {
             .iter()
             .map(|transaction| {
                 (
-                    market_transactions::timestamp.eq(transaction.timestamp),
-                    market_transactions::market_symbol.eq(market.data.symbol.to_string()),
-                    market_transactions::symbol.eq(&transaction.trade_symbol),
-                    market_transactions::ship_symbol.eq(&transaction.ship_symbol),
-                    market_transactions::type_.eq(&transaction._type),
-                    market_transactions::units.eq(transaction.units as i32),
-                    market_transactions::price_per_unit.eq(transaction.price_per_unit as i32),
-                    market_transactions::total_price.eq(transaction.total_price as i32),
+                    market_transaction_log::timestamp.eq(transaction.timestamp),
+                    market_transaction_log::market_symbol.eq(market.data.symbol.to_string()),
+                    market_transaction_log::symbol.eq(&transaction.trade_symbol),
+                    market_transaction_log::ship_symbol.eq(&transaction.ship_symbol),
+                    market_transaction_log::type_.eq(&transaction._type),
+                    market_transaction_log::units.eq(transaction.units as i32),
+                    market_transaction_log::price_per_unit.eq(transaction.price_per_unit as i32),
+                    market_transaction_log::total_price.eq(transaction.total_price as i32),
                 )
             })
             .collect::<Vec<_>>();
-        diesel::insert_into(market_transactions::table)
+        diesel::insert_into(market_transaction_log::table)
             .values(inserts)
             .on_conflict((
-                market_transactions::market_symbol,
-                market_transactions::timestamp,
+                market_transaction_log::market_symbol,
+                market_transaction_log::timestamp,
             ))
             .do_nothing()
             .execute(&mut self.conn().await)
@@ -332,7 +357,6 @@ impl DbClient {
             .iter()
             .map(|survey| {
                 (
-                    surveys::reset_id.eq(self.reset_date()),
                     surveys::uuid.eq(&survey.uuid),
                     surveys::survey.eq(serde_json::to_value(&survey.survey).unwrap()),
                     surveys::asteroid_symbol.eq(survey.survey.symbol.to_string()),
@@ -350,7 +374,6 @@ impl DbClient {
 
     pub async fn get_surveys(&self) -> Vec<KeyedSurvey> {
         let surveys: Vec<(Uuid, Value)> = surveys::table
-            .filter(surveys::reset_id.eq(self.reset_date()))
             .select((surveys::uuid, surveys::survey))
             .load(&mut self.conn().await)
             .await
@@ -365,19 +388,14 @@ impl DbClient {
     }
 
     pub async fn remove_survey(&self, uuid: &Uuid) {
-        diesel::delete(
-            surveys::table
-                .filter(surveys::reset_id.eq(self.reset_date()))
-                .filter(surveys::uuid.eq(uuid)),
-        )
-        .execute(&mut self.conn().await)
-        .await
-        .expect("DB Query error");
+        diesel::delete(surveys::table.filter(surveys::uuid.eq(uuid)))
+            .execute(&mut self.conn().await)
+            .await
+            .expect("DB Query error");
     }
 
     pub async fn get_systems(&self) -> Vec<db_models::System> {
         systems::table
-            .filter(systems::reset_id.eq(self.reset_date()))
             .select(db_models::System::as_select())
             .load(&mut self.conn().await)
             .await

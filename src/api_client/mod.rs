@@ -339,8 +339,8 @@ impl ApiClient {
         }
         // override auth type for /register
         if path == "/register" {
-            let account_token = std::env::var("ACCOUNT_TOKEN")
-                .expect("ACCOUNT_TOKEN env var must be set to register");
+            let account_token = std::env::var("SPACETRADERS_ACCOUNT_TOKEN")
+                .expect("SPACETRADERS_ACCOUNT_TOKEN env var must be set to register");
             request = request.header("Authorization", format!("Bearer {}", account_token));
         } else if let Some(token) = self.agent_token() {
             request = request.header("Authorization", format!("Bearer {}", token));

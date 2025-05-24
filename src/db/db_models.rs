@@ -7,7 +7,6 @@ use diesel::{
 #[diesel(table_name = crate::schema::systems)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewSystem<'a> {
-    pub reset_id: &'a str,
     pub symbol: &'a str,
     pub type_: &'a str,
     pub x: i32,
@@ -18,7 +17,6 @@ pub struct NewSystem<'a> {
 #[diesel(table_name = crate::schema::waypoints)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewWaypoint<'a> {
-    pub reset_id: &'a str,
     pub symbol: &'a str,
     pub system_id: i64,
     pub type_: &'a str,
@@ -29,8 +27,7 @@ pub struct NewWaypoint<'a> {
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = crate::schema::waypoint_details)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct NewWaypointDetails<'a> {
-    pub reset_id: &'a str,
+pub struct NewWaypointDetails {
     pub waypoint_id: i64,
     pub is_market: bool,
     pub is_shipyard: bool,
@@ -42,7 +39,6 @@ pub struct NewWaypointDetails<'a> {
 #[diesel(table_name = crate::schema::jumpgate_connections)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewJumpGateConnections<'a> {
-    pub reset_id: &'a str,
     pub waypoint_symbol: &'a str,
     pub edges: Vec<&'a str>,
     pub is_under_construction: bool,
