@@ -1,4 +1,5 @@
 use crate::agent_controller::Event;
+use crate::api_client::api_models::{NavigateResponse, OrbitResponse, TradeResponse};
 use crate::models::{ShipCargoItem, ShipCooldown, Survey};
 use crate::ship_controller::ShipNavStatus::*;
 use crate::{
@@ -160,9 +161,8 @@ impl ShipController {
             return;
         }
         let uri = format!("/my/ships/{}/orbit", self.ship_symbol);
-        let mut response: Value = self.api_client.post(&uri, &json!({})).await;
-        let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
-        self.update_nav(nav).await;
+        let resp: Data<OrbitResponse> = self.api_client.post(&uri, &json!({})).await;
+        self.update_nav(resp.data.nav).await;
     }
 
     pub async fn dock(&self) {
@@ -170,9 +170,8 @@ impl ShipController {
             return;
         }
         let uri = format!("/my/ships/{}/dock", self.ship_symbol);
-        let mut response: Value = self.api_client.post(&uri, &json!({})).await;
-        let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
-        self.update_nav(nav).await;
+        let resp: Data<OrbitResponse> = self.api_client.post(&uri, &json!({})).await;
+        self.update_nav(resp.data.nav).await;
     }
 
     pub async fn set_flight_mode(&self, mode: ShipFlightMode) {
@@ -238,27 +237,38 @@ impl ShipController {
         }
     }
 
-    pub async fn buy_goods(&self, good: &str, units: i64, adjust_reserved_credits: bool) {
+    async fn trade_good(&self, _type: &str, good: &str, units: i64, adjust_reserved_credits: bool) {
         assert!(!self.is_in_transit(), "Ship is in transit");
-        assert!(
-            units <= self.cargo_capacity(),
-            "Ship can't hold that much cargo"
-        );
+        match _type {
+            "purchase" => {
+                assert!(
+                    units <= self.cargo_capacity(),
+                    "Ship can't hold that much cargo"
+                );
+                self.debug(&format!("Buying {} units of {}", units, good));
+            }
+            "sell" => {
+                self.debug(&format!("Selling {} units of {}", units, good));
+            }
+            _ => {
+                panic!("Invalid trade type: {}", _type);
+            }
+        }
         self.dock().await;
-        self.debug(&format!("Buying {} units of {}", units, good));
-        let uri = format!("/my/ships/{}/purchase", self.ship_symbol);
+        let uri = format!("/my/ships/{}/{}", self.ship_symbol, _type);
         let body = json!({
             "symbol": good,
             "units": units,
         });
-        let mut response: Value = self.api_client.post(&uri, &body).await;
-        let cargo: ShipCargo = serde_json::from_value(response["data"]["cargo"].take()).unwrap();
-        let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
-        let transaction: MarketTransaction =
-            serde_json::from_value(response["data"]["transaction"].take()).unwrap();
+        let TradeResponse { cargo, agent, transaction } = self
+            .api_client
+            .post::<Data<TradeResponse>, _>(&uri, &body)
+            .await
+            .data;
         self.update_cargo(cargo).await;
         self.agent_controller.update_agent(agent).await;
         if adjust_reserved_credits {
+            let units = if _type == "purchase" { units } else { -units };
             self.agent_controller.ledger.register_goods_change(
                 &self.ship_symbol,
                 &transaction.trade_symbol,
@@ -266,48 +276,24 @@ impl ShipController {
                 transaction.price_per_unit,
             );
         }
-
         self.debug(&format!(
-            "BOUGHT {} {} for ${} (total ${})",
+            "{} {} {} for ${} (total ${})",
+            transaction._type,
             transaction.units,
             transaction.trade_symbol,
             transaction.price_per_unit,
             transaction.total_price
         ));
+    }
+
+    pub async fn buy_goods(&self, good: &str, units: i64, adjust_reserved_credits: bool) {
+        self.trade_good("purchase", good, units, adjust_reserved_credits).await;
     }
 
     pub async fn sell_goods(&self, good: &str, units: i64, adjust_reserved_credits: bool) {
-        assert!(!self.is_in_transit(), "Ship is in transit");
-        self.dock().await;
-        self.debug(&format!("Selling {} units of {}", units, good));
-        let uri = format!("/my/ships/{}/sell", self.ship_symbol);
-        let body = json!({
-            "symbol": good,
-            "units": units,
-        });
-        let mut response: Value = self.api_client.post(&uri, &body).await;
-        let cargo: ShipCargo = serde_json::from_value(response["data"]["cargo"].take()).unwrap();
-        let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
-        let transaction: MarketTransaction =
-            serde_json::from_value(response["data"]["transaction"].take()).unwrap();
-        self.update_cargo(cargo).await;
-        self.agent_controller.update_agent(agent).await;
-        if adjust_reserved_credits {
-            self.agent_controller.ledger.register_goods_change(
-                &self.ship_symbol,
-                &transaction.trade_symbol,
-                -units,
-                transaction.price_per_unit,
-            );
-        }
-        self.debug(&format!(
-            "SOLD {} {} for ${} (total ${})",
-            transaction.units,
-            transaction.trade_symbol,
-            transaction.price_per_unit,
-            transaction.total_price
-        ));
+        self.trade_good("sell", good, units, adjust_reserved_credits).await;
     }
+
     pub async fn sell_all_cargo(&self) {
         self.refresh_market().await;
         let market = self.universe.get_market(&self.waypoint()).await.unwrap();
@@ -335,8 +321,7 @@ impl ShipController {
             "symbol": good,
             "units": units,
         });
-        let mut response: Value = self.api_client.post(&uri, &body).await;
-        let cargo: ShipCargo = serde_json::from_value(response["data"]["cargo"].take()).unwrap();
+        let cargo = self.api_client.post::<Data<ShipCargo>, _>(&uri, &body).await.data;
         self.update_cargo(cargo).await;
     }
 
@@ -346,6 +331,14 @@ impl ShipController {
     // If from_cargo is true, refuel from cargo, and we must check after the refuel whether the refuel suceeded
     // Whereas if buying from market, we can safely assume we can obtain the required amount
     pub async fn refuel(&self, required_fuel: i64, from_cargo: bool) {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct RefuelResponse {
+            agent: Agent,
+            fuel: ShipFuel,
+            transaction: MarketTransaction,
+            cargo: ShipCargo,
+        }
+
         assert!(!self.is_in_transit(), "Ship is in transit");
         assert!(
             required_fuel <= self.fuel_capacity(),
@@ -388,24 +381,24 @@ impl ShipController {
             "units": units,
             "fromCargo": from_cargo,
         });
-        let mut response: Value = self.api_client.post(&uri, &body).await;
-        let fuel = serde_json::from_value(response["data"]["fuel"].take()).unwrap();
-        let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
-        // let transaction: Transaction = serde_json::from_value(response["data"]["transaction"].take()).unwrap();
-        self.update_fuel(fuel).await;
-        if from_cargo {
+
+        let cargo_fuel = self.cargo_good_count("FUEL");
+        let expected_cargo_fuel = if from_cargo {
             let cargo_units = (units + 99) / 100;
-            let mut ship = self.ship.lock().unwrap();
-            let fuel_item = ship
-                .cargo
-                .inventory
-                .iter_mut()
-                .find(|x| x.symbol == "FUEL")
-                .unwrap();
-            assert!(fuel_item.units >= cargo_units);
-            fuel_item.units -= cargo_units;
-        }
+            assert!(cargo_fuel >= cargo_units);
+            cargo_fuel - cargo_units
+        } else {
+            cargo_fuel
+        };
+        let RefuelResponse { fuel, agent, cargo, transaction: _ } = self
+            .api_client
+            .post::<Data<RefuelResponse>, _>(&uri, &body)
+            .await
+            .data;
+        self.update_fuel(fuel).await;
+        self.update_cargo(cargo).await;
         self.agent_controller.update_agent(agent).await;
+        assert_eq!(self.cargo_good_count("FUEL"), expected_cargo_fuel);
     }
 
     pub async fn full_load_cargo(&self, good: &str) {
@@ -430,13 +423,11 @@ impl ShipController {
         self.orbit().await;
         self.debug(&format!("Navigating to waypoint: {}", waypoint));
         let uri = format!("/my/ships/{}/navigate", self.ship_symbol);
-        let mut response: Value = self
+        let NavigateResponse { nav, fuel, events } = self
             .api_client
-            .post(&uri, &json!({ "waypointSymbol": waypoint }))
-            .await;
-        let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
-        let fuel = serde_json::from_value(response["data"]["fuel"].take()).unwrap();
-        let events = serde_json::from_value(response["data"]["events"].take()).unwrap();
+            .post::<Data<NavigateResponse>, _>(&uri, &json!({ "waypointSymbol": waypoint }))
+            .await
+            .data;
         self.handle_ship_condition_events(&events);
         self.update_nav(nav).await;
         self.update_fuel(fuel).await;
@@ -454,14 +445,12 @@ impl ShipController {
         self.orbit().await;
         self.debug(&format!("Warp to waypoint: {}", waypoint));
         let uri = format!("/my/ships/{}/warp", self.ship_symbol);
-        let mut response: Value = self
+        let NavigateResponse { nav, fuel, events } = self
             .api_client
-            .post(&uri, &json!({ "waypointSymbol": waypoint }))
-            .await;
-        let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
-        let fuel = serde_json::from_value(response["data"]["fuel"].take()).unwrap();
-        // let events = serde_json::from_value(response["data"]["events"].take()).unwrap();
-        // self.handle_ship_condition_events(&events);
+            .post::<Data<NavigateResponse>, _>(&uri, &json!({ "waypointSymbol": waypoint }))
+            .await
+            .data;
+        self.handle_ship_condition_events(&events);
         self.update_nav(nav).await;
         self.update_fuel(fuel).await;
         self.wait_for_transit().await;
@@ -469,20 +458,25 @@ impl ShipController {
     }
 
     pub async fn jump(&self, waypoint: &WaypointSymbol) {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct JumpResponse {
+            nav: ShipNav,
+            cooldown: ShipCooldown,
+            transaction: MarketTransaction,
+            agent: Agent,
+        }
+
         assert!(!self.is_in_transit(), "Ship is in transit");
         self.wait_for_cooldown().await;
         self.orbit().await;
         self.debug(&format!("Jumping to waypoint: {}", waypoint));
         let uri = format!("/my/ships/{}/jump", self.ship_symbol);
         let body = json!({ "waypointSymbol": waypoint });
-        let mut response: Value = self.api_client.post(&uri, &body).await;
-
-        let nav = serde_json::from_value(response["data"]["nav"].take()).unwrap();
-        let cooldown: ShipCooldown =
-            serde_json::from_value(response["data"]["cooldown"].take()).unwrap();
-        let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
-        let _transaction: MarketTransaction =
-            serde_json::from_value(response["data"]["transaction"].take()).unwrap();
+        let JumpResponse { nav, cooldown, agent, transaction: _ } = self
+            .api_client
+            .post::<Data<JumpResponse>, _>(&uri, &body)
+            .await
+            .data;
         self.update_nav(nav).await;
         self.agent_controller.update_agent(agent).await;
         self.update_cooldown(cooldown).await;
@@ -527,6 +521,12 @@ impl ShipController {
     }
 
     pub async fn supply_construction(&self, good: &str, units: i64) {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct SupplyConstructionResponse {
+            cargo: ShipCargo,
+            construction: Construction,
+        }
+
         assert!(!self.is_in_transit(), "Ship is in transit");
         self.dock().await;
         self.debug(&format!("Constructing {} units of {}", units, good));
@@ -540,10 +540,11 @@ impl ShipController {
             "tradeSymbol": good,
             "units": units,
         });
-        let mut response: Value = self.api_client.post(&uri, &body).await;
-        let cargo: ShipCargo = serde_json::from_value(response["data"]["cargo"].take()).unwrap();
-        let construction: Construction =
-            serde_json::from_value(response["data"]["construction"].take()).unwrap();
+        let SupplyConstructionResponse { cargo, construction } = self
+            .api_client
+            .post::<Data<SupplyConstructionResponse>, _>(&uri, &body)
+            .await
+            .data;
         self.update_cargo(cargo).await;
         self.universe.update_construction(&construction).await;
     }
@@ -554,11 +555,10 @@ impl ShipController {
         let system = self.system();
         self.debug(&format!("Refreshing market at waypoint {}", &waypoint));
         let uri = format!("/systems/{}/waypoints/{}/market", &system, &waypoint);
-        let mut response: Value = self.api_client.get(&uri).await;
-        let market: Market = serde_json::from_value(response["data"].take()).unwrap();
+        let response: Data<Market> = self.api_client.get(&uri).await;
         let market = WithTimestamp::<Market> {
             timestamp: chrono::Utc::now(),
-            data: market,
+            data: response.data,
         };
         self.universe.save_market(&waypoint, market).await;
     }
@@ -569,25 +569,30 @@ impl ShipController {
         let system = self.system();
         self.debug(&format!("Refreshing shipyard at waypoint {}", &waypoint));
         let uri = format!("/systems/{}/waypoints/{}/shipyard", &system, &waypoint);
-        let mut response: Value = self.api_client.get(&uri).await;
-        let shipyard: Shipyard = serde_json::from_value(response["data"].take()).unwrap();
+        let response: Data<Shipyard> = self.api_client.get(&uri).await;
         let shipyard = WithTimestamp::<Shipyard> {
             timestamp: chrono::Utc::now(),
-            data: shipyard,
+            data: response.data,
         };
         self.universe.save_shipyard(&waypoint, shipyard).await;
     }
 
     pub async fn survey(&self) {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct SurveyResponse {
+            cooldown: ShipCooldown,
+            surveys: Vec<Survey>,
+        }
+
         assert!(!self.is_in_transit());
         self.wait_for_cooldown().await;
         self.debug(&format!("Surveying {}", self.waypoint()));
         let uri = format!("/my/ships/{}/survey", self.ship_symbol);
-        let mut response: Value = self.api_client.post(&uri, &json!({})).await;
-        let cooldown: ShipCooldown =
-            serde_json::from_value(response["data"]["cooldown"].take()).unwrap();
-        let surveys: Vec<Survey> =
-            serde_json::from_value(response["data"]["surveys"].take()).unwrap();
+        let SurveyResponse { cooldown, surveys } = self
+            .api_client
+            .post::<Data<SurveyResponse>, _>(&uri, &json!({}))
+            .await
+            .data;
         for survey in &surveys {
             let deposits = survey
                 .deposits
@@ -699,20 +704,26 @@ impl ShipController {
     }
 
     pub async fn siphon(&self) {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct SiphonResponse {
+            cargo: ShipCargo,
+            cooldown: ShipCooldown,
+            siphon: Value,
+            events: Vec<ShipConditionEvent>,
+        }
         assert!(!self.is_in_transit(), "Ship is in transit");
         self.orbit().await;
         self.wait_for_cooldown().await;
         self.debug("Siphoning");
         let uri = format!("/my/ships/{}/siphon", self.ship_symbol);
         let body = json!({});
-        let mut response: Value = self.api_client.post(&uri, &body).await;
-        let cargo: ShipCargo = serde_json::from_value(response["data"]["cargo"].take()).unwrap();
-        let cooldown: ShipCooldown =
-            serde_json::from_value(response["data"]["cooldown"].take()).unwrap();
-        let siphon: Value = serde_json::from_value(response["data"]["siphon"].take()).unwrap();
+        let SiphonResponse { cargo, cooldown, siphon, events } = self
+            .api_client
+            .post::<Data<SiphonResponse>, _>(&uri, &body)
+            .await
+            .data;
         let good = siphon["yield"]["symbol"].as_str().unwrap();
         let units = siphon["yield"]["units"].as_i64().unwrap();
-        let events = serde_json::from_value(response["data"]["events"].take()).unwrap();
         self.handle_ship_condition_events(&events);
         self.debug(&format!("Siphoned {} units of {}", units, good));
         self.update_cooldown(cooldown).await;
@@ -790,14 +801,21 @@ impl ShipController {
     }
 
     pub async fn scrap(&self) {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct ScrapResponse {
+            agent: Agent,
+            transaction: ScrapTransaction,
+        }
+
         assert!(!self.is_in_transit(), "Ship is in transit");
         self.dock().await;
         self.debug("Scrapping Ship");
         let uri = format!("/my/ships/{}/scrap", self.ship_symbol);
-        let mut response: Value = self.api_client.post(&uri, &json!({})).await;
-        let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
-        let transaction: ScrapTransaction =
-            serde_json::from_value(response["data"]["transaction"].take()).unwrap();
+        let ScrapResponse { agent, transaction } = self
+            .api_client
+            .post::<Data<ScrapResponse>, _>(&uri, &json!({}))
+            .await
+            .data;
         info!(
             "{} Scrapped ship for ${}",
             self.ship_symbol, transaction.total_price

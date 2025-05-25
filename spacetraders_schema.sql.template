@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS ___SCHEMA___.generic_lookup (
 
 -- market_transaction_log
 CREATE TABLE IF NOT EXISTS ___SCHEMA___.market_transaction_log (
-    id bigint NOT NULL,
+    id BIGSERIAL NOT NULL,
     "timestamp" timestamp with time zone NOT NULL,
     market_symbol text NOT NULL,
     symbol text NOT NULL,

@@ -1,5 +1,5 @@
 use super::{SystemSymbol, WaypointSymbol};
-use crate::models::{Symbol, SymbolNameDescr};
+use crate::models::{self, Symbol, SymbolNameDescr};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -84,6 +84,25 @@ impl WaypointDetailed {
     pub fn is_engineered_asteroid(&self) -> bool {
         self.waypoint_type == "ENGINEERED_ASTEROID"
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrbitResponse {
+    pub nav: models::ShipNav,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TradeResponse {
+    pub agent: models::Agent,
+    pub cargo: models::ShipCargo,
+    pub transaction: models::MarketTransaction,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NavigateResponse {
+    pub nav: models::ShipNav,
+    pub fuel: models::ShipFuel,
+    pub events: Vec<models::ShipConditionEvent>,
 }
 
 #[cfg(test)]
