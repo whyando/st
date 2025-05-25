@@ -346,7 +346,7 @@ impl ShipController {
             agent: Agent,
             fuel: ShipFuel,
             transaction: MarketTransaction,
-            cargo: ShipCargo,
+            cargo: Option<ShipCargo>,
         }
 
         assert!(!self.is_in_transit(), "Ship is in transit");
@@ -392,14 +392,7 @@ impl ShipController {
             "fromCargo": from_cargo,
         });
 
-        let cargo_fuel = self.cargo_good_count("FUEL");
-        let expected_cargo_fuel = if from_cargo {
-            let cargo_units = (units + 99) / 100;
-            assert!(cargo_fuel >= cargo_units);
-            cargo_fuel - cargo_units
-        } else {
-            cargo_fuel
-        };
+        let initial_cargo_fuel = self.cargo_good_count("FUEL");
         let RefuelResponse {
             fuel,
             agent,
@@ -411,9 +404,13 @@ impl ShipController {
             .await
             .data;
         self.update_fuel(fuel).await;
-        self.update_cargo(cargo).await;
+        assert_eq!(cargo.is_some(), from_cargo);
+        if let Some(cargo) = cargo {
+            self.update_cargo(cargo).await;
+            let expected_cargo_fuel = initial_cargo_fuel - (units + 99) / 100;
+            assert_eq!(self.cargo_good_count("FUEL"), expected_cargo_fuel);
+        }
         self.agent_controller.update_agent(agent).await;
-        assert_eq!(self.cargo_good_count("FUEL"), expected_cargo_fuel);
     }
 
     pub async fn full_load_cargo(&self, good: &str) {
