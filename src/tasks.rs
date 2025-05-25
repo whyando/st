@@ -238,7 +238,16 @@ impl LogisticTaskManager {
                     ],
                 )
                 .await;
-            assert_eq!(adv_circuit_market.len(), 1);
+            assert!(adv_circuit_market.len() >= 1);
+            if adv_circuit_market.len() > 1 {
+                warn!(
+                    "Found multiple advanced circuit markets: {:?}",
+                    adv_circuit_market
+                        .iter()
+                        .map(|m| m.symbol.clone())
+                        .collect::<Vec<_>>()
+                );
+            }
             let adv_circuit_market = &adv_circuit_market[0].symbol;
 
             let electronics_market = self
@@ -252,7 +261,16 @@ impl LogisticTaskManager {
                     ],
                 )
                 .await;
-            assert_eq!(electronics_market.len(), 1);
+            assert!(electronics_market.len() >= 1);
+            if electronics_market.len() > 1 {
+                warn!(
+                    "Found multiple electronics markets: {:?}",
+                    electronics_market
+                        .iter()
+                        .map(|m| m.symbol.clone())
+                        .collect::<Vec<_>>()
+                );
+            }
             let electronics_market = &electronics_market[0].symbol;
             let microprocessor_market = self
                 .universe
