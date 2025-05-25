@@ -1,7 +1,7 @@
 use crate::{
     agent_controller::{AgentController, Event},
     api_client::api_models::WaypointDetailed,
-    db::DbClient,
+    database::DbClient,
     models::Agent,
     universe::Universe,
 };

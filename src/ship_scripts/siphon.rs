@@ -1,5 +1,5 @@
 use crate::{
-    db::DbClient, models::WaypointSymbol, ship_controller::ShipController, universe::WaypointFilter,
+    database::DbClient, models::WaypointSymbol, ship_controller::ShipController, universe::WaypointFilter,
 };
 use lazy_static::lazy_static;
 use log::*;

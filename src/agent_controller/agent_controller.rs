@@ -11,7 +11,7 @@ use crate::survey_manager::SurveyManager;
 use crate::universe::WaypointFilter;
 use crate::{
     api_client::ApiClient,
-    db::DbClient,
+    database::DbClient,
     models::{Agent, Ship, ShipBehaviour, ShipConfig, SystemSymbol, WaypointSymbol},
     ship_controller::ShipController,
     ship_scripts,

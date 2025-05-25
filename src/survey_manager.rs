@@ -1,4 +1,4 @@
-use crate::db::DbClient;
+use crate::database::DbClient;
 use crate::models::{KeyedSurvey, Survey, WaypointSymbol};
 use chrono::Duration;
 use std::collections::BTreeMap;

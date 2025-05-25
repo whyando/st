@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use crate::{
-    db::DbClient, models::LogisticsScriptConfig, ship_controller::ShipController,
+    database::DbClient, models::LogisticsScriptConfig, ship_controller::ShipController,
     tasks::LogisticTaskManager,
 };
 use chrono::Duration;

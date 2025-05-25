@@ -1,7 +1,7 @@
 use crate::agent_controller::AgentController;
 use crate::api_client::api_models::WaypointDetailed;
 use crate::config::CONFIG;
-use crate::db::DbClient;
+use crate::database::DbClient;
 use crate::logistics_planner::plan::task_to_scheduled_action;
 use crate::logistics_planner::{
     self, Action, LogisticShip, PlannerConstraints, ShipSchedule, Task, TaskActions,

@@ -7,6 +7,7 @@ use crate::{
 };
 use log::*;
 use reqwest::{Method, StatusCode};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::cmp::min;
 use std::sync::{Arc, Mutex};
@@ -175,17 +176,28 @@ impl ShipController {
     }
 
     pub async fn set_flight_mode(&self, mode: ShipFlightMode) {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct NavUpdateResponse {
+            nav: ShipNav,
+            fuel: ShipFuel,
+            events: Vec<ShipConditionEvent>,
+        }
+
         if self.flight_mode() == mode {
             return;
         }
         self.debug(&format!("Setting flight mode to {:?}", mode));
         let uri = format!("/my/ships/{}/nav", self.ship_symbol);
-        let mut response: Value = self
+        let response: Data<NavUpdateResponse> = self
             .api_client
             .patch(&uri, &json!({ "flightMode": mode }))
             .await;
-        let nav = serde_json::from_value(response["data"].take()).unwrap();
+        let nav = response.data.nav;
+        let fuel = response.data.fuel;
+        let events = response.data.events;
         self.update_nav(nav).await;
+        self.update_fuel(fuel).await;
+        self.handle_ship_condition_events(&events);
     }
 
     pub fn is_in_transit(&self) -> bool {

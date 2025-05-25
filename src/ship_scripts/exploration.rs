@@ -1,5 +1,5 @@
 use crate::{
-    db::DbClient,
+    database::DbClient,
     models::{LogisticsScriptConfig, ShipFlightMode, SystemSymbol},
     // ship_config::market_waypoints,
     ship_controller::ShipController,

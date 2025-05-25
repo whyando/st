@@ -4,7 +4,7 @@ use crate::api_client::api_models::WaypointDetailed;
 use crate::models::MarketType::*;
 use crate::ship_controller::ShipController;
 use crate::universe::WaypointFilter;
-use crate::{db::DbClient, models::*};
+use crate::{database::DbClient, models::*};
 use lazy_static::lazy_static;
 use log::*;
 use serde::{Deserialize, Serialize};

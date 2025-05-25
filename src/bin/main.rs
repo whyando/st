@@ -2,7 +2,7 @@ use log::*;
 use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
 use st::config::CONFIG;
-use st::db::DbClient;
+use st::database::DbClient;
 use st::models::Faction;
 use st::universe::Universe;
 use st::web_api_server::WebApiServer;

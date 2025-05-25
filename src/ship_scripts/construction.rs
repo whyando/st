@@ -9,7 +9,7 @@ use crate::models::MarketActivity::*;
 use crate::models::MarketSupply::*;
 use crate::models::MarketType::*;
 use crate::{
-    db::DbClient,
+    database::DbClient,
     models::{Construction, WaypointSymbol},
     ship_controller::ShipController,
     universe::WaypointFilter,
