@@ -318,16 +318,21 @@ impl ShipController {
     }
 
     pub async fn jettison_cargo(&self, good: &str, units: i64) {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct JettisonResponse {
+            cargo: ShipCargo,
+        }
+
         assert!(!self.is_in_transit(), "Ship is in transit");
-        self.debug(format!("Jettisoning {} {}", units, good).as_str());
+        self.debug(&format!("Jettisoning {} {}", units, good));
         let uri = format!("/my/ships/{}/jettison", self.ship_symbol);
         let body = json!({
             "symbol": good,
             "units": units,
         });
-        let cargo = self
+        let JettisonResponse { cargo } = self
             .api_client
-            .post::<Data<ShipCargo>, _>(&uri, &body)
+            .post::<Data<JettisonResponse>, _>(&uri, &body)
             .await
             .data;
         self.update_cargo(cargo).await;
