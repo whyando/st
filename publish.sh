@@ -4,7 +4,7 @@ set -e
 # Configuration
 REGISTRY="registry.jpa-dev.whyando.com"
 IMAGE_NAME="whyando/spacetraders"
-VERSION=$(cargo pkgid | cut -d# -f2 | cut -d: -f2)
+VERSION=$(grep '^version = ' Cargo.toml | cut -d'"' -f2)
 
 echo "Building version: $VERSION"
 
