@@ -17,7 +17,6 @@ pub struct Agent {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
-    pretty_env_logger::init_timed();
 
     // output to ./all_agents.txt
     let mut f = File::create("all_agents.txt")?;

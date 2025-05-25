@@ -3,6 +3,7 @@ use crate::models::{KeyedSurvey, Survey, WaypointSymbol};
 use chrono::Duration;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
+use tracing::*;
 
 pub struct SurveyManager {
     db: DbClient,
@@ -96,7 +97,7 @@ impl SurveyManager {
     }
 
     pub async fn remove_survey(&self, survey: &KeyedSurvey) {
-        log::debug!("Deleting survey {}", survey.uuid);
+        debug!("Deleting survey {}", survey.uuid);
         self.db.remove_survey(&survey.uuid).await;
 
         let mut inner = self.inner.lock().unwrap();

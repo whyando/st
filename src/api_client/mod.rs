@@ -3,12 +3,12 @@ pub mod api_models;
 use crate::config::CONFIG;
 use crate::models::*;
 use core::panic;
-use log::*;
 use reqwest::{self, Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::{Arc, Mutex, RwLock};
 use tokio::time::Instant;
+use tracing::*;
 
 #[derive(Debug, Clone)]
 pub struct ApiClient {

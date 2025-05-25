@@ -1,7 +1,7 @@
 use crate::{models::WaypointSymbol, ship_controller::ShipController};
-use log::*;
 use pathfinding::directed::dijkstra::dijkstra;
 use serde::{Deserialize, Serialize};
+use tracing::*;
 use ExplorerState::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

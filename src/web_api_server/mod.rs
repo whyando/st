@@ -7,7 +7,6 @@ use crate::{
 };
 use axum::{debug_handler, http::StatusCode};
 use axum::{extract::State, routing::get};
-use log::*;
 use serde_json::json;
 use socketioxide::{
     extract::{Data, SocketRef},
@@ -15,6 +14,7 @@ use socketioxide::{
 };
 use std::{sync::Arc, time::Duration};
 use tower_http::cors::CorsLayer;
+use tracing::*;
 
 pub struct WebApiServer {
     agent_controller: AgentController,

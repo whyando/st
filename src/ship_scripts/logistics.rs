@@ -5,7 +5,7 @@ use crate::{
     tasks::LogisticTaskManager,
 };
 use chrono::Duration;
-use log::*;
+use tracing::*;
 
 pub async fn run(
     ship_controller: ShipController,

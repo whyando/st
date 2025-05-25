@@ -1,8 +1,8 @@
 use crate::{models::ProbeScriptConfig, ship_controller::ShipController};
 use chrono::{DateTime, Duration, Utc};
 use lazy_static::lazy_static;
-use log::*;
 use std::ops::Add as _;
+use tracing::*;
 
 lazy_static! {
     static ref MARKET_REFRESH_INTERVAL: Duration = Duration::try_minutes(6).unwrap();

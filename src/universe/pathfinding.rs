@@ -1,10 +1,10 @@
 use super::Universe;
 use crate::models::{SystemSymbol, WaypointSymbol};
-use log::*;
 use quadtree_rs::area::AreaBuilder;
 use quadtree_rs::{point::Point, Quadtree};
 use std::cmp::max;
 use std::collections::BTreeMap;
+use tracing::*;
 
 pub struct JumpGate {
     pub active_connections: Vec<(WaypointSymbol, i64)>,

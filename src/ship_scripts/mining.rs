@@ -6,8 +6,8 @@ use crate::ship_controller::ShipController;
 use crate::universe::WaypointFilter;
 use crate::{database::DbClient, models::*};
 use lazy_static::lazy_static;
-use log::*;
 use serde::{Deserialize, Serialize};
+use tracing::*;
 use MiningShuttleState::*;
 
 async fn sell_location(ship: &ShipController, cargo_symbol: &str) -> Option<WaypointSymbol> {

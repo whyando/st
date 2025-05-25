@@ -356,11 +356,6 @@ mod test {
 
     #[test]
     fn test_run_planner() {
-        pretty_env_logger::formatted_timed_builder()
-            .is_test(true)
-            .filter_level(log::LevelFilter::Debug)
-            .try_init()
-            .ok();
         let ships = vec![
             LogisticShip {
                 symbol: "SHIP1".to_string(),

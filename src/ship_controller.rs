@@ -6,12 +6,12 @@ use crate::{
     agent_controller::AgentController, api_client::ApiClient, logistics_planner::Action, models::*,
     universe::Universe,
 };
-use log::*;
 use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::cmp::min;
 use std::sync::{Arc, Mutex};
+use tracing::*;
 
 #[derive(Clone)]
 pub struct ShipController {

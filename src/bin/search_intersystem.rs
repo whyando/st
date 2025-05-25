@@ -1,4 +1,4 @@
-// use log::*;
+// use tracing::*;
 // use st::api_client::ApiClient;
 // use st::db::DbClient;
 // use st::models::WaypointSymbol;

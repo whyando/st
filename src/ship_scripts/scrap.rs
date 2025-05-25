@@ -5,7 +5,7 @@
 //!
 
 use crate::ship_controller::ShipController;
-use log::*;
+use tracing::*;
 
 pub async fn run(ship: ShipController) {
     info!("Starting script scrap for {}", ship.symbol());

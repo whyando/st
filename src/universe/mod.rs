@@ -19,10 +19,10 @@ use diesel::GroupedBy as _;
 use diesel::QueryDsl as _;
 use diesel::SelectableHelper as _;
 use diesel_async::RunQueryDsl as _;
-use log::*;
 use moka::future::Cache;
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use tracing::*;
 
 use self::pathfinding::WarpEdge;
 
