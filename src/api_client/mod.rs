@@ -164,55 +164,21 @@ impl ApiClient {
     }
 
     pub async fn get_jumpgate_conns(&self, symbol: &WaypointSymbol) -> Vec<WaypointSymbol> {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct JumpGateResponse {
+            symbol: WaypointSymbol,
+            connections: Vec<WaypointSymbol>,
+        }
         let path = format!(
             "/systems/{}/waypoints/{}/jump-gate",
             symbol.system(),
             symbol
         );
-        let mut response: Value = self.get(&path).await;
-        let connections: Vec<WaypointSymbol> =
-            serde_json::from_value(response["data"]["connections"].take()).unwrap();
+        let JumpGateResponse {
+            symbol: _,
+            connections,
+        } = self.get::<Data<JumpGateResponse>>(&path).await.data;
         connections
-        // let path = format!(
-        //     "/systems/{}/waypoints/{}/jump-gate",
-        //     symbol.system(),
-        //     symbol
-        // );
-        // let (status, resp_body): (StatusCode, Result<Value, String>) =
-        //     self.request(Method::GET, &path, None::<&()>).await;
-        // let connections = match status {
-        //     StatusCode::OK => {
-        //         let mut response = resp_body.unwrap();
-        //         let connections: Vec<WaypointSymbol> =
-        //             serde_json::from_value(response["data"]["connections"].take()).unwrap();
-        //         JumpGateConnections::Charted(connections)
-        //     }
-        //     StatusCode::BAD_REQUEST => {
-        //         let response: Value = serde_json::from_str(&resp_body.unwrap_err()).unwrap();
-        //         let code = response["error"]["code"].as_i64().unwrap();
-        //         if code == 4001 {
-        //             // 400 {"error":{"message":"Waypoint X1-XS84-X11D is not accessible. Either the waypoint is uncharted or the agent has no ships present at the location.","code":4001,"data":{"waypointSymbol":"X1-XS84-X11D"}}}
-        //             JumpGateConnections::Uncharted
-        //         } else {
-        //             panic!(
-        //                 "Request failed: {} {} {}",
-        //                 status.as_u16(),
-        //                 Method::GET,
-        //                 path
-        //             );
-        //         }
-        //     }
-        //     _ => panic!(
-        //         "Request failed: {} {} {}",
-        //         status.as_u16(),
-        //         Method::GET,
-        //         path
-        //     ),
-        // };
-        // JumpGateInfo {
-        //     timestamp: chrono::Utc::now(),
-        //     connections,
-        // }
     }
 
     pub async fn get_all_pages<T>(&self, path: &str) -> Vec<T>

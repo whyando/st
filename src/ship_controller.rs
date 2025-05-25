@@ -260,7 +260,11 @@ impl ShipController {
             "symbol": good,
             "units": units,
         });
-        let TradeResponse { cargo, agent, transaction } = self
+        let TradeResponse {
+            cargo,
+            agent,
+            transaction,
+        } = self
             .api_client
             .post::<Data<TradeResponse>, _>(&uri, &body)
             .await
@@ -287,11 +291,13 @@ impl ShipController {
     }
 
     pub async fn buy_goods(&self, good: &str, units: i64, adjust_reserved_credits: bool) {
-        self.trade_good("purchase", good, units, adjust_reserved_credits).await;
+        self.trade_good("purchase", good, units, adjust_reserved_credits)
+            .await;
     }
 
     pub async fn sell_goods(&self, good: &str, units: i64, adjust_reserved_credits: bool) {
-        self.trade_good("sell", good, units, adjust_reserved_credits).await;
+        self.trade_good("sell", good, units, adjust_reserved_credits)
+            .await;
     }
 
     pub async fn sell_all_cargo(&self) {
@@ -321,7 +327,11 @@ impl ShipController {
             "symbol": good,
             "units": units,
         });
-        let cargo = self.api_client.post::<Data<ShipCargo>, _>(&uri, &body).await.data;
+        let cargo = self
+            .api_client
+            .post::<Data<ShipCargo>, _>(&uri, &body)
+            .await
+            .data;
         self.update_cargo(cargo).await;
     }
 
@@ -390,7 +400,12 @@ impl ShipController {
         } else {
             cargo_fuel
         };
-        let RefuelResponse { fuel, agent, cargo, transaction: _ } = self
+        let RefuelResponse {
+            fuel,
+            agent,
+            cargo,
+            transaction: _,
+        } = self
             .api_client
             .post::<Data<RefuelResponse>, _>(&uri, &body)
             .await
@@ -472,7 +487,12 @@ impl ShipController {
         self.debug(&format!("Jumping to waypoint: {}", waypoint));
         let uri = format!("/my/ships/{}/jump", self.ship_symbol);
         let body = json!({ "waypointSymbol": waypoint });
-        let JumpResponse { nav, cooldown, agent, transaction: _ } = self
+        let JumpResponse {
+            nav,
+            cooldown,
+            agent,
+            transaction: _,
+        } = self
             .api_client
             .post::<Data<JumpResponse>, _>(&uri, &body)
             .await
@@ -540,7 +560,10 @@ impl ShipController {
             "tradeSymbol": good,
             "units": units,
         });
-        let SupplyConstructionResponse { cargo, construction } = self
+        let SupplyConstructionResponse {
+            cargo,
+            construction,
+        } = self
             .api_client
             .post::<Data<SupplyConstructionResponse>, _>(&uri, &body)
             .await
@@ -717,7 +740,12 @@ impl ShipController {
         self.debug("Siphoning");
         let uri = format!("/my/ships/{}/siphon", self.ship_symbol);
         let body = json!({});
-        let SiphonResponse { cargo, cooldown, siphon, events } = self
+        let SiphonResponse {
+            cargo,
+            cooldown,
+            siphon,
+            events,
+        } = self
             .api_client
             .post::<Data<SiphonResponse>, _>(&uri, &body)
             .await

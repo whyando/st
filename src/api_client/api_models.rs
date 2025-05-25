@@ -87,6 +87,16 @@ impl WaypointDetailed {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShipPurchaseTransaction {
+    pub waypoint_symbol: WaypointSymbol,
+    pub ship_type: String,
+    pub price: i64,
+    pub agent_symbol: String,
+    pub timestamp: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrbitResponse {
     pub nav: models::ShipNav,
 }

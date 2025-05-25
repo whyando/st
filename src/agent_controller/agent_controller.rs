@@ -1,5 +1,5 @@
 use super::ledger::Ledger;
-use crate::api_client::api_models::WaypointDetailed;
+use crate::api_client::api_models::{ShipPurchaseTransaction, WaypointDetailed};
 use crate::broker::{CargoBroker, TransferActor};
 use crate::config::CONFIG;
 use crate::models::{ShipNavStatus::*, *};
@@ -185,6 +185,12 @@ impl AgentController {
         good: String,
         units: i64,
     ) {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct TransferResponse {
+            cargo: ShipCargo,
+            target_cargo: ShipCargo,
+        }
         debug!("agent_controller::transfer_cargo");
 
         self.debug(&format!(
@@ -197,26 +203,21 @@ impl AgentController {
             "tradeSymbol": &good,
             "units": &units,
         });
-        let mut response: Value = self.api_client.post(&uri, &body).await;
-        let cargo: ShipCargo = serde_json::from_value(response["data"]["cargo"].take()).unwrap();
+        let TransferResponse {
+            cargo,
+            target_cargo,
+        } = self
+            .api_client
+            .post::<Data<TransferResponse>, _>(&uri, &body)
+            .await
+            .data;
         let (src_ship, dest_ship) = {
             let src_ship = self.ships.get(&src_ship_symbol).unwrap();
             let dest_ship = self.ships.get(&dest_ship_symbol).unwrap();
             let mut src_ship = src_ship.lock().unwrap();
             let mut dest_ship = dest_ship.lock().unwrap();
-            let transferred: ShipCargoItem = {
-                let mut x = src_ship
-                    .cargo
-                    .inventory
-                    .iter()
-                    .find(|x| x.symbol == good)
-                    .unwrap()
-                    .clone();
-                x.units = units;
-                x
-            };
             src_ship.cargo = cargo;
-            dest_ship.incr_cargo(transferred);
+            dest_ship.cargo = target_cargo;
             (src_ship.clone(), dest_ship.clone())
         };
         self.emit_event(&Event::ShipUpdate(src_ship)).await;
@@ -461,18 +462,33 @@ impl AgentController {
     }
 
     async fn buy_ship(&self, shipyard: &WaypointSymbol, ship_model: &str) -> String {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct BuyShipResponse {
+            agent: Agent,
+            ship: Ship,
+            transaction: ShipPurchaseTransaction,
+        }
         self.debug(&format!("Buying {} at {}", &ship_model, &shipyard));
         let uri = "/my/ships";
         let body = json!({
             "shipType": ship_model,
             "waypointSymbol": shipyard,
         });
-        let mut response: Value = self.api_client.post(uri, &body).await;
-        let agent: Agent = serde_json::from_value(response["data"]["agent"].take()).unwrap();
-        let ship: Ship = serde_json::from_value(response["data"]["ship"].take()).unwrap();
-        // let transaction = response["data"]["transaction"].take();
+        let BuyShipResponse {
+            agent,
+            ship,
+            transaction,
+        } = self
+            .api_client
+            .post::<Data<BuyShipResponse>, _>(&uri, &body)
+            .await
+            .data;
         let ship_symbol = ship.symbol.clone();
-        self.debug(&format!("Successfully bought ship {}", ship_symbol));
+        self.debug(&format!(
+            "Successfully bought ship {} for ${}",
+            ship_symbol, transaction.price
+        ));
         self.update_agent(agent).await;
         self.ships
             .insert(ship_symbol.clone(), Arc::new(Mutex::new(ship)));
