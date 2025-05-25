@@ -1,6 +1,6 @@
 // use imageproc::drawing::*;
 // use imageproc::image::{Rgb, RgbImage};
-// use tracing::*;
+// use log::*;
 // use pathfinding::directed::dijkstra::dijkstra_all;
 // use quadtree_rs::{point::Point, Quadtree};
 // use st::api_client::ApiClient;

@@ -5,9 +5,9 @@ use crate::{
     ship_controller::ShipController,
     universe::pathfinding::EdgeType,
 };
+use log::*;
 use pathfinding::directed::dijkstra::dijkstra;
 use serde::{Deserialize, Serialize};
-use tracing::*;
 use ExplorerState::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

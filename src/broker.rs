@@ -1,10 +1,10 @@
+use log::*;
 use std::{
     collections::{BTreeMap, VecDeque},
     pin::Pin,
     sync::Arc,
 };
 use tokio::sync::{mpsc, oneshot, Mutex};
-use tracing::*;
 
 use crate::models::WaypointSymbol;
 
@@ -213,6 +213,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_cargo_broker() {
+        pretty_env_logger::formatted_timed_builder()
+            .is_test(true)
+            .filter_level(log::LevelFilter::Debug)
+            .try_init()
+            .ok();
         debug!("test_cargo_broker");
 
         let mock = MockTransferActor::new();

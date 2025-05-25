@@ -3,8 +3,8 @@ use crate::{
     universe::WaypointFilter,
 };
 use lazy_static::lazy_static;
+use log::*;
 use serde::{Deserialize, Serialize};
-use tracing::*;
 use SiphonShuttleState::*;
 
 lazy_static! {

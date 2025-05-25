@@ -1,3 +1,4 @@
+use log::*;
 use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
 use st::config::CONFIG;
@@ -7,17 +8,11 @@ use st::universe::Universe;
 use st::web_api_server::WebApiServer;
 use std::env;
 use std::sync::Arc;
-use tracing::*;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
 
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
-    let subscriber = tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::from_default_env())
-        .with(tracing_subscriber::fmt::layer());
-    subscriber.init();
+    pretty_env_logger::init_timed();
 
     let spacetraders_env = env::var("SPACETRADERS_ENV").unwrap();
     let faction = env::var("AGENT_FACTION").unwrap_or("".to_string());

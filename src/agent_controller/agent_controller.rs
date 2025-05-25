@@ -21,6 +21,7 @@ use crate::{
 use dashmap::DashMap;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
+use log::*;
 use pathfinding::directed::dijkstra::dijkstra_all;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -29,7 +30,6 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use strum::EnumString;
 use tokio::sync::mpsc::Sender;
-use tracing::*;
 
 #[derive(Clone, Debug)]
 pub enum Event {

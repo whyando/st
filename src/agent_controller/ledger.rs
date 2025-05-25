@@ -1,7 +1,7 @@
+/// Track the allocations of current credits of the agent
+use log::*;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
-/// Track the allocations of current credits of the agent
-use tracing::*;
 
 #[derive(Debug)]
 struct ShipEntry {

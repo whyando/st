@@ -26,10 +26,10 @@ use diesel_async::pooled_connection::deadpool::Pool;
 use diesel_async::pooled_connection::AsyncDieselConnectionManager;
 use diesel_async::AsyncPgConnection;
 use diesel_async::RunQueryDsl as _;
+use log::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
-use tracing::*;
 use uuid::Uuid;
 
 #[derive(Clone)]

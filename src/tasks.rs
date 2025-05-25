@@ -13,10 +13,10 @@ use crate::models::{LogisticsScriptConfig, MarketActivity::*};
 use crate::universe::{Universe, WaypointFilter};
 use chrono::{DateTime, Duration, Utc};
 use dashmap::DashMap;
+use log::*;
 use std::cmp::min;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, RwLock};
-use tracing::*;
 
 fn is_task_allowed(task: &Task, config: &LogisticsScriptConfig) -> bool {
     if let Some(waypoint_allowlist) = &config.waypoint_allowlist {
