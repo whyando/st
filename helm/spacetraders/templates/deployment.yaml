@@ -39,17 +39,11 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- if .Values.persistence.enabled }}
-          volumeMounts:
-            - name: data
-              mountPath: /app/data
-              subPath: data
-          {{- end }}
           env:
             - name: RUST_LOG
               value: info,st=debug
             - name: RUST_BACKTRACE
-              value: 0
+              value: "0"
             {{- toYaml .Values.env | nindent 12 }}            
       {{- with .Values.volumes }}
       volumes:
