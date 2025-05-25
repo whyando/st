@@ -1,0 +1,34 @@
+replicaCount: 1
+
+image:
+  repository: registry.jpa-dev.whyando.com/whyando/spacetraders
+  pullPolicy: IfNotPresent
+  tag: 0.2.0
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+resources: {}
+
+volumes: []
+
+volumeMounts: []
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
