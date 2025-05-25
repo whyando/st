@@ -142,24 +142,6 @@ impl DbClient {
             .await
     }
 
-    // pub async fn get_system(&self, symbol: &SystemSymbol) -> Option<System> {
-    //     self.get_value(&format!("systems/{}", symbol)).await
-    // }
-
-    // pub async fn save_system(&self, symbol: &SystemSymbol, system: &System) {
-    //     self.set_value(&format!("systems/{}", symbol), system).await
-    // }
-
-    // pub async fn get_system_waypoints(&self, symbol: &SystemSymbol) -> Option<Vec<Waypoint>> {
-    //     let key = format!("system_waypoints_2/{}", symbol);
-    //     self.get_value(&key).await
-    // }
-
-    // pub async fn save_system_waypoints(&self, symbol: &SystemSymbol, waypoints: &Vec<Waypoint>) {
-    //     let key = format!("system_waypoints_2/{}", symbol);
-    //     self.set_value(&key, waypoints).await
-    // }
-
     pub async fn get_market_remote(&self, symbol: &WaypointSymbol) -> Option<MarketRemoteView> {
         self.get_value(&format!("markets_remote/{}", symbol)).await
     }
