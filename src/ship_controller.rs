@@ -241,18 +241,16 @@ impl ShipController {
         assert!(!self.is_in_transit(), "Ship is in transit");
         match _type {
             "purchase" => {
+                self.debug(&format!("Buying {} units of {}", units, good));
                 assert!(
                     units <= self.cargo_capacity(),
                     "Ship can't hold that much cargo"
                 );
-                self.debug(&format!("Buying {} units of {}", units, good));
             }
             "sell" => {
                 self.debug(&format!("Selling {} units of {}", units, good));
             }
-            _ => {
-                panic!("Invalid trade type: {}", _type);
-            }
+            _ => panic!("Invalid trade type: {}", _type),
         }
         self.dock().await;
         let uri = format!("/my/ships/{}/{}", self.ship_symbol, _type);

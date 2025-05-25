@@ -24,7 +24,7 @@ use futures::stream::FuturesUnordered;
 use log::*;
 use pathfinding::directed::dijkstra::dijkstra_all;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};

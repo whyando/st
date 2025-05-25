@@ -6,7 +6,7 @@ use core::panic;
 use log::*;
 use reqwest::{self, Method, StatusCode};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::sync::{Arc, Mutex, RwLock};
 use tokio::time::Instant;
 
