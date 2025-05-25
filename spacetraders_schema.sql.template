@@ -56,20 +56,7 @@ CREATE TABLE IF NOT EXISTS ___SCHEMA___.systems (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     PRIMARY KEY (id)
 );
-
--- waypoint_details
-CREATE TABLE IF NOT EXISTS ___SCHEMA___.waypoint_details (
-    id BIGSERIAL NOT NULL,
-    waypoint_id bigint NOT NULL,
-    is_market boolean NOT NULL,
-    is_shipyard boolean NOT NULL,
-    is_uncharted boolean NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    is_under_construction boolean NOT NULL,
-    PRIMARY KEY (id)
-);
-CREATE UNIQUE INDEX IF NOT EXISTS waypoint_details_waypoint_idx ON ___SCHEMA___.waypoint_details USING btree (waypoint_id);
+CREATE UNIQUE INDEX IF NOT EXISTS systems_symbol ON ___SCHEMA___.systems USING btree (symbol);
 
 -- waypoints
 CREATE TABLE IF NOT EXISTS ___SCHEMA___.waypoints (
@@ -84,4 +71,18 @@ CREATE TABLE IF NOT EXISTS ___SCHEMA___.waypoints (
 );
 CREATE INDEX IF NOT EXISTS waypoints_system_idx ON ___SCHEMA___.waypoints USING btree (system_id);
 CREATE UNIQUE INDEX IF NOT EXISTS waypoints_unique_idx ON ___SCHEMA___.waypoints USING btree (symbol);
+
+-- waypoint_details
+CREATE TABLE IF NOT EXISTS ___SCHEMA___.waypoint_details (
+    id BIGSERIAL NOT NULL,
+    waypoint_id bigint NOT NULL,
+    is_market boolean NOT NULL,
+    is_shipyard boolean NOT NULL,
+    is_uncharted boolean NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    is_under_construction boolean NOT NULL,
+    PRIMARY KEY (id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS waypoint_details_waypoint_idx ON ___SCHEMA___.waypoint_details USING btree (waypoint_id);
 

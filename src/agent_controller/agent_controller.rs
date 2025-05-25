@@ -246,6 +246,8 @@ impl AgentController {
         };
 
         let system_symbol = agent.lock().unwrap().headquarters.system();
+        universe.ensure_system_loaded(&system_symbol).await;
+
         let job_assignments: DashMap<String, String> = db
             .get_value(&format!("{}/ship_assignments", callsign))
             .await

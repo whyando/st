@@ -38,7 +38,7 @@ async fn main() {
     // Startup Phase: register if not already registered, and load agent token
     let agent_token = match db.get_agent_token(&callsign).await {
         Some(token) => token,
-        None => {            
+        None => {
             let faction = match faction.as_str() {
                 "" => {
                     // Pick a random faction

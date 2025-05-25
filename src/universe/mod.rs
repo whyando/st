@@ -1,13 +1,12 @@
 pub mod pathfinding;
 
-
-use crate::api_client::api_models::WaypointDetailed;
+use crate::api_client::api_models::{self, WaypointDetailed};
 use crate::api_client::ApiClient;
 use crate::db::db_models;
 use crate::db::db_models::NewWaypointDetails;
 use crate::db::DbClient;
 use crate::models::{
-    Construction, Faction, Market, MarketRemoteView, Shipyard, ShipyardRemoteView, System,
+    Construction, Data, Faction, Market, MarketRemoteView, Shipyard, ShipyardRemoteView, System,
     SystemSymbol, Waypoint, WaypointSymbol, WithTimestamp,
 };
 use crate::models::{SymbolNameDescr, WaypointDetails};
@@ -166,7 +165,10 @@ impl Universe {
                 );
             }
         } else {
-            warn!("Only {} systems loaded out of {}", num_systems, status.stats.systems);
+            warn!(
+                "Only {} systems loaded out of {}",
+                num_systems, status.stats.systems
+            );
 
             // ### old systems.json loading code ###
             // use crate::api_client::api_models;
@@ -432,6 +434,102 @@ impl Universe {
             .clone()
     }
 
+    pub async fn ensure_system_loaded(&self, symbol: &SystemSymbol) {
+        if !self.systems.contains_key(symbol) {
+            self.load_system(symbol).await;
+        }
+        let system = self.systems.get(symbol).expect("System not found");
+        let all_details = !system.value().waypoints.iter().any(|w| w.details.is_none());
+        if !all_details {
+            self.load_system_waypoint_details(symbol).await;
+        }
+    }
+
+    // Fetch system info from API, insert to database and cache
+    pub async fn load_system(&self, symbol: &SystemSymbol) {
+        // 1. Get from API (single system)
+        let system: api_models::System = self
+            .api_client
+            .get::<Data<api_models::System>>(&format!("/systems/{}", symbol))
+            .await
+            .data;
+
+        // 2. Insert to database. tables: `systems` and `waypoints`
+        // Insert system
+        let system_insert = db_models::NewSystem {
+            symbol: system.symbol.as_str(),
+            type_: &system.system_type,
+            x: system.x as i32,
+            y: system.y as i32,
+        };
+        let system_id = self.db.insert_system(&system_insert).await;
+
+        // Insert waypoints
+        let waypoint_inserts = system
+            .waypoints
+            .iter()
+            .map(|w| db_models::NewWaypoint {
+                symbol: w.symbol.as_str(),
+                system_id: system_id,
+                type_: &w.waypoint_type,
+                x: w.x as i32,
+                y: w.y as i32,
+            })
+            .collect::<Vec<_>>();
+        let waypoint_ids = self.db.insert_waypoints(&waypoint_inserts).await;
+
+        let waypoint_id_map = std::iter::zip(waypoint_ids, waypoint_inserts)
+            .map(|(id, waypoint)| (waypoint.symbol.to_string(), id))
+            .collect::<std::collections::HashMap<_, _>>();
+
+        // 3. Finally load to cache
+        let system = System {
+            symbol: system.symbol.clone(),
+            system_type: system.system_type,
+            x: system.x,
+            y: system.y,
+            waypoints: system
+                .waypoints
+                .into_iter()
+                .map(|waypoint| Waypoint {
+                    id: waypoint_id_map[waypoint.symbol.as_str()],
+                    symbol: waypoint.symbol.clone(),
+                    waypoint_type: waypoint.waypoint_type,
+                    x: waypoint.x,
+                    y: waypoint.y,
+                    details: None,
+                })
+                .collect(),
+        };
+        self.systems.insert(system.symbol.clone(), system);
+    }
+
+    // Fetch waypoint details from API, insert to database and cache
+    pub async fn load_system_waypoint_details(&self, symbol: &SystemSymbol) {
+        return;
+        // let system = self.get_system(symbol).await;
+
+        // // 1. Fetch from API
+        // let waypoints: Vec<WaypointDetailed> = self
+        //     .api_client
+        //     .get_all_pages(&format!("/systems/{}/waypoints", symbol))
+        //     .await;
+
+        // // 2. Insert to database
+        // let waypoint_inserts = waypoints.iter().map(|w| db_models::NewWaypoint {
+        //     symbol: w.symbol.as_str(),
+        //     system_id: system.id,
+        //     type_: &w.waypoint_type,
+        //     x: w.x,
+        //     y: w.y,
+        // }).collect::<Vec<_>>();
+        // let waypoint_ids = self.db.insert_waypoints(&waypoint_inserts).await;
+
+        // // 3. Finally load to cache
+        // let waypoint_id_map = std::iter::zip(waypoint_ids, waypoint_inserts)
+        //     .map(|(id, waypoint)| (waypoint.symbol.to_string(), id))
+    }
+
     pub async fn get_system_waypoints(&self, symbol: &SystemSymbol) -> Vec<WaypointDetailed> {
         let system = self.get_system(symbol).await;
         // Collect Vec<Option<_>> to Option<Vec<_>>
@@ -465,8 +563,12 @@ impl Universe {
                         x: w.x,
                         y: w.y,
                         traits: traits,
-                        // faction: None,
                         is_under_construction: details.is_under_construction,
+                        orbitals: vec![],
+                        orbits: None,
+                        faction: None,
+                        modifiers: vec![],
+                        chart: None,
                     })
                 }
                 None => None,

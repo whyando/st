@@ -15,6 +15,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use dashmap::DashMap;
 use diesel::sql_types::{Integer, Text};
+use diesel::upsert::excluded;
 use diesel::ExpressionMethods as _;
 use diesel::OptionalExtension as _;
 use diesel::QueryDsl as _;
@@ -379,11 +380,57 @@ impl DbClient {
             .expect("DB Query error")
     }
 
-    pub async fn insert_systems(&self, systems: &Vec<db_models::NewSystem<'_>>) {
-        diesel::insert_into(systems::table)
-            .values(systems)
-            .execute(&mut self.conn().await)
-            .await
-            .expect("DB Query error");
+    pub async fn insert_systems(&self, system_inserts: &[db_models::NewSystem<'_>]) -> Vec<i64> {
+        let mut system_ids: Vec<i64> = vec![];
+        for chunk in system_inserts.chunks(1000) {
+            let ids: Vec<i64> = diesel::insert_into(systems::table)
+                .values(chunk)
+                .returning(systems::id)
+                .on_conflict(systems::symbol)
+                .do_update()
+                .set((
+                    // Use empty ON CONFLICT UPDATE set hack to return id
+                    // yes it's a hack, and empty updates have consequences, but it's okay here
+                    systems::symbol.eq(excluded(systems::symbol)),
+                ))
+                .get_results(&mut self.conn().await)
+                .await
+                .expect("DB Insert error");
+            assert_eq!(chunk.len(), ids.len());
+            system_ids.extend(ids);
+        }
+        assert_eq!(system_ids.len(), system_inserts.len());
+        system_ids
+    }
+
+    pub async fn insert_system(&self, system_insert: &db_models::NewSystem<'_>) -> i64 {
+        let ids = self
+            .insert_systems(std::slice::from_ref(system_insert))
+            .await;
+        assert_eq!(ids.len(), 1);
+        ids[0]
+    }
+
+    pub async fn insert_waypoints(&self, waypoints: &[db_models::NewWaypoint<'_>]) -> Vec<i64> {
+        let mut waypoint_ids: Vec<i64> = vec![];
+        for chunk in waypoints.chunks(1000) {
+            let ids: Vec<i64> = diesel::insert_into(waypoints::table)
+                .values(chunk)
+                .returning(waypoints::id)
+                .on_conflict(waypoints::symbol)
+                .do_update()
+                .set((
+                    // Use empty ON CONFLICT UPDATE set hack to return id
+                    // yes it's a hack, and empty updates have consequences, but it's okay here
+                    waypoints::symbol.eq(excluded(waypoints::symbol)),
+                ))
+                .get_results(&mut self.conn().await)
+                .await
+                .expect("DB Insert error");
+            assert_eq!(chunk.len(), ids.len());
+            waypoint_ids.extend(ids);
+        }
+        assert_eq!(waypoint_ids.len(), waypoints.len());
+        waypoint_ids
     }
 }

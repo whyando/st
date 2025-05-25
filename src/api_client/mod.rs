@@ -341,18 +341,17 @@ impl ApiClient {
         let response = request.send().await.expect("Failed to send request");
         let status = response.status();
         debug!("{} {} {}", status.as_u16(), method, path);
+        let body = response.text().await.unwrap();
 
         if status.is_success() {
-            let content = response
-                .json::<T>()
-                .await
-                .expect("Failed to parse successful response as json");
+            let content: T = serde_json::from_str(&body)
+                .map_err(|e| {
+                    error!("Unable to parse response as json: {}\nbody: {}", e, body);
+                    panic!("Deserialisation failed");
+                })
+                .unwrap();
             (status, Ok(content))
         } else {
-            let body = response
-                .text()
-                .await
-                .expect("Failed to read response body from failed request");
             (status, Err(body))
         }
     }
