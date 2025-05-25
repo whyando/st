@@ -1,6 +1,6 @@
 pub mod pathfinding;
 
-use crate::api_client::api_models;
+
 use crate::api_client::api_models::WaypointDetailed;
 use crate::api_client::ApiClient;
 use crate::db::db_models;
@@ -14,7 +14,6 @@ use crate::models::{SymbolNameDescr, WaypointDetails};
 use crate::pathfinding::{Pathfinding, Route};
 use crate::schema::*;
 use dashmap::DashMap;
-use diesel::upsert::excluded;
 use diesel::BelongingToDsl as _;
 use diesel::ExpressionMethods as _;
 use diesel::GroupedBy as _;
@@ -167,97 +166,102 @@ impl Universe {
                 );
             }
         } else {
-            let systems: Vec<api_models::System> = self.api_client.get("/systems.json").await;
-            let system_inserts = systems
-                .iter()
-                .map(|system| db_models::NewSystem {
-                    symbol: system.symbol.as_str(),
-                    type_: &system.system_type,
-                    x: system.x as i32,
-                    y: system.y as i32,
-                })
-                .collect::<Vec<_>>();
-            info!("Inserting {} systems", system_inserts.len());
-            let mut system_ids: Vec<i64> = vec![];
-            for chunk in system_inserts.chunks(1000) {
-                let ids: Vec<i64> = diesel::insert_into(systems::table)
-                    .values(chunk)
-                    .returning(systems::id)
-                    .on_conflict(systems::symbol)
-                    .do_update()
-                    .set((
-                        // Use empty ON CONFLICT UPDATE set hack to return id
-                        // yes it's a hack, and empty updates have consequences, but it's okay here
-                        systems::symbol.eq(excluded(systems::symbol)),
-                    ))
-                    .get_results(&mut self.db.conn().await)
-                    .await
-                    .expect("DB Insert error");
-                assert_eq!(chunk.len(), ids.len());
-                system_ids.extend(ids);
-            }
-            assert_eq!(system_ids.len(), system_inserts.len());
+            warn!("Only {} systems loaded out of {}", num_systems, status.stats.systems);
 
-            let waypoint_inserts = std::iter::zip(system_ids, systems.iter())
-                .flat_map(|(system_id, system)| {
-                    system
-                        .waypoints
-                        .iter()
-                        .map(move |waypoint| db_models::NewWaypoint {
-                            symbol: waypoint.symbol.as_str(),
-                            system_id: system_id,
-                            type_: waypoint.waypoint_type.as_str(),
-                            x: waypoint.x as i32,
-                            y: waypoint.y as i32,
-                        })
-                })
-                .collect::<Vec<_>>();
-            info!("Inserting {} waypoints", waypoint_inserts.len());
-            let mut waypoint_ids: Vec<i64> = vec![];
-            for chunk in waypoint_inserts.chunks(1000) {
-                let ids: Vec<i64> = diesel::insert_into(waypoints::table)
-                    .values(chunk)
-                    .on_conflict(waypoints::symbol)
-                    .do_update()
-                    .set((
-                        // as above, use empty ON CONFLICT UPDATE set hack to return id
-                        // yes it's a hack, and empty updates have consequences, but it's okay here
-                        waypoints::symbol.eq(excluded(waypoints::symbol)),
-                    ))
-                    .returning(waypoints::id)
-                    .get_results(&mut self.db.conn().await)
-                    .await
-                    .expect("DB Insert error");
-                assert_eq!(chunk.len(), ids.len());
-                waypoint_ids.extend(ids);
-            }
-            assert_eq!(waypoint_ids.len(), waypoint_inserts.len());
+            // ### old systems.json loading code ###
+            // use crate::api_client::api_models;
+            // use diesel::upsert::excluded;
+            // let systems: Vec<api_models::System> = self.api_client.get("/systems.json").await;
+            // let system_inserts = systems
+            //     .iter()
+            //     .map(|system| db_models::NewSystem {
+            //         symbol: system.symbol.as_str(),
+            //         type_: &system.system_type,
+            //         x: system.x as i32,
+            //         y: system.y as i32,
+            //     })
+            //     .collect::<Vec<_>>();
+            // info!("Inserting {} systems", system_inserts.len());
+            // let mut system_ids: Vec<i64> = vec![];
+            // for chunk in system_inserts.chunks(1000) {
+            //     let ids: Vec<i64> = diesel::insert_into(systems::table)
+            //         .values(chunk)
+            //         .returning(systems::id)
+            //         .on_conflict(systems::symbol)
+            //         .do_update()
+            //         .set((
+            //             // Use empty ON CONFLICT UPDATE set hack to return id
+            //             // yes it's a hack, and empty updates have consequences, but it's okay here
+            //             systems::symbol.eq(excluded(systems::symbol)),
+            //         ))
+            //         .get_results(&mut self.db.conn().await)
+            //         .await
+            //         .expect("DB Insert error");
+            //     assert_eq!(chunk.len(), ids.len());
+            //     system_ids.extend(ids);
+            // }
+            // assert_eq!(system_ids.len(), system_inserts.len());
 
-            let waypoint_id_map = std::iter::zip(waypoint_ids, waypoint_inserts)
-                .map(|(id, waypoint)| (waypoint.symbol.to_string(), id))
-                .collect::<std::collections::HashMap<_, _>>();
+            // let waypoint_inserts = std::iter::zip(system_ids, systems.iter())
+            //     .flat_map(|(system_id, system)| {
+            //         system
+            //             .waypoints
+            //             .iter()
+            //             .map(move |waypoint| db_models::NewWaypoint {
+            //                 symbol: waypoint.symbol.as_str(),
+            //                 system_id: system_id,
+            //                 type_: waypoint.waypoint_type.as_str(),
+            //                 x: waypoint.x as i32,
+            //                 y: waypoint.y as i32,
+            //             })
+            //     })
+            //     .collect::<Vec<_>>();
+            // info!("Inserting {} waypoints", waypoint_inserts.len());
+            // let mut waypoint_ids: Vec<i64> = vec![];
+            // for chunk in waypoint_inserts.chunks(1000) {
+            //     let ids: Vec<i64> = diesel::insert_into(waypoints::table)
+            //         .values(chunk)
+            //         .on_conflict(waypoints::symbol)
+            //         .do_update()
+            //         .set((
+            //             // as above, use empty ON CONFLICT UPDATE set hack to return id
+            //             // yes it's a hack, and empty updates have consequences, but it's okay here
+            //             waypoints::symbol.eq(excluded(waypoints::symbol)),
+            //         ))
+            //         .returning(waypoints::id)
+            //         .get_results(&mut self.db.conn().await)
+            //         .await
+            //         .expect("DB Insert error");
+            //     assert_eq!(chunk.len(), ids.len());
+            //     waypoint_ids.extend(ids);
+            // }
+            // assert_eq!(waypoint_ids.len(), waypoint_inserts.len());
 
-            for system in systems.into_iter() {
-                let system = System {
-                    symbol: system.symbol.clone(),
-                    system_type: system.system_type,
-                    x: system.x,
-                    y: system.y,
-                    waypoints: system
-                        .waypoints
-                        .into_iter()
-                        .map(|waypoint| Waypoint {
-                            id: waypoint_id_map[waypoint.symbol.as_str()],
-                            symbol: waypoint.symbol.clone(),
-                            waypoint_type: waypoint.waypoint_type,
-                            x: waypoint.x,
-                            y: waypoint.y,
-                            details: None,
-                        })
-                        .collect(),
-                };
-                self.systems.insert(system.symbol.clone(), system);
-            }
+            // let waypoint_id_map = std::iter::zip(waypoint_ids, waypoint_inserts)
+            //     .map(|(id, waypoint)| (waypoint.symbol.to_string(), id))
+            //     .collect::<std::collections::HashMap<_, _>>();
+
+            // for system in systems.into_iter() {
+            //     let system = System {
+            //         symbol: system.symbol.clone(),
+            //         system_type: system.system_type,
+            //         x: system.x,
+            //         y: system.y,
+            //         waypoints: system
+            //             .waypoints
+            //             .into_iter()
+            //             .map(|waypoint| Waypoint {
+            //                 id: waypoint_id_map[waypoint.symbol.as_str()],
+            //                 symbol: waypoint.symbol.clone(),
+            //                 waypoint_type: waypoint.waypoint_type,
+            //                 x: waypoint.x,
+            //                 y: waypoint.y,
+            //                 details: None,
+            //             })
+            //             .collect(),
+            //     };
+            //     self.systems.insert(system.symbol.clone(), system);
+            // }
         }
     }
 

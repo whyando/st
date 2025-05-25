@@ -5,7 +5,7 @@ use crate::models::*;
 use core::panic;
 use log::*;
 use reqwest::{self, Method, StatusCode};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex, RwLock};
 use tokio::time::Instant;
@@ -60,17 +60,6 @@ impl ApiClient {
     }
 
     pub async fn register(&self, faction: &str, callsign: &str) -> String {
-        let faction = match faction {
-            "" => {
-                let factions: Vec<Faction> = self.get_all_pages("/factions").await;
-                let factions: Vec<Faction> =
-                    factions.into_iter().filter(|f| f.is_recruiting).collect();
-                use rand::prelude::IndexedRandom as _;
-                let faction = factions.choose(&mut rand::rng()).unwrap();
-                faction.symbol.clone()
-            }
-            _ => faction.to_string(),
-        };
         assert!(
             self.agent_token().is_none(),
             "Cannot register while agent token is already set"
@@ -83,14 +72,18 @@ impl ApiClient {
             "faction": faction,
             "symbol": callsign,
         });
-        let mut body: Value = self.post("/register", &req_body).await;
-        let _agent: Agent = serde_json::from_value(body["data"]["agent"].take()).unwrap();
-        let _contract: Contract = serde_json::from_value(body["data"]["contract"].take()).unwrap();
-        let _faction: Faction = serde_json::from_value(body["data"]["faction"].take()).unwrap();
-        let _ship: Ship = serde_json::from_value(body["data"]["ship"].take()).unwrap();
-        let token: String = body["data"]["token"].as_str().unwrap().to_string();
 
-        token
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct RegisterResponse {
+            agent: Agent,
+            contract: Contract,
+            faction: Faction,
+            ships: Vec<Ship>,
+            token: String,
+        }
+
+        let body: Data<RegisterResponse> = self.post("/register", &req_body).await;
+        body.data.token
     }
 
     pub async fn get_agent(&self) -> Agent {

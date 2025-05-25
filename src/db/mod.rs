@@ -92,11 +92,6 @@ impl DbClient {
         conn.batch_execute(&sql).await.unwrap();
     }
 
-    // @@ TODO: remove this
-    pub fn reset_date(&self) -> &str {
-        ""
-    }
-
     pub async fn conn(&self) -> Object<AsyncPgConnection> {
         self.db
             .get()

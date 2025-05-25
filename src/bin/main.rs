@@ -3,6 +3,7 @@ use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
 use st::config::CONFIG;
 use st::db::DbClient;
+use st::models::Faction;
 use st::universe::Universe;
 use st::web_api_server::WebApiServer;
 use std::env;
@@ -37,7 +38,20 @@ async fn main() {
     // Startup Phase: register if not already registered, and load agent token
     let agent_token = match db.get_agent_token(&callsign).await {
         Some(token) => token,
-        None => {
+        None => {            
+            let faction = match faction.as_str() {
+                "" => {
+                    // Pick a random faction
+                    let factions: Vec<Faction> = api_client.get_all_pages("/factions").await;
+                    let factions: Vec<Faction> =
+                        factions.into_iter().filter(|f| f.is_recruiting).collect();
+                    use rand::prelude::IndexedRandom as _;
+                    let faction = factions.choose(&mut rand::rng()).unwrap();
+                    info!("Picked faction {}", faction.symbol);
+                    faction.symbol.clone()
+                }
+                _ => faction.to_string(),
+            };
             let token = api_client.register(&faction, &callsign).await;
             db.save_agent_token(&callsign, &token).await;
             token

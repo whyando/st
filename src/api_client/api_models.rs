@@ -90,12 +90,4 @@ mod test {
         );
         assert_eq!(waypoints.data.len(), 10);
     }
-
-    #[test]
-    fn test_system_dot_json() {
-        // get /systems.json response
-        let json = r#"[{"symbol":"X1-HN18","sectorSymbol":"X1","type":"ORANGE_STAR","x":-4792,"y":-5050,"waypoints":[{"symbol":"X1-HN18-ZX1B","type":"GAS_GIANT","x":16,"y":3,"orbitals":[]},{"symbol":"X1-HN18-DD4X","type":"ASTEROID","x":116,"y":-713,"orbitals":[]},{"symbol":"X1-HN18-EB5E","type":"ASTEROID","x":694,"y":249,"orbitals":[]},{"symbol":"X1-HN18-ED6Z","type":"ASTEROID","x":-464,"y":573,"orbitals":[]},{"symbol":"X1-HN18-XC8X","type":"ASTEROID","x":-371,"y":619,"orbitals":[]},{"symbol":"X1-HN18-FB9Z","type":"ASTEROID","x":-228,"y":724,"orbitals":[]},{"symbol":"X1-HN18-FB2D","type":"ASTEROID","x":-621,"y":-423,"orbitals":[]},{"symbol":"X1-HN18-CD7D","type":"ASTEROID","x":-203,"y":733,"orbitals":[]},{"symbol":"X1-HN18-DB3Z","type":"ASTEROID","x":-28,"y":-779,"orbitals":[]},{"symbol":"X1-HN18-F10F","type":"ASTEROID","x":-510,"y":-532,"orbitals":[]}],"factions":[]}]"#;
-        let systems: Vec<System> = serde_json::from_str(json).unwrap();
-        assert_eq!(systems[0].symbol, SystemSymbol::new("X1-HN18"));
-    }
 }
