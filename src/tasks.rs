@@ -265,7 +265,16 @@ impl LogisticTaskManager {
                     ],
                 )
                 .await;
-            assert_eq!(microprocessor_market.len(), 1);
+            assert!(microprocessor_market.len() >= 1);
+            if microprocessor_market.len() > 1 {
+                warn!(
+                    "Found multiple microprocessor markets: {:?}",
+                    microprocessor_market
+                        .iter()
+                        .map(|m| m.symbol.clone())
+                        .collect::<Vec<_>>()
+                );
+            }
             let microprocessor_market = &microprocessor_market[0].symbol;
 
             for material in &construction.materials {

@@ -385,14 +385,16 @@ impl AgentController {
                         None
                     }
                 }
-                AgentEra::StartingSystem2 => {
-                    let jumpgate_finished = self.is_jumpgate_finished().await;
-                    if jumpgate_finished {
-                        Some(AgentEra::InterSystem1)
-                    } else {
-                        None
-                    }
-                }
+                // Disable advancement to intersystem1 for now
+                // AgentEra::StartingSystem2 => {
+                //     let jumpgate_finished = self.is_jumpgate_finished().await;
+                //     if jumpgate_finished {
+                //         Some(AgentEra::InterSystem1)
+                //     } else {
+                //         None
+                //     }
+                // }
+                AgentEra::StartingSystem2 => None,
                 AgentEra::InterSystem1 => None,
                 AgentEra::InterSystem2 => None,
             };

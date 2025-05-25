@@ -1,4 +1,5 @@
 use log::*;
+use reqwest::StatusCode;
 use st::agent_controller::AgentController;
 use st::api_client::ApiClient;
 use st::config::CONFIG;
@@ -24,7 +25,15 @@ async fn main() {
     info!("Loaded config: {:?}", *CONFIG);
 
     let api_client = ApiClient::new();
-    let status = api_client.status().await;
+    let (status_code, status) = api_client.status().await;
+    let status = match status_code {
+        StatusCode::OK => status.unwrap(),
+        _ => {
+            error!("Failed to get status: {}\nbody: {:?}", status_code, status);
+            panic!("Failed to get status");
+            // TODO: handle 503 maintenance mode by repeating
+        }
+    };
 
     info!("Spacetraders env: {:?}", spacetraders_env);
     info!("Reset date: {:?}", status.reset_date);

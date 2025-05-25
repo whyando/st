@@ -85,7 +85,7 @@ impl Universe {
     }
 
     async fn init_systems(&self) {
-        let status = self.api_client.status().await;
+        let status = self.api_client.status().await.1.unwrap();
         let query_start = std::time::Instant::now();
         let systems: Vec<db_models::System> = systems::table
             .select(db_models::System::as_select())

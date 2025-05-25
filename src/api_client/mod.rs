@@ -51,8 +51,12 @@ impl ApiClient {
         *agent_token = Some(token.to_string());
     }
 
-    pub async fn status(&self) -> Status {
-        self.get("/").await
+    // pub async fn status(&self) -> Status {
+    //     self.get("/").await
+    // }
+
+    pub async fn status(&self) -> (StatusCode, Result<Status, String>) {
+        self.request(Method::GET, "/", None::<&()>).await
     }
 
     pub fn agent_token(&self) -> Option<String> {
