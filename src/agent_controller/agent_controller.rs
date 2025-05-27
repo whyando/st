@@ -20,7 +20,6 @@ use crate::{
 };
 use dashmap::DashMap;
 use futures::future::BoxFuture;
-use futures::stream::FuturesUnordered;
 use log::*;
 use pathfinding::directed::dijkstra::dijkstra_all;
 use serde::{Deserialize, Serialize};
@@ -30,6 +29,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use strum::EnumString;
 use tokio::sync::mpsc::Sender;
+use tokio_util::task::task_tracker::TaskTracker;
 
 #[derive(Clone, Debug)]
 pub enum Event {
@@ -96,7 +96,7 @@ pub struct AgentController {
     probe_jumpgate_reservations: Arc<DashMap<String, WaypointSymbol>>,
     explorer_reservations: Arc<DashMap<String, SystemSymbol>>,
 
-    hdls: Arc<JoinHandles>,
+    handles: Arc<TaskTracker>,
     pub task_manager: Arc<LogisticTaskManager>,
     pub survey_manager: Arc<SurveyManager>,
     pub cargo_broker: Arc<CargoBroker>,
@@ -283,8 +283,7 @@ impl AgentController {
             db: db.clone(),
             universe: universe.clone(),
             listeners: Arc::new(Mutex::new(Vec::new())),
-            // ship_futs: Arc::new(Mutex::new(VecDeque::new())),
-            hdls: Arc::new(JoinHandles::new()),
+            handles: Arc::new(TaskTracker::new()),
             ship_config: Arc::new(Mutex::new(vec![])),
             job_assignments: Arc::new(job_assignments),
             job_assignments_rev: Arc::new(job_assignments_rev),
@@ -817,12 +816,11 @@ impl AgentController {
     pub async fn run_ships(&self) {
         let self_clone = self.clone();
         {
-            let join_hdl = tokio::spawn(async move {
+            debug!("spawn_broker try push join_hdl");
+            self.handles.spawn(async move {
                 let broker = self_clone.cargo_broker.clone();
                 broker.run(Box::new(self_clone)).await;
             });
-            debug!("spawn_broker try push join_hdl");
-            self.hdls.push(join_hdl).await;
             debug!("spawn_broker pushed join_hdl");
         }
 
@@ -831,13 +829,16 @@ impl AgentController {
         let (_bought, _tasks) = self.try_buy_ships(None).await;
 
         let self_clone = self.clone();
-        let start = tokio::spawn(async move {
+        debug!("spawn_ships try push join_hdl");
+        self.handles.spawn(async move {
             for ship in self_clone.ships.iter() {
                 let ship_symbol = ship.key().clone();
                 self_clone.spawn_run_ship(ship_symbol).await;
             }
         });
-        self.hdls.wait_all(Some(start)).await;
+        debug!("spawn_ships pushed join_hdl");
+
+        self.handles.wait().await;
         info!("All ships have completed their tasks");
     }
 
@@ -889,10 +890,11 @@ impl AgentController {
         let scrap = CONFIG.scrap_all_ships || (job_id_opt.is_none() && CONFIG.scrap_unassigned);
         if scrap {
             let ship_controller = self.ship_controller(&ship_symbol);
-            let join_hdl = tokio::spawn(async move {
+            debug!("spawn_run_ship try push join_hdl");
+            self.handles.spawn(async move {
                 ship_scripts::scrap::run(ship_controller).await;
             });
-            self.hdls.push(join_hdl).await;
+            debug!("spawn_run_ship pushed join_hdl");
             return;
         }
 
@@ -934,62 +936,69 @@ impl AgentController {
                 }
 
                 // run script for assigned job
-                let join_hdl = match &job_spec.behaviour {
+                debug!("spawn_run_ship try push join_hdl");
+                match &job_spec.behaviour {
                     ShipBehaviour::Probe(config) => {
                         let config = config.clone();
-                        tokio::spawn(async move {
+                        self.handles.spawn(async move {
                             ship_scripts::probe::run(ship_controller, &config).await;
-                        })
+                        });
                     }
                     ShipBehaviour::Logistics(config) => {
                         let db = self.db.clone();
                         let task_manager = self.task_manager.clone();
                         let config = config.clone();
-                        tokio::spawn(async move {
+                        self.handles.spawn(async move {
                             ship_scripts::logistics::run(ship_controller, db, task_manager, config)
                                 .await;
-                        })
+                        });
                     }
-                    ShipBehaviour::SiphonDrone => tokio::spawn(async move {
-                        ship_scripts::siphon::run_drone(ship_controller).await;
-                    }),
+                    ShipBehaviour::SiphonDrone => {
+                        self.handles.spawn(async move {
+                            ship_scripts::siphon::run_drone(ship_controller).await;
+                        });
+                    }
                     ShipBehaviour::SiphonShuttle => {
                         let db = self.db.clone();
-                        tokio::spawn(async move {
+                        self.handles.spawn(async move {
                             ship_scripts::siphon::run_shuttle(ship_controller, db).await;
-                        })
+                        });
                     }
-                    ShipBehaviour::MiningDrone => tokio::spawn(async move {
-                        ship_scripts::mining::run_mining_drone(ship_controller).await;
-                    }),
+                    ShipBehaviour::MiningDrone => {
+                        self.handles.spawn(async move {
+                            ship_scripts::mining::run_mining_drone(ship_controller).await;
+                        });
+                    }
                     ShipBehaviour::MiningShuttle => {
                         let db = self.db.clone();
-                        tokio::spawn(async move {
+                        self.handles.spawn(async move {
                             ship_scripts::mining::run_shuttle(ship_controller, db).await;
-                        })
+                        });
                     }
-                    ShipBehaviour::MiningSurveyor => tokio::spawn(async move {
-                        ship_scripts::mining::run_surveyor(ship_controller).await;
-                    }),
+                    ShipBehaviour::MiningSurveyor => {
+                        self.handles.spawn(async move {
+                            ship_scripts::mining::run_surveyor(ship_controller).await;
+                        });
+                    }
                     ShipBehaviour::ConstructionHauler => {
                         let db = self.db.clone();
-                        tokio::spawn(async move {
+                        self.handles.spawn(async move {
                             ship_scripts::construction::run_hauler(ship_controller, db).await;
-                        })
+                        });
                     }
-                    ShipBehaviour::JumpgateProbe => tokio::spawn(async move {
-                        ship_scripts::probe_exploration::run_jumpgate_probe(ship_controller).await;
-                    }),
+                    ShipBehaviour::JumpgateProbe => {
+                        self.handles.spawn(async move {
+                            ship_scripts::probe_exploration::run_jumpgate_probe(ship_controller)
+                                .await;
+                        });
+                    }
                     ShipBehaviour::Explorer => {
                         let db = self.db.clone();
-                        tokio::spawn(async move {
+                        self.handles.spawn(async move {
                             ship_scripts::exploration::run_explorer(ship_controller, db).await;
-                        })
+                        });
                     }
                 };
-                debug!("spawn_run_ship try push join_hdl");
-                self.hdls.push(join_hdl).await;
-                // self.ship_futs.lock().unwrap().push_back(join_hdl);
                 debug!("spawn_run_ship pushed join_hdl");
             }
             None => {
@@ -1119,51 +1128,5 @@ impl AgentController {
     pub fn set_state_description(&self, ship_symbol: &str, desc: &str) {
         self.ship_state_description
             .insert(ship_symbol.to_string(), desc.to_string());
-    }
-}
-
-// ! todo: replace JoinHandles with TaskTracker from tokio-util (or tokio::task::join_set::JoinSet also from tokio-util)
-// https://docs.rs/tokio-util/0.7.10/tokio_util/task/task_tracker/struct.TaskTracker.html
-use tokio::task::JoinHandle;
-
-#[derive(Debug)]
-struct JoinHandles {
-    handles: Arc<Mutex<FuturesUnordered<JoinHandle<()>>>>,
-    rx: Arc<Mutex<tokio::sync::mpsc::Receiver<JoinHandle<()>>>>,
-    tx: tokio::sync::mpsc::Sender<JoinHandle<()>>,
-}
-impl JoinHandles {
-    fn new() -> Self {
-        let (tx, rx) = tokio::sync::mpsc::channel::<JoinHandle<()>>(1);
-        Self {
-            handles: Arc::new(Mutex::new(FuturesUnordered::new())),
-            rx: Arc::new(Mutex::new(rx)),
-            tx,
-        }
-    }
-    async fn push(&self, handle: tokio::task::JoinHandle<()>) {
-        self.tx.send(handle).await.unwrap();
-    }
-    async fn wait_all(&self, start: Option<tokio::task::JoinHandle<()>>) {
-        use futures::StreamExt as _;
-        let mut handles = self.handles.lock().unwrap();
-        let mut rx = self.rx.lock().unwrap();
-
-        if let Some(start) = start {
-            debug!("JoinHandles::wait_all: adding new (start) handle");
-            handles.push(start);
-        }
-        loop {
-            tokio::select! {
-                hdl_ret = handles.next() => {
-                    hdl_ret.unwrap().unwrap();
-                    debug!("JoinHandles::wait_all: handle completed");
-                }
-                handle = rx.recv() => {
-                    debug!("JoinHandles::wait_all: adding new handle");
-                    handles.push(handle.unwrap());
-                }
-            }
-        }
     }
 }
