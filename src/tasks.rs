@@ -182,12 +182,12 @@ impl LogisticTaskManager {
             .expect("Star system has no jump gate");
 
         // Markets deemed critical enough to be the exclusive recipient of certain goods
-        let mut good_import_permits = BTreeMap::<String, Vec<WaypointSymbol>>::new();
+        let mut good_import_permits = BTreeMap::<&'static str, Vec<WaypointSymbol>>::new();
         // Goods where their flow is more important that prices (bypasses the STRONG MODERATE condition)
-        let mut good_req_constant_flow = BTreeSet::<String>::new();
+        let mut good_req_constant_flow = BTreeSet::<&'static str>::new();
         // Markets where we would like to cap the amount of units we import once we reach a target evolution
         // to prevent overevolution and yo-yo behaviours
-        let mut market_capped_import = BTreeMap::<(WaypointSymbol, String), i64>::new();
+        let mut market_capped_import = BTreeMap::<(WaypointSymbol, &'static str), i64>::new();
 
         let construction = self.universe.get_construction(&jump_gate.symbol).await;
         let mut construction = match &construction.data {
@@ -200,7 +200,7 @@ impl LogisticTaskManager {
         }
 
         if let Some(construction) = &construction {
-            let fab_mat_market = self
+            let fab_mat_markets = self
                 .universe
                 .search_waypoints(
                     &system_symbol,
@@ -211,9 +211,8 @@ impl LogisticTaskManager {
                     ],
                 )
                 .await;
-            assert_eq!(fab_mat_market.len(), 1);
-            let fab_mat_market = &fab_mat_market[0].symbol;
-            let smeltery_market = self
+            assert!(fab_mat_markets.len() >= 1);
+            let smeltery_markets = self
                 .universe
                 .search_waypoints(
                     &system_symbol,
@@ -225,9 +224,8 @@ impl LogisticTaskManager {
                     ],
                 )
                 .await;
-            assert_eq!(smeltery_market.len(), 1);
-            let smeltery_market = &smeltery_market[0].symbol;
-            let adv_circuit_market = self
+            assert!(smeltery_markets.len() >= 1);
+            let adv_circuit_markets = self
                 .universe
                 .search_waypoints(
                     &system_symbol,
@@ -238,19 +236,9 @@ impl LogisticTaskManager {
                     ],
                 )
                 .await;
-            assert!(adv_circuit_market.len() >= 1);
-            if adv_circuit_market.len() > 1 {
-                warn!(
-                    "Found multiple advanced circuit markets: {:?}",
-                    adv_circuit_market
-                        .iter()
-                        .map(|m| m.symbol.clone())
-                        .collect::<Vec<_>>()
-                );
-            }
-            let adv_circuit_market = &adv_circuit_market[0].symbol;
+            assert!(adv_circuit_markets.len() >= 1);
 
-            let electronics_market = self
+            let electronics_markets = self
                 .universe
                 .search_waypoints(
                     &system_symbol,
@@ -261,18 +249,8 @@ impl LogisticTaskManager {
                     ],
                 )
                 .await;
-            assert!(electronics_market.len() >= 1);
-            if electronics_market.len() > 1 {
-                warn!(
-                    "Found multiple electronics markets: {:?}",
-                    electronics_market
-                        .iter()
-                        .map(|m| m.symbol.clone())
-                        .collect::<Vec<_>>()
-                );
-            }
-            let electronics_market = &electronics_market[0].symbol;
-            let microprocessor_market = self
+            assert!(electronics_markets.len() >= 1);
+            let microprocessor_markets = self
                 .universe
                 .search_waypoints(
                     &system_symbol,
@@ -283,146 +261,114 @@ impl LogisticTaskManager {
                     ],
                 )
                 .await;
-            assert!(microprocessor_market.len() >= 1);
-            if microprocessor_market.len() > 1 {
-                warn!(
-                    "Found multiple microprocessor markets: {:?}",
-                    microprocessor_market
-                        .iter()
-                        .map(|m| m.symbol.clone())
-                        .collect::<Vec<_>>()
-                );
-            }
-            let microprocessor_market = &microprocessor_market[0].symbol;
+            assert!(microprocessor_markets.len() >= 1);
 
-            for material in &construction.materials {
-                if material.fulfilled >= material.required {
-                    continue;
+            let fab_mats = construction
+                .materials
+                .iter()
+                .find(|m| m.trade_symbol == "FAB_MATS")
+                .unwrap();
+            let adv_circuit = construction
+                .materials
+                .iter()
+                .find(|m| m.trade_symbol == "ADVANCED_CIRCUITRY")
+                .unwrap();
+
+            // FAB_MATS
+            if fab_mats.fulfilled < fab_mats.required {
+                // Clear all imports for the FAB_MAT chain
+                good_import_permits.insert("FAB_MATS", vec![]);
+                good_import_permits.insert("IRON", vec![]);
+                good_import_permits.insert("QUARTZ_SAND", vec![]);
+                good_import_permits.insert("IRON_ORE", vec![]);
+
+                for market in &fab_mat_markets {
+                    good_import_permits
+                        .get_mut("IRON")
+                        .unwrap()
+                        .push(market.symbol.clone());
+                    good_import_permits
+                        .get_mut("QUARTZ_SAND")
+                        .unwrap()
+                        .push(market.symbol.clone());
                 }
-                // Don't trade goods for profit if we need them for construction
-                match material.trade_symbol.as_str() {
-                    "FAB_MATS" => {
-                        // fab_mat_market
-                        good_import_permits
-                            .entry("IRON".to_string())
-                            .or_default()
-                            .push(fab_mat_market.clone());
-                        good_import_permits
-                            .entry("QUARTZ_SAND".to_string())
-                            .or_default()
-                            .push(fab_mat_market.clone());
-                        // smeltery_market
-                        good_import_permits
-                            .entry("IRON_ORE".to_string())
-                            .or_default()
-                            .push(smeltery_market.clone());
-                        good_req_constant_flow.insert("IRON".to_string());
-                        // iron: cap evolution at 120 (double initial trade volume)
-                        market_capped_import
-                            .insert((fab_mat_market.clone(), "IRON".to_string()), 120);
-                    }
-                    "ADVANCED_CIRCUITRY" => {
-                        // empty list: do not allow any market to import ADVANCED_CIRCUITRY
-                        good_import_permits
-                            .entry("ADVANCED_CIRCUITRY".to_string())
-                            .or_default();
-                        // adv_circuit_market
-                        good_import_permits
-                            .entry("ELECTRONICS".to_string())
-                            .or_default()
-                            .push(adv_circuit_market.clone());
-                        good_import_permits
-                            .entry("MICROPROCESSORS".to_string())
-                            .or_default()
-                            .push(adv_circuit_market.clone());
-                        // electronics_market
-                        good_import_permits
-                            .entry("SILICON_CRYSTALS".to_string())
-                            .or_default()
-                            .push(electronics_market.clone());
-                        good_import_permits
-                            .entry("COPPER".to_string())
-                            .or_default()
-                            .push(electronics_market.clone());
-                        // microprocessor_market
-                        good_import_permits
-                            .entry("SILICON_CRYSTALS".to_string())
-                            .or_default()
-                            .push(microprocessor_market.clone());
-                        good_import_permits
-                            .entry("COPPER".to_string())
-                            .or_default()
-                            .push(microprocessor_market.clone());
-                        // smeltery_market
-                        good_import_permits
-                            .entry("COPPER_ORE".to_string())
-                            .or_default()
-                            .push(smeltery_market.clone());
-                    }
-                    _ => panic!("Unknown construction good: {}", material.trade_symbol),
-                };
+                for market in &smeltery_markets {
+                    good_import_permits
+                        .get_mut("IRON_ORE")
+                        .unwrap()
+                        .push(market.symbol.clone());
+                }
 
-                // !! Don't add construction tasks
+                // Buy all supply chain components at constant flow
+                // (except FAB_MATS, where we want to minimize cost)
+                good_req_constant_flow.insert("IRON_ORE");
+                good_req_constant_flow.insert("QUARTZ_SAND");
+                good_req_constant_flow.insert("IRON");
+                // good_req_constant_flow.insert("FAB_MATS");
 
-                // let remaining = material.required - material.fulfilled;
-                // let buy_trade_good = markets
-                //     .iter()
-                //     .filter_map(|(_, market_opt)| match market_opt {
-                //         Some(market) => {
-                //             let market_symbol = market.data.symbol.clone();
-                //             let trade = market
-                //                 .data
-                //                 .trade_goods
-                //                 .iter()
-                //                 .find(|g| g.symbol == material.trade_symbol);
-                //             trade.map(|trade| (market_symbol, trade))
-                //         }
-                //         None => None,
-                //     })
-                //     // purchase filters
-                //     .filter(|(_, trade)| match trade._type {
-                //         Import => false,
-                //         Export => {
-                //             let req_constant_flow = good_req_constant_flow.contains(&material.trade_symbol);
-                //             // unsure if this is just causing weird fluctuations
-                //             // Strong markets are where we'll make the most consistent profit
-                //             // ?? what about RESTRICTED markets?
-                //             if !req_constant_flow && trade.activity == Some(Strong) {
-                //                 trade.supply >= High
-                //             } else {
-                //                 trade.supply >= Moderate
-                //             }
-                //             // trade.supply >= Moderate
-                //         }
-                //         Exchange => true,
-                //     })
-                //     .min_by_key(|(_, trade)| trade.purchase_price);
-                // if let Some(buy_trade_good) = buy_trade_good {
-                //     let units = min(min(remaining, capacity_cap), buy_trade_good.1.trade_volume);
-                //     let cost = units * buy_trade_good.1.purchase_price;
-                //     // if cost + 2000000 <= available_credits {
-                //     debug!(
-                //         "Construction: buy {} @ {} for ${}, progress: {}/{}",
-                //         material.trade_symbol,
-                //         buy_trade_good.1.purchase_price,
-                //         cost,
-                //         material.fulfilled,
-                //         material.required
-                //     );
-                //     tasks.push(Task {
-                //         id: format!("{}construction_{}", system_prefix, material.trade_symbol),
-                //         actions: TaskActions::TransportCargo {
-                //             src: buy_trade_good.0.clone(),
-                //             dest: jump_gate.symbol.clone(),
-                //             src_action: Action::BuyGoods(material.trade_symbol.clone(), units),
-                //             dest_action: Action::DeliverConstruction(
-                //                 material.trade_symbol.clone(),
-                //                 units,
-                //             ),
-                //         },
-                //         value: 100000,
-                //     });
-                // }
+                // Extra settings for the iron market:
+                // Attempt to massage this market to cap its evolution at 120 trade volume
+                // This is because I've observed this specific market over-evolve with an abundance of ore
+                // and then proceed to consume more ore than available, leading to a IRON shortage
+                for market in &fab_mat_markets {
+                    market_capped_import.insert((market.symbol.clone(), "IRON"), 120);
+                }
+            }
+
+            // ADVANCED_CIRCUITRY
+            if adv_circuit.fulfilled < adv_circuit.required {
+                // Clear all imports for the ADVANCED_CIRCUITRY chain
+                good_import_permits.insert("ADVANCED_CIRCUITRY", vec![]);
+                good_import_permits.insert("ELECTRONICS", vec![]);
+                good_import_permits.insert("MICROPROCESSORS", vec![]);
+                good_import_permits.insert("SILICON_CRYSTALS", vec![]);
+                good_import_permits.insert("COPPER", vec![]);
+                good_import_permits.insert("COPPER_ORE", vec![]);
+
+                for market in adv_circuit_markets {
+                    good_import_permits
+                        .get_mut("ELECTRONICS")
+                        .unwrap()
+                        .push(market.symbol.clone());
+                    good_import_permits
+                        .get_mut("MICROPROCESSORS")
+                        .unwrap()
+                        .push(market.symbol.clone());
+                }
+                for market in electronics_markets {
+                    good_import_permits
+                        .get_mut("SILICON_CRYSTALS")
+                        .unwrap()
+                        .push(market.symbol.clone());
+                    good_import_permits
+                        .get_mut("COPPER")
+                        .unwrap()
+                        .push(market.symbol.clone());
+                }
+                for market in microprocessor_markets {
+                    good_import_permits
+                        .get_mut("SILICON_CRYSTALS")
+                        .unwrap()
+                        .push(market.symbol.clone());
+                    good_import_permits
+                        .get_mut("COPPER")
+                        .unwrap()
+                        .push(market.symbol.clone());
+                }
+                for market in smeltery_markets {
+                    good_import_permits
+                        .get_mut("COPPER_ORE")
+                        .unwrap()
+                        .push(market.symbol.clone());
+                }
+
+                // Buy all supply chain components at constant flow
+                // (except ADVANCED_CIRCUITRY, where we want to minimize cost)
+                good_req_constant_flow.insert("ELECTRONICS");
+                good_req_constant_flow.insert("MICROPROCESSORS");
+                good_req_constant_flow.insert("SILICON_CRYSTALS");
+                good_req_constant_flow.insert("COPPER");
+                good_req_constant_flow.insert("COPPER_ORE");
             }
         }
 
@@ -471,7 +417,7 @@ impl LogisticTaskManager {
         }
 
         for good in goods {
-            let req_constant_flow = good_req_constant_flow.contains(&good);
+            let req_constant_flow = good_req_constant_flow.contains(good.as_str());
             let trades = markets
                 .iter()
                 .filter_map(|(_, market_opt)| match market_opt {
@@ -501,7 +447,7 @@ impl LogisticTaskManager {
             let sell_trade_good = trades
                 .iter()
                 .filter(|(market_symbol, trade)| {
-                    let key = (market_symbol.clone(), good.clone());
+                    let key = (market_symbol.clone(), good.as_str());
                     let evo_cap = market_capped_import.get(&key);
                     match evo_cap {
                         Some(evo_cap) => {
@@ -525,8 +471,8 @@ impl LogisticTaskManager {
                     Export => false,
                     Exchange => true,
                 })
-                .filter(|(market, _)| match good_import_permits.get(&good) {
-                    Some(allowlist) => allowlist.contains(market),
+                .filter(|(market, _)| match good_import_permits.get(good.as_str()) {
+                    Some(allowlist) => allowlist.contains(&market),
                     None => true,
                 })
                 .max_by_key(|(_, trade)| trade.sell_price);
