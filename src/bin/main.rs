@@ -24,13 +24,19 @@ async fn main() {
     info!("Loaded config: {:?}", *CONFIG);
 
     let api_client = ApiClient::new();
-    let (status_code, status) = api_client.status().await;
-    let status = match status_code {
-        StatusCode::OK => status.unwrap(),
-        _ => {
-            error!("Failed to get status: {}\nbody: {:?}", status_code, status);
-            panic!("Failed to get status");
-            // TODO: handle 503 maintenance mode by repeating
+    let status = loop {
+        let (status_code, status) = api_client.status().await;
+        match status_code {
+            StatusCode::OK => break status.unwrap(),
+            StatusCode::SERVICE_UNAVAILABLE => {
+                error!("Failed to get status: {}\nbody: {:?}", status_code, status);
+                error!("Assumed maintenance mode, retrying in 1 second");
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            }
+            _ => {
+                error!("Failed to get status: {}\nbody: {:?}", status_code, status);
+                panic!("Failed to get status");
+            }
         }
     };
 
