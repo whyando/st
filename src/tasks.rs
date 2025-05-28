@@ -387,14 +387,17 @@ impl LogisticTaskManager {
                     let age_minutes =
                         now.signed_duration_since(market.timestamp).num_seconds() as f64 / 60.;
                     match age_minutes {
-                        f64::MIN..15. => continue,
+                        f64::MIN..5. => continue,
+                        // Very small reward
+                        5.0..15. => 1.,
+                        // Standard
                         15.0..30.0 => 1000.,
-                        30.0..60.0 => 1000. + ((age_minutes - 30.0) * (4000. / 30.0)),
-                        60.0..=f64::MAX => 5000.,
+                        30.0..60.0 => 2000.,
+                        60.0..=f64::MAX => 4000.,
                         _ => panic!("Invalid age_minutes: {}", age_minutes),
                     }
                 }
-                None => 5000.,
+                None => 4000.,
             };
             tasks.push(Task {
                 id: format!("{}refreshmarket_{}", system_prefix, market_remote.symbol),
@@ -421,7 +424,7 @@ impl LogisticTaskManager {
                         waypoint: shipyard_remote.symbol.clone(),
                         action: Action::RefreshShipyard,
                     },
-                    value: 5000,
+                    value: 1000,
                 });
             }
         }
