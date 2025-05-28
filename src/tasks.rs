@@ -2,9 +2,9 @@ use crate::agent_controller::AgentController;
 use crate::api_client::api_models::WaypointDetailed;
 use crate::config::CONFIG;
 use crate::database::DbClient;
-use crate::logistics_planner::plan::task_to_scheduled_action;
 use crate::logistics_planner::{
-    self, Action, LogisticShip, PlannerConstraints, ShipSchedule, Task, TaskActions,
+    self, Action, LogisticShip, PlannerConstraints, ScheduledAction, ShipSchedule, Task,
+    TaskActions,
 };
 use crate::models::MarketSupply::*;
 use crate::models::MarketType::*;
@@ -568,9 +568,16 @@ impl LogisticTaskManager {
             .filter(|task| is_task_allowed(&task, config))
             .collect::<Vec<_>>();
 
-        let matrix = self
+        let market_waypoints = self
             .universe
-            .estimate_duration_matrix(&system_symbol, engine_speed, fuel_capacity)
+            .get_system_waypoints(system_symbol)
+            .await
+            .into_iter()
+            .filter(|w| w.is_market())
+            .collect::<Vec<_>>();
+        let (duration_matrix, distance_matrix) = self
+            .universe
+            .full_travel_matrix(&market_waypoints, engine_speed, fuel_capacity)
             .await;
         let logistics_ship = LogisticShip {
             symbol: ship_symbol.to_string(),
@@ -580,7 +587,7 @@ impl LogisticTaskManager {
             // available_from: Duration::seconds(0), // if we need to account for in-progress task(s)
         };
         let contraints = PlannerConstraints {
-            plan_length,
+            plan_length: plan_length.num_seconds() as i64,
             max_compute_time: Duration::try_seconds(5).unwrap(),
         };
         let available_tasks_clone = available_tasks.clone();
@@ -589,7 +596,12 @@ impl LogisticTaskManager {
                 logistics_planner::plan::run_planner(
                     &[logistics_ship],
                     &available_tasks_clone,
-                    &matrix,
+                    &market_waypoints
+                        .iter()
+                        .map(|w| w.symbol.clone())
+                        .collect::<Vec<_>>(),
+                    &duration_matrix,
+                    &distance_matrix,
                     &contraints,
                 )
             })
@@ -609,7 +621,7 @@ impl LogisticTaskManager {
         if schedule.actions.len() == 0 {
             let mut highest_value_task = None;
             let mut highest_value = 0;
-            for task in available_tasks {
+            for task in &available_tasks {
                 if task.value > highest_value {
                     highest_value = task.value;
                     highest_value_task = Some(task);
@@ -622,30 +634,43 @@ impl LogisticTaskManager {
                 );
                 // add actions for the task
                 match &task.actions {
-                    TaskActions::VisitLocation { .. } => {
-                        schedule
-                            .actions
-                            .push(task_to_scheduled_action(&task, "", None));
+                    TaskActions::VisitLocation { waypoint, action } => {
+                        schedule.actions.push(ScheduledAction {
+                            timestamp: 0.0,
+                            waypoint: waypoint.clone(),
+                            action: action.clone(),
+                            completes_task_id: Some(task.id.clone()),
+                        });
                     }
-                    TaskActions::TransportCargo { .. } => {
-                        schedule
-                            .actions
-                            .push(task_to_scheduled_action(&task, "pickup", None));
-                        schedule
-                            .actions
-                            .push(task_to_scheduled_action(&task, "delivery", None));
+                    TaskActions::TransportCargo {
+                        src,
+                        dest,
+                        src_action,
+                        dest_action,
+                    } => {
+                        schedule.actions.push(ScheduledAction {
+                            timestamp: 0.0,
+                            waypoint: src.clone(),
+                            action: src_action.clone(),
+                            completes_task_id: None,
+                        });
+                        schedule.actions.push(ScheduledAction {
+                            timestamp: 0.0,
+                            waypoint: dest.clone(),
+                            action: dest_action.clone(),
+                            completes_task_id: Some(task.id.clone()),
+                        });
                     }
                 };
-                task_assignments.insert(task, Some(ship_symbol.to_string()));
+                task_assignments.insert(task.id.clone(), ship_symbol.to_string());
             }
         }
 
-        for (task, ship) in task_assignments {
-            if let Some(ship) = &ship {
-                debug!("Assigned task {} to ship {}", task.id, ship);
-                self.in_progress_tasks
-                    .insert(task.id.clone(), (task.clone(), ship.clone(), Utc::now()));
-            }
+        for (task_id, ship_symbol) in task_assignments {
+            let task = available_tasks.iter().find(|t| t.id == task_id).unwrap();
+            debug!("Assigned task {} to ship {}", task_id, ship_symbol);
+            self.in_progress_tasks
+                .insert(task_id, (task.clone(), ship_symbol.clone(), Utc::now()));
         }
         self.db_client
             .save_task_manager_state(&self.start_system, &self.in_progress_tasks)
@@ -654,12 +679,12 @@ impl LogisticTaskManager {
         schedule
     }
 
-    pub async fn set_task_completed(&self, task: &Task) {
-        self.in_progress_tasks.remove(&task.id);
+    pub async fn set_task_completed(&self, task_id: &str) {
+        self.in_progress_tasks.remove(task_id);
         self.db_client
             .save_task_manager_state(&self.start_system, &self.in_progress_tasks)
             .await;
-        debug!("Marking task {} as completed", task.id);
+        debug!("Marking task {} as completed", task_id);
     }
 }
 

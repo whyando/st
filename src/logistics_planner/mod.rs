@@ -1,4 +1,6 @@
 pub mod plan;
+pub mod value_feature;
+
 use crate::models::WaypointSymbol;
 use serde::{Deserialize, Serialize};
 
@@ -64,16 +66,16 @@ pub struct LogisticShip {
 
 #[derive(Debug, Clone)]
 pub struct PlannerConstraints {
-    pub plan_length: chrono::Duration,
+    pub plan_length: i64, // in seconds
     pub max_compute_time: chrono::Duration,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScheduledAction {
+    pub timestamp: f64,
     pub waypoint: WaypointSymbol,
     pub action: Action,
-    pub timestamp: i64,
-    pub task_completed: Option<Task>,
+    pub completes_task_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

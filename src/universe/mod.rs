@@ -6,12 +6,12 @@ use crate::database::db_models;
 use crate::database::db_models::NewWaypointDetails;
 use crate::database::DbClient;
 use crate::models::{
-    Construction, Data, Faction, Market, MarketRemoteView, Shipyard, ShipyardRemoteView, System,
-    SystemSymbol, Waypoint, WaypointSymbol, WithTimestamp,
+    Construction, Data, Faction, Market, MarketRemoteView, ShipFlightMode, Shipyard,
+    ShipyardRemoteView, System, SystemSymbol, Waypoint, WaypointSymbol, WithTimestamp,
 };
 use crate::models::{SymbolNameDescr, WaypointDetails};
 use crate::pathfinding::{Pathfinding, Route};
-use crate::schema::*;
+use crate::{schema::*, util};
 use dashmap::DashMap;
 use diesel::BelongingToDsl as _;
 use diesel::ExpressionMethods as _;
@@ -43,6 +43,13 @@ pub enum WaypointFilter {
 pub struct JumpGateInfo {
     pub is_constructed: bool,
     pub connections: Vec<WaypointSymbol>,
+}
+
+pub struct NavEdge {
+    pub flight_mode: ShipFlightMode,
+    pub fuel_cost: i64,
+    pub distance: i64,
+    pub duration: i64,
 }
 
 pub struct Universe {
@@ -684,17 +691,6 @@ impl Universe {
         filtered
     }
 
-    pub async fn estimate_duration_matrix(
-        &self,
-        system_symbol: &SystemSymbol,
-        speed: i64,
-        fuel_capacity: i64,
-    ) -> BTreeMap<WaypointSymbol, BTreeMap<WaypointSymbol, i64>> {
-        let waypoints = self.get_system_waypoints(system_symbol).await;
-        let pathfinding = Pathfinding::new(waypoints);
-        pathfinding.estimate_duration_matrix(speed, fuel_capacity)
-    }
-
     pub async fn get_route(
         &self,
         src: &WaypointSymbol,
@@ -792,5 +788,99 @@ impl Universe {
             .expect("DB Insert error");
         self.jumpgates.insert(symbol.clone(), info.clone());
         info
+    }
+
+    // Returns a matrix between market waypoints. Assumes we can refuel at any waypoint.
+    // Weights are the travel duration in seconds between two waypoints
+    // Preferring BURN flight mode, and only CRUISE if the fuel capacity isn't high enough
+    pub async fn market_adjacency_edges<'a>(
+        &self,
+        market_waypoints: &'a [WaypointDetailed],
+        ship_max_fuel: i64,
+        ship_speed: i64,
+    ) -> Vec<BTreeMap<usize, NavEdge>> {
+        let mut edges = Vec::new();
+        for w1 in market_waypoints.iter() {
+            let mut row = BTreeMap::new();
+            for (j, w2) in market_waypoints.iter().enumerate() {
+                let dist = util::distance(w1, w2);
+                let burn_fuel = util::fuel_cost(&ShipFlightMode::Burn, dist);
+                let cruise_fuel = util::fuel_cost(&ShipFlightMode::Cruise, dist);
+                if burn_fuel <= ship_max_fuel {
+                    row.insert(
+                        j,
+                        NavEdge {
+                            flight_mode: ShipFlightMode::Burn,
+                            fuel_cost: burn_fuel,
+                            distance: dist,
+                            duration: util::estimated_travel_duration(
+                                &ShipFlightMode::Burn,
+                                ship_speed,
+                                dist,
+                            ),
+                        },
+                    );
+                } else if cruise_fuel <= ship_max_fuel {
+                    row.insert(
+                        j,
+                        NavEdge {
+                            flight_mode: ShipFlightMode::Cruise,
+                            fuel_cost: cruise_fuel,
+                            distance: dist,
+                            duration: util::estimated_travel_duration(
+                                &ShipFlightMode::Cruise,
+                                ship_speed,
+                                dist,
+                            ),
+                        },
+                    );
+                }
+            }
+            edges.push(row);
+        }
+        assert_eq!(edges.len(), market_waypoints.len());
+        edges
+    }
+
+    pub async fn full_travel_matrix(
+        &self,
+        market_waypoints: &[WaypointDetailed],
+        ship_max_fuel: i64,
+        ship_speed: i64,
+    ) -> (Vec<Vec<f64>>, Vec<Vec<f64>>) {
+        let mut durations: Vec<Vec<f64>> =
+            vec![vec![0.; market_waypoints.len()]; market_waypoints.len()];
+        let mut distances: Vec<Vec<f64>> =
+            vec![vec![0.; market_waypoints.len()]; market_waypoints.len()];
+        let edges = self
+            .market_adjacency_edges(market_waypoints, ship_max_fuel, ship_speed)
+            .await;
+        for i in 0..market_waypoints.len() {
+            for j in 0..market_waypoints.len() {
+                if i == j {
+                    durations[i][j] = 0.;
+                    distances[i][j] = 0.;
+                } else {
+                    if let Some(edge) = edges[i].get(&j) {
+                        durations[i][j] = edge.duration as f64;
+                        distances[i][j] = edge.distance as f64;
+                    } else {
+                        durations[i][j] = f64::INFINITY;
+                        distances[i][j] = f64::INFINITY;
+                    }
+                }
+            }
+        }
+
+        // Fill in the rest of the matrix with floyd warshall
+        for k in 0..market_waypoints.len() {
+            for i in 0..market_waypoints.len() {
+                for j in 0..market_waypoints.len() {
+                    durations[i][j] = durations[i][j].min(durations[i][k] + durations[k][j]);
+                    distances[i][j] = distances[i][j].min(distances[i][k] + distances[k][j]);
+                }
+            }
+        }
+        (durations, distances)
     }
 }

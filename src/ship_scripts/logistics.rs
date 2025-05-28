@@ -140,8 +140,8 @@ pub async fn run(
             // log action completion, so we can resume from this point if we crash
             db.update_schedule_progress(&ship_symbol, action_idx + 1)
                 .await;
-            if let Some(task) = &scheduled_action.task_completed {
-                taskmanager.set_task_completed(task).await;
+            if let Some(task_id) = &scheduled_action.completes_task_id {
+                taskmanager.set_task_completed(task_id).await;
             }
         }
         info!(

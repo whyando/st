@@ -1,83 +1,69 @@
-use super::*;
-use chrono::DateTime;
-use chrono::Utc;
+use crate::logistics_planner::{
+    Action, LogisticShip, PlannerConstraints, ScheduledAction, ShipSchedule, Task, TaskActions,
+};
+use crate::models::WaypointSymbol;
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use vrp_pragmatic::core::models::{Problem as CoreProblem, Solution as CoreSolution};
-use vrp_pragmatic::core::solver::Solver;
-use vrp_pragmatic::core::solver::VrpConfigBuilder;
-use vrp_pragmatic::format::problem::*;
-use vrp_pragmatic::format::solution::*;
-use vrp_pragmatic::format::Location;
 
-fn location_index(locations: &mut Vec<WaypointSymbol>, location: &WaypointSymbol) -> usize {
-    match locations.iter().position(|x| x == location) {
-        Some(index) => index,
-        None => {
-            let index = locations.len();
-            locations.push(location.clone());
-            index
-        }
+use super::value_feature::JobValueDimension as _;
+use vrp_core::models::common::*;
+use vrp_core::models::problem::*;
+use vrp_core::prelude::*;
+
+struct Planner<'a> {
+    ships: &'a [LogisticShip],
+    tasks: &'a [Task],
+    market_waypoints: &'a [WaypointSymbol],
+    duration_matrix: &'a [Vec<f64>],
+    distance_matrix: &'a [Vec<f64>],
+    constraints: &'a PlannerConstraints,
+}
+
+#[derive(Debug)]
+struct Activity {
+    waypoint: WaypointSymbol,
+    action: Action,
+    completes_task_id: Option<String>,
+}
+
+impl<'a> Planner<'a> {
+    fn waypoint_index(&self, waypoint: &WaypointSymbol) -> usize {
+        self.market_waypoints
+            .iter()
+            .position(|w| w == waypoint)
+            .unwrap()
     }
-}
 
-// return timestamp in RFC3339 format of seconds since 0000-01-01T00:00:00Z
-fn get_timestamp(seconds: i64) -> String {
-    let dt: DateTime<Utc> = DateTime::from_timestamp(seconds, 0).unwrap();
-    dt.to_rfc3339()
-}
+    pub fn translate_problem(&self) -> (Arc<Problem>, BTreeMap<String, Activity>) {
+        let mut job_id_map: BTreeMap<String, Activity> = BTreeMap::new();
 
-fn from_timestamp(timestamp: &str) -> i64 {
-    DateTime::parse_from_rfc3339(timestamp).unwrap().timestamp()
-}
-
-pub fn run_planner(
-    ships: &[LogisticShip],
-    tasks: &[Task],
-    duration_matrix: &BTreeMap<WaypointSymbol, BTreeMap<WaypointSymbol, i64>>,
-    constraints: &PlannerConstraints,
-) -> (BTreeMap<Task, Option<String>>, Vec<ShipSchedule>) {
-    // start by defining vrp problem
-    // docs: https://reinterpretcat.github.io/vrp/concepts/pragmatic/index.html
-
-    let mut task_job_id_map: BTreeMap<String, &Task> = BTreeMap::new();
-
-    let mut locations = vec![];
-    let time_window = vec![vec![
-        get_timestamp(0),
-        get_timestamp(constraints.plan_length.num_seconds()),
-    ]];
-
-    let jobs: Vec<Job> = tasks
-        .iter()
-        .map(|task| {
-            match &task.actions {
+        let max_duration = self.constraints.plan_length as f64;
+        let jobs: Vec<Job> = self
+            .tasks
+            .iter()
+            .map(|task| match &task.actions {
                 TaskActions::VisitLocation { waypoint, action } => {
-                    let id = format!("Visit-{}-{:?}", waypoint, action);
-                    let tag = format!("[{}] {:?}", waypoint, action);
-                    task_job_id_map.insert(id.clone(), task);
-                    Job {
-                        id,
-                        pickups: None,
-                        deliveries: None,
-                        replacements: None,
-                        services: Some(vec![JobTask {
-                            places: vec![JobPlace {
-                                location: Location::Reference {
-                                    index: location_index(&mut locations, waypoint),
-                                },
-                                duration: 0.0,
-                                times: Some(time_window.clone()),
-                                tag: Some(tag),
-                            }],
-                            demand: None, // service: no demand
-                            order: None,
-                        }]),
-                        skills: None,
-                        value: Some(task.value as f64),
-                        group: None,
-                        compatibility: None,
-                    }
+                    let job_id = format!("Visit-{}-{:?}", waypoint, action);
+                    job_id_map.insert(
+                        job_id.clone(),
+                        Activity {
+                            waypoint: waypoint.clone(),
+                            action: action.clone(),
+                            completes_task_id: Some(task.id.clone()),
+                        },
+                    );
+                    let job = SingleBuilder::default()
+                        .id(&job_id)
+                        .location(self.waypoint_index(waypoint))
+                        .unwrap()
+                        .times(vec![TimeWindow::new(0.0, max_duration)])
+                        .unwrap()
+                        .dimension(|dimens| {
+                            dimens.set_job_value(task.value as f64);
+                        })
+                        .build_as_job()
+                        .unwrap();
+                    job
                 }
                 TaskActions::TransportCargo {
                     src,
@@ -97,165 +83,166 @@ pub fn run_planner(
                     };
                     assert_eq!(good, dest_good);
                     assert_eq!(units, dest_units);
-                    let id = format!("Transport-{}", good);
-                    task_job_id_map.insert(id.clone(), task);
-                    Job {
-                        id,
-                        pickups: Some(vec![JobTask {
-                            places: vec![JobPlace {
-                                location: Location::Reference {
-                                    index: location_index(&mut locations, src),
-                                },
-                                duration: 0.0,
-                                times: Some(time_window.clone()),
-                                tag: Some(format!("[{}] {:?} {} {}", src, src_action, units, good)),
-                            }],
-                            demand: Some(vec![*units as i32]),
-                            order: None,
-                        }]),
-                        deliveries: Some(vec![JobTask {
-                            places: vec![JobPlace {
-                                location: Location::Reference {
-                                    index: location_index(&mut locations, dest),
-                                },
-                                duration: 0.0,
-                                times: Some(time_window.clone()),
-                                tag: Some(format!(
-                                    "[{}] {:?} {} {}",
-                                    dest, dest_action, units, good
-                                )),
-                            }],
-                            demand: Some(vec![*units as i32]),
-                            order: None,
-                        }]),
-                        replacements: None,
-                        services: None,
-                        skills: None,
-                        value: Some(task.value as f64), // usually profit
-                        group: None,
-                        compatibility: None,
-                    }
-                }
-            }
-        })
-        .collect();
-
-    let vehicles: Vec<VehicleType> = ships
-        .iter()
-        .map(|ship| {
-            VehicleType {
-                type_id: ship.symbol.clone(),
-                vehicle_ids: vec![ship.symbol.clone()],
-                profile: VehicleProfile {
-                    matrix: "cruise".to_string(),
-                    scale: None, // default 1
-                },
-                costs: VehicleCosts {
-                    fixed: None,
-                    distance: 0.0001,
-                    time: 0.0001,
-                },
-                shifts: vec![VehicleShift {
-                    start: ShiftStart {
-                        earliest: get_timestamp(0),
-                        latest: None,
-                        location: Location::Reference {
-                            index: location_index(&mut locations, &ship.start_waypoint),
+                    let job_id = format!("Transport-{}", good);
+                    let buy_job_id = format!("buy/{}/{}", units, good);
+                    let sell_job_id = format!("sell/{}/{}", units, good);
+                    let job = MultiBuilder::default()
+                        .id(&job_id)
+                        .add_job(
+                            SingleBuilder::default()
+                                .id(&buy_job_id)
+                                .demand(Demand::pudo_pickup(*units as i32))
+                                .location(self.waypoint_index(src))
+                                .unwrap()
+                                .times(vec![TimeWindow::new(0.0, max_duration)])
+                                .unwrap()
+                                .build()
+                                .unwrap(),
+                        )
+                        .add_job(
+                            SingleBuilder::default()
+                                .id(&sell_job_id)
+                                .demand(Demand::pudo_delivery(*units as i32))
+                                .location(self.waypoint_index(dest))
+                                .unwrap()
+                                .times(vec![TimeWindow::new(0.0, max_duration)])
+                                .unwrap()
+                                .build()
+                                .unwrap(),
+                        )
+                        .dimension(|dimens| {
+                            dimens.set_job_value(task.value as f64);
+                        })
+                        .build_as_job()
+                        .unwrap();
+                    job_id_map.insert(
+                        buy_job_id,
+                        Activity {
+                            waypoint: src.clone(),
+                            action: src_action.clone(),
+                            completes_task_id: None,
                         },
-                    },
-                    end: None,
-                    breaks: None,
-                    reloads: None,
-                    recharges: None,
-                }],
-                capacity: vec![ship.capacity as i32],
-                skills: None,
-                limits: None,
-            }
-        })
-        .collect();
+                    );
+                    job_id_map.insert(
+                        sell_job_id,
+                        Activity {
+                            waypoint: dest.clone(),
+                            action: dest_action.clone(),
+                            completes_task_id: Some(task.id.clone()),
+                        },
+                    );
+                    job
+                }
+            })
+            .collect();
 
-    let problem = Problem {
-        plan: Plan {
-            jobs,
-            relations: None,
-            clustering: None,
-        },
-        fleet: Fleet {
-            vehicles,
-            profiles: vec![MatrixProfile {
-                name: "cruise".to_string(),
-                speed: None,
-            }],
-            resources: None,
-        },
-        objectives: None,
+        let duration_matrix = self
+            .duration_matrix
+            .iter()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        let distance_matrix = self
+            .distance_matrix
+            .iter()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        let routing_matrix =
+            Arc::new(SimpleTransportCost::new(duration_matrix, distance_matrix).unwrap());
+
+        let vehicles: Vec<Vehicle> = self
+            .ships
+            .iter()
+            .map(|ship| {
+                VehicleBuilder::default()
+                    .id(&ship.symbol)
+                    .add_detail(
+                        VehicleDetailBuilder::default()
+                            .set_start_location(self.waypoint_index(&ship.start_waypoint))
+                            .set_start_time(0.0)
+                            .build()
+                            .unwrap(),
+                    )
+                    .capacity(SingleDimLoad::new(ship.capacity as i32))
+                    .build()
+                    .unwrap()
+            })
+            .collect();
+
+        // Goal
+        let capacity_feature = CapacityFeatureBuilder::<SingleDimLoad>::new("capacity")
+            .build()
+            .unwrap();
+        let transport_feature = TransportFeatureBuilder::new("min-distance")
+            .set_transport_cost(routing_matrix.clone())
+            .set_time_constrained(true)
+            .build_minimize_duration()
+            .unwrap();
+        let minimize_unassigned = MinimizeUnassignedBuilder::new("min-unassigned")
+            .build()
+            .unwrap();
+        let max_value_feature = super::value_feature::feature_layer();
+        let goal = GoalContextBuilder::with_features(&[
+            max_value_feature,
+            minimize_unassigned,
+            transport_feature,
+            capacity_feature,
+        ])
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let problem = ProblemBuilder::default()
+            .add_jobs(jobs.into_iter())
+            .add_vehicles(vehicles.into_iter())
+            .with_goal(goal)
+            .with_transport_cost(routing_matrix.clone())
+            .build()
+            .unwrap();
+
+        (Arc::new(problem), job_id_map)
+    }
+}
+
+pub fn run_planner(
+    ships: &[LogisticShip],
+    tasks: &[Task],
+    market_waypoints: &[WaypointSymbol],
+    duration_matrix: &[Vec<f64>],
+    distance_matrix: &[Vec<f64>],
+    constraints: &PlannerConstraints,
+) -> (BTreeMap<String, String>, Vec<ShipSchedule>) {
+    let planner = Planner {
+        ships,
+        tasks,
+        market_waypoints,
+        duration_matrix,
+        distance_matrix,
+        constraints,
     };
+    let (problem, job_id_map) = planner.translate_problem();
 
-    // cruise matrix
-    let matrix = {
-        let mut travel_times = vec![];
-        let mut distances = vec![];
-        for src in &locations {
-            for dest in &locations {
-                let duration = duration_matrix.get(src).unwrap().get(dest).unwrap();
-                travel_times.push(*duration);
-                distances.push(0); // 0 weight on distance
-            }
-        }
-        Matrix {
-            profile: Some("cruise".to_string()),
-            timestamp: None,
-            travel_times,
-            distances,
-            error_codes: None,
-        }
-    };
-    let matrices = Some(vec![matrix]);
-
-    let core_problem = (problem.clone(), matrices.clone()).read_pragmatic();
-    let core_problem = Arc::new(
-        core_problem.unwrap_or_else(|errors| panic!("cannot read pragmatic problem: {errors}")),
-    );
-
-    let config = VrpConfigBuilder::new(core_problem.clone())
+    let config = VrpConfigBuilder::new(problem.clone())
         .prebuild()
         .unwrap()
-        .with_max_generations(Some(3000))
         .with_max_time(Some(constraints.max_compute_time.num_seconds() as usize))
+        .with_max_generations(Some(3000))
         .build()
-        .unwrap_or_else(|err| panic!("cannot build default solver configuration: {err}"));
-    let solution = Solver::new(core_problem.clone(), config)
-        .solve()
-        .unwrap_or_else(|err| panic!("cannot solver problem: {err}"));
-    let solution = get_pragmatic_solution(&core_problem, &solution);
-    // log::info!("solution: {:#?}", solution);
+        .unwrap();
 
-    // write file
-    //let solution_json = serde_json::to_string_pretty(&solution).unwrap();
-    //std::fs::create_dir_all("./output").unwrap();
-    //std::fs::write("./output/logistics_plan_pragmatic.json", solution_json).unwrap();
+    let solution = Solver::new(problem.clone(), config).solve().unwrap();
 
-    // solution checker is bugged?
-    // if let Err(errs) = CheckerContext::new(core_problem, problem, matrices, solution.clone())
-    //     .and_then(|ctx| ctx.check())
-    // {
-    //     panic!(
-    //         "unfeasible solution:\n'{}'",
-    //         GenericError::join_many(&errs, "\n")
-    //     );
-    // }
-
-    let mut task_result = BTreeMap::<Task, Option<String>>::new();
+    let mut task_result = BTreeMap::<String, String>::new();
     let ship_schedules = ships
         .iter()
         .map(|ship| {
-            let vehicle = solution
-                .tours
+            let route = solution
+                .routes
                 .iter()
-                .find(|tour| tour.vehicle_id == ship.symbol);
-            let vehicle = match vehicle {
-                Some(vehicle) => vehicle,
+                .find(|route| route.actor.vehicle.dimens.get_vehicle_id().unwrap() == &ship.symbol);
+            let route = match route {
+                Some(route) => route,
                 None => {
                     return ShipSchedule {
                         ship: ship.clone(),
@@ -264,30 +251,24 @@ pub fn run_planner(
                 }
             };
             let mut actions = vec![];
-            for stop in vehicle.stops.iter() {
-                let arrival = from_timestamp(&stop.schedule().arrival);
-                let location_index: usize = match stop.location() {
-                    Some(Location::Reference { index }) => *index,
-                    _ => panic!("unexpected location type"),
-                };
-                let waypoint_symbol = locations[location_index].clone();
-                // let departure = from_timestamp(&stop.schedule().departure);
-                for activity in stop.activities().iter() {
-                    if activity.job_id == "departure" || activity.job_id == "arrival" {
-                        // special job ids
-                        continue;
+            for activity in route.tour.all_activities() {
+                let arrival = activity.schedule.arrival;
+                assert_eq!(activity.place.idx, 0); // Our tasks can only be performed in 1 place
+                let waypoint_symbol = &market_waypoints[activity.place.location];
+                if let Some(job) = &activity.job {
+                    let job_id = job.dimens.get_job_id().unwrap();
+                    let activity = &job_id_map[job_id.as_str()];
+                    assert_eq!(&activity.waypoint, waypoint_symbol);
+
+                    actions.push(ScheduledAction {
+                        waypoint: activity.waypoint.clone(),
+                        action: activity.action.clone(),
+                        timestamp: arrival,
+                        completes_task_id: activity.completes_task_id.clone(),
+                    });
+                    if let Some(task_id) = &activity.completes_task_id {
+                        task_result.insert(task_id.clone(), ship.symbol.clone());
                     }
-                    let task = *task_job_id_map
-                        .get(&activity.job_id)
-                        .expect("cannot find task for job id");
-                    task_result.insert(task.clone(), Some(ship.symbol.clone()));
-                    let sa = task_to_scheduled_action(
-                        task,
-                        activity.activity_type.as_str(),
-                        Some(arrival),
-                    );
-                    assert_eq!(sa.waypoint, waypoint_symbol);
-                    actions.push(sa);
                 }
             }
             ShipSchedule {
@@ -296,57 +277,7 @@ pub fn run_planner(
             }
         })
         .collect();
-    if let Some(unassigned_jobs) = &solution.unassigned {
-        for unassigned_job in unassigned_jobs {
-            let task = *task_job_id_map
-                .get(&unassigned_job.job_id)
-                .expect("cannot find task for job id");
-            task_result.insert(task.clone(), None);
-        }
-    }
-    // make sure all tasks are accounted for
-    for task in tasks {
-        assert!(task_result.contains_key(task));
-    }
     (task_result, ship_schedules)
-}
-
-pub fn task_to_scheduled_action(
-    task: &Task,
-    activity_type: &str,
-    arrival: Option<i64>,
-) -> ScheduledAction {
-    let (waypoint, action, task_completed) = match &task.actions {
-        TaskActions::VisitLocation { waypoint, action } => (waypoint, action, Some(task.clone())),
-        TaskActions::TransportCargo {
-            src,
-            dest,
-            src_action,
-            dest_action,
-        } => match activity_type {
-            "pickup" => (src, src_action, None),
-            "delivery" => (dest, dest_action, Some(task.clone())),
-            _ => panic!("unexpected activity type"),
-        },
-    };
-    ScheduledAction {
-        waypoint: waypoint.clone(),
-        action: action.clone(),
-        timestamp: arrival.unwrap_or_default(),
-        task_completed,
-    }
-}
-
-fn get_pragmatic_solution(problem: &CoreProblem, solution: &CoreSolution) -> Solution {
-    let output_type = Default::default();
-    let mut writer = std::io::BufWriter::new(Vec::new());
-
-    write_pragmatic(problem, solution, output_type, &mut writer)
-        .expect("cannot write pragmatic solution");
-    let bytes = writer.into_inner().expect("cannot get bytes from writer");
-
-    deserialize_solution(std::io::BufReader::new(bytes.as_slice()))
-        .expect("cannot deserialize solution")
 }
 
 #[cfg(test)]
@@ -404,27 +335,25 @@ mod test {
             },
         ];
         let constraints = PlannerConstraints {
-            plan_length: Duration::try_hours(24).unwrap(),
-            max_compute_time: Duration::try_seconds(1).unwrap(),
+            plan_length: 24 * 60 * 60,
+            max_compute_time: Duration::seconds(1),
         };
-        let matrix = {
-            let mut duration_matrix: BTreeMap<WaypointSymbol, BTreeMap<WaypointSymbol, i64>> =
-                BTreeMap::new();
-            duration_matrix.insert(WaypointSymbol::new("X1-S1-W1"), {
-                let mut dests = BTreeMap::new();
-                dests.insert(WaypointSymbol::new("X1-S1-W1"), 0);
-                dests.insert(WaypointSymbol::new("X1-S1-W2"), 100);
-                dests
-            });
-            duration_matrix.insert(WaypointSymbol::new("X1-S1-W2"), {
-                let mut dests = BTreeMap::new();
-                dests.insert(WaypointSymbol::new("X1-S1-W1"), 100);
-                dests.insert(WaypointSymbol::new("X1-S1-W2"), 0);
-                dests
-            });
-            duration_matrix
-        };
-        let (assignments, schedule) = run_planner(&ships, &tasks, &matrix, &constraints);
+        let market_waypoints = vec![
+            WaypointSymbol::new("X1-S1-W1"),
+            WaypointSymbol::new("X1-S1-W2"),
+        ];
+        let duration_matrix = vec![vec![0.0, 100.0], vec![100.0, 0.0]];
+        let distance_matrix = vec![vec![0.0, 100.0], vec![100.0, 0.0]];
+        let (assignments, schedule) = run_planner(
+            &ships,
+            &tasks,
+            &market_waypoints,
+            &duration_matrix,
+            &distance_matrix,
+            &constraints,
+        );
+        println!("assignments: {:?}", assignments);
+        println!("schedule: {:?}", schedule);
         assert_eq!(schedule.len(), 2);
         assert_eq!(assignments.len(), 3);
     }

@@ -48,30 +48,6 @@ impl Pathfinding {
         }
     }
 
-    pub fn estimate_duration_matrix(
-        &self,
-        speed: i64,
-        _fuel_capacity: i64,
-    ) -> BTreeMap<WaypointSymbol, BTreeMap<WaypointSymbol, i64>> {
-        let mut duration_matrix: BTreeMap<WaypointSymbol, BTreeMap<WaypointSymbol, i64>> =
-            BTreeMap::new();
-        for src in self.waypoints.values() {
-            let src_map = duration_matrix.entry(src.symbol.clone()).or_default();
-            for dest in self.waypoints.values() {
-                if src.symbol == dest.symbol {
-                    src_map.insert(dest.symbol.clone(), 0);
-                    continue;
-                }
-                let distance = src.distance(&dest);
-                let travel_duration = (15.0
-                    + CRUISE_NAV_MODIFIER / (speed as f64) * (distance as f64))
-                    .round() as i64;
-                src_map.insert(dest.symbol.clone(), travel_duration);
-            }
-        }
-        duration_matrix
-    }
-
     pub fn get_route(
         &self,
         src_symbol: &WaypointSymbol,
