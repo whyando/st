@@ -10,7 +10,6 @@ license = "MIT"
 
 # tokio/hyper stack
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
-tokio-util = { version = "0.7", features = ["rt"] }
 futures = "0.3.30"
 reqwest = { version = "0.12", features = ["json", "native-tls"] }
 
@@ -36,6 +35,7 @@ rand = "0.9"
 uuid = { version = "1.7.0", features = ["v4"] }
 regex = "1.10.3"
 quadtree_rs = "0.1.3"
+imageproc = "0.25"
 moka = { version = "0.12.5", features = ["future"] }
 strum = { version = "0.27", features = ["derive"] }
 paste = "1.0.15"
