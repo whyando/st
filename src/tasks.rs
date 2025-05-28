@@ -502,7 +502,7 @@ impl LogisticTaskManager {
                     profit
                 );
                 tasks.push(Task {
-                    // exclusion seems a bit broad right now, but it's a start
+                    // full exclusivity seems a bit broad right now, but it's a start
                     id: format!("{}trade_{}", system_prefix, good),
                     actions: TaskActions::TransportCargo {
                         src: buy_trade_good.0.clone(),
