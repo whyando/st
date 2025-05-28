@@ -6,6 +6,7 @@ use crate::{
     agent_controller::AgentController, api_client::ApiClient, logistics_planner::Action, models::*,
     universe::Universe,
 };
+use chrono::{DateTime, Duration, Utc};
 use log::*;
 use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -210,30 +211,34 @@ impl ShipController {
         ship.nav.status = status;
     }
 
-    pub async fn wait_for_transit(&self) {
-        let arrival_time = { self.ship.lock().unwrap().nav.route.arrival };
-        let now = chrono::Utc::now();
-        let wait_time = arrival_time - now + chrono::Duration::try_seconds(1).unwrap();
-        if wait_time > chrono::Duration::try_seconds(0).unwrap() {
-            self.debug(&format!(
-                "Waiting for transit: {} seconds",
-                wait_time.num_seconds()
-            ));
+    async fn wait_until_timestamp(&self, timestamp: DateTime<Utc>, event: &str) {
+        // Multiple sleep calls are necessary due to WSL2 tendency to 'skip time'
+        loop {
+            let now = Utc::now();
+            let wait_time = timestamp - now;
+            if wait_time > chrono::Duration::zero() {
+                debug!(
+                    "Waiting for {}: {:.3}s",
+                    event,
+                    wait_time.num_milliseconds() as f64 / 1000.0
+                );
+            } else {
+                break;
+            }
             tokio::time::sleep(wait_time.to_std().unwrap()).await;
         }
+    }
+
+    pub async fn wait_for_transit(&self) {
+        let arrival_time = { self.ship.lock().unwrap().nav.route.arrival };
+        self.wait_until_timestamp(arrival_time + Duration::seconds(1), "transit")
+            .await;
     }
     pub async fn wait_for_cooldown(&self) {
         let cooldown = { self.ship.lock().unwrap().cooldown.clone() };
         if let Some(expiration) = cooldown.expiration {
-            let now = chrono::Utc::now();
-            let wait_time = expiration - now + chrono::Duration::try_seconds(1).unwrap();
-            if wait_time > chrono::Duration::try_seconds(0).unwrap() {
-                self.debug(&format!(
-                    "Waiting for cooldown: {} seconds",
-                    wait_time.num_seconds()
-                ));
-                tokio::time::sleep(wait_time.to_std().unwrap()).await;
-            }
+            self.wait_until_timestamp(expiration + Duration::seconds(1), "cooldown")
+                .await;
         }
     }
 
