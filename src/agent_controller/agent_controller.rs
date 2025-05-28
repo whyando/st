@@ -830,15 +830,12 @@ impl AgentController {
         // purchased ships are assigned, but not yet started
         let (_bought, _tasks) = self.try_buy_ships(None).await;
 
-        let self_clone = self.clone();
-        let start = tokio::spawn(async move {
-            for ship in self_clone.ships.iter() {
-                let ship_symbol = ship.key().clone();
-                self_clone.spawn_run_ship(ship_symbol).await;
-            }
-        });
-        self.hdls.wait_all(Some(start)).await;
-        info!("All ships have completed their tasks");
+        for ship in self.ships.iter() {
+            let ship_symbol = ship.key().clone();
+            self.spawn_run_ship(ship_symbol).await;
+        }
+        self.hdls.wait_all().await;
+        unreachable!();
     }
 
     pub async fn try_assign_ship(&self, ship_symbol: &str) -> bool {
@@ -1144,15 +1141,11 @@ impl JoinHandles {
     async fn push(&self, handle: tokio::task::JoinHandle<()>) {
         self.tx.send(handle).await.unwrap();
     }
-    async fn wait_all(&self, start: Option<tokio::task::JoinHandle<()>>) {
+    async fn wait_all(&self) {
         use futures::StreamExt as _;
         let mut handles = self.handles.lock().unwrap();
         let mut rx = self.rx.lock().unwrap();
 
-        if let Some(start) = start {
-            debug!("JoinHandles::wait_all: adding new (start) handle");
-            handles.push(start);
-        }
         loop {
             tokio::select! {
                 hdl_ret = handles.next() => {
