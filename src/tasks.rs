@@ -374,26 +374,36 @@ impl LogisticTaskManager {
 
         let probe_locations = self.probe_locations();
         for (market_remote, market_opt) in &markets {
-            let requires_visit = match market_opt {
-                Some(market) => {
-                    now.signed_duration_since(market.timestamp) >= Duration::try_hours(3).unwrap()
-                }
-                None => true,
-            };
             let is_probed = probe_locations.contains(&market_remote.symbol);
             // Some fuel stop markets only trade fuel, so not worth visiting
             let is_pure_exchange =
                 market_remote.exports.is_empty() && market_remote.imports.is_empty();
-            if requires_visit && !is_pure_exchange && !is_probed {
-                tasks.push(Task {
-                    id: format!("{}refreshmarket_{}", system_prefix, market_remote.symbol),
-                    actions: TaskActions::VisitLocation {
-                        waypoint: market_remote.symbol.clone(),
-                        action: Action::RefreshMarket,
-                    },
-                    value: 20000,
-                });
+            if is_probed || is_pure_exchange {
+                continue;
             }
+
+            let reward: f64 = match market_opt {
+                Some(market) => {
+                    let age_minutes =
+                        now.signed_duration_since(market.timestamp).num_seconds() as f64 / 60.;
+                    match age_minutes {
+                        f64::MIN..15. => continue,
+                        15.0..30.0 => 1000.,
+                        30.0..60.0 => 1000. + ((age_minutes - 30.0) * (4000. / 30.0)),
+                        60.0..=f64::MAX => 5000.,
+                        _ => panic!("Invalid age_minutes: {}", age_minutes),
+                    }
+                }
+                None => 5000.,
+            };
+            tasks.push(Task {
+                id: format!("{}refreshmarket_{}", system_prefix, market_remote.symbol),
+                actions: TaskActions::VisitLocation {
+                    waypoint: market_remote.symbol.clone(),
+                    action: Action::RefreshMarket,
+                },
+                value: reward as i64,
+            });
         }
         for (shipyard_remote, shipyard_opt) in &shipyards {
             let requires_visit = match shipyard_opt {
@@ -577,7 +587,7 @@ impl LogisticTaskManager {
             .collect::<Vec<_>>();
         let (duration_matrix, distance_matrix) = self
             .universe
-            .full_travel_matrix(&market_waypoints, engine_speed, fuel_capacity)
+            .full_travel_matrix(&market_waypoints, fuel_capacity, engine_speed)
             .await;
         let logistics_ship = LogisticShip {
             symbol: ship_symbol.to_string(),
