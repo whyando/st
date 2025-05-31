@@ -4,7 +4,6 @@ use crate::{
     database::DbClient, models::LogisticsScriptConfig, ship_controller::ShipController,
     tasks::LogisticTaskManager,
 };
-use chrono::Duration;
 use log::*;
 
 pub async fn run(
@@ -18,6 +17,11 @@ pub async fn run(
 
     let ship_symbol = ship_controller.symbol();
     let system_symbol = ship_controller.system();
+    assert_eq!(
+        config.use_planner,
+        config.planner_config.is_some(),
+        "planner_config must be set if use_planner is true"
+    );
 
     loop {
         // Generate or resume schedule
@@ -41,7 +45,6 @@ pub async fn run(
             assert!(ship_controller.cargo_empty());
 
             // Generate new schedule
-            let plan_length = Duration::try_minutes(15).unwrap();
             let schedule = taskmanager
                 .take_tasks(
                     &ship_symbol,
@@ -51,7 +54,6 @@ pub async fn run(
                     ship_controller.engine_speed(),
                     ship_controller.fuel_capacity(),
                     &ship_controller.waypoint(),
-                    plan_length,
                 )
                 .await;
             db.save_schedule(&ship_symbol, &schedule).await;

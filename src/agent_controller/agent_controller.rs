@@ -1,10 +1,11 @@
+use super::join_handles::JoinHandles;
 use super::ledger::Ledger;
 use crate::api_client::api_models::{ShipPurchaseTransaction, WaypointDetailed};
 use crate::broker::{CargoBroker, TransferActor};
 use crate::config::CONFIG;
 use crate::models::{ShipNavStatus::*, *};
 use crate::ship_config::{
-    ship_config_capital_system, ship_config_lategame, ship_config_no_gate,
+    // ship_config_capital_system, ship_config_lategame, ship_config_no_gate,
     ship_config_starter_system,
 };
 use crate::survey_manager::SurveyManager;
@@ -20,7 +21,6 @@ use crate::{
 };
 use dashmap::DashMap;
 use futures::future::BoxFuture;
-use futures::stream::FuturesUnordered;
 use log::*;
 use pathfinding::directed::dijkstra::dijkstra_all;
 use serde::{Deserialize, Serialize};
@@ -686,7 +686,8 @@ impl AgentController {
             let capital = self.faction_capital().await;
             let waypoints: Vec<WaypointDetailed> =
                 self.universe.get_system_waypoints(&capital).await;
-            return ship_config_lategame(&capital, &waypoints);
+            panic!("Late game not supported");
+            // return ship_config_lategame(&capital, &waypoints);
         }
 
         let start_system = self.starting_system();
@@ -705,11 +706,12 @@ impl AgentController {
             _ => true,
         };
         if CONFIG.no_gate_mode {
-            return ship_config_no_gate(
-                &waypoints,
-                use_nonstatic_probes,
-                incl_outer_probes_and_siphons,
-            );
+            panic!("No gate mode not supported");
+            // return ship_config_no_gate(
+            //     &waypoints,
+            //     use_nonstatic_probes,
+            //     incl_outer_probes_and_siphons,
+            // );
         }
 
         ships.append(&mut ship_config_starter_system(
@@ -726,14 +728,15 @@ impl AgentController {
                 self.universe.get_system_waypoints(&capital).await;
             let markets = self.universe.get_system_markets_remote(&capital).await;
             let shipyards = self.universe.get_system_shipyards_remote(&capital).await;
-            ships.append(&mut ship_config_capital_system(
-                &capital,
-                &start_system,
-                &waypoints,
-                &markets,
-                &shipyards,
-                false,
-            ));
+            panic!("Capital system not supported");
+            // ships.append(&mut ship_config_capital_system(
+            //     &capital,
+            //     &start_system,
+            //     &waypoints,
+            //     &markets,
+            //     &shipyards,
+            //     false,
+            // ));
         }
         ships
     }
@@ -822,7 +825,7 @@ impl AgentController {
                 broker.run(Box::new(self_clone)).await;
             });
             debug!("spawn_broker try push join_hdl");
-            self.hdls.push(join_hdl).await;
+            self.hdls.push(join_hdl);
             debug!("spawn_broker pushed join_hdl");
         }
 
@@ -834,8 +837,7 @@ impl AgentController {
             let ship_symbol = ship.key().clone();
             self.spawn_run_ship(ship_symbol).await;
         }
-        self.hdls.wait_all().await;
-        unreachable!();
+        self.hdls.start().await;
     }
 
     pub async fn try_assign_ship(&self, ship_symbol: &str) -> bool {
@@ -889,7 +891,7 @@ impl AgentController {
             let join_hdl = tokio::spawn(async move {
                 ship_scripts::scrap::run(ship_controller).await;
             });
-            self.hdls.push(join_hdl).await;
+            self.hdls.push(join_hdl);
             return;
         }
 
@@ -985,7 +987,7 @@ impl AgentController {
                     }
                 };
                 debug!("spawn_run_ship try push join_hdl");
-                self.hdls.push(join_hdl).await;
+                self.hdls.push(join_hdl);
                 // self.ship_futs.lock().unwrap().push_back(join_hdl);
                 debug!("spawn_run_ship pushed join_hdl");
             }
@@ -1116,47 +1118,5 @@ impl AgentController {
     pub fn set_state_description(&self, ship_symbol: &str, desc: &str) {
         self.ship_state_description
             .insert(ship_symbol.to_string(), desc.to_string());
-    }
-}
-
-// ! todo: replace JoinHandles with TaskTracker from tokio-util (or tokio::task::join_set::JoinSet also from tokio-util)
-// https://docs.rs/tokio-util/0.7.10/tokio_util/task/task_tracker/struct.TaskTracker.html
-use tokio::task::JoinHandle;
-
-#[derive(Debug)]
-struct JoinHandles {
-    handles: Arc<Mutex<FuturesUnordered<JoinHandle<()>>>>,
-    rx: Arc<Mutex<tokio::sync::mpsc::Receiver<JoinHandle<()>>>>,
-    tx: tokio::sync::mpsc::Sender<JoinHandle<()>>,
-}
-impl JoinHandles {
-    fn new() -> Self {
-        let (tx, rx) = tokio::sync::mpsc::channel::<JoinHandle<()>>(1);
-        Self {
-            handles: Arc::new(Mutex::new(FuturesUnordered::new())),
-            rx: Arc::new(Mutex::new(rx)),
-            tx,
-        }
-    }
-    async fn push(&self, handle: tokio::task::JoinHandle<()>) {
-        self.tx.send(handle).await.unwrap();
-    }
-    async fn wait_all(&self) {
-        use futures::StreamExt as _;
-        let mut handles = self.handles.lock().unwrap();
-        let mut rx = self.rx.lock().unwrap();
-
-        loop {
-            tokio::select! {
-                hdl_ret = handles.next() => {
-                    hdl_ret.unwrap().unwrap();
-                    debug!("JoinHandles::wait_all: handle completed");
-                }
-                handle = rx.recv() => {
-                    debug!("JoinHandles::wait_all: adding new handle");
-                    handles.push(handle.unwrap());
-                }
-            }
-        }
     }
 }

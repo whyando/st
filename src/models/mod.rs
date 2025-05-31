@@ -5,7 +5,7 @@ mod ship;
 mod system;
 mod waypoint_symbol;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 pub use contract::*;
 pub use faction::*;
 pub use market::*;
@@ -83,8 +83,23 @@ pub struct WithTimestamp<T> {
 }
 
 #[derive(Debug, Clone)]
+pub enum PlanLength {
+    // Fixed plan size
+    Fixed(Duration),
+    // Ramping plan size, from min to max
+    Ramping(Duration, Duration, f64), // min, max, ramp_factor
+}
+
+#[derive(Debug, Clone)]
+pub struct PlannerConfig {
+    pub plan_length: PlanLength,
+    pub max_compute_time: Duration,
+}
+
+#[derive(Debug, Clone)]
 pub struct LogisticsScriptConfig {
     pub use_planner: bool,
+    pub planner_config: Option<PlannerConfig>,
     pub allow_shipbuying: bool,
     pub allow_construction: bool,
     pub allow_market_refresh: bool,

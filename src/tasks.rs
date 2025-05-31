@@ -559,7 +559,6 @@ impl LogisticTaskManager {
         engine_speed: i64,
         fuel_capacity: i64,
         start_waypoint: &WaypointSymbol,
-        plan_length: Duration,
     ) -> ShipSchedule {
         let _guard = self.take_tasks_lock().await;
         assert_eq!(&start_waypoint.system(), system_symbol);
@@ -599,12 +598,17 @@ impl LogisticTaskManager {
             start_waypoint: start_waypoint.clone(),
             // available_from: Duration::seconds(0), // if we need to account for in-progress task(s)
         };
-        let contraints = PlannerConstraints {
-            plan_length: plan_length.num_seconds() as i64,
-            max_compute_time: Duration::try_seconds(5).unwrap(),
-        };
         let available_tasks_clone = available_tasks.clone();
         let (mut task_assignments, schedules) = if config.use_planner {
+            let planner_config = config.planner_config.as_ref().unwrap();
+            let plan_length = match &planner_config.plan_length {
+                PlanLength::Fixed(duration) => *duration,
+                PlanLength::Ramping(min, max, f) => *min, // @@
+            };
+            let contraints = PlannerConstraints {
+                plan_length: plan_length.num_seconds() as i64,
+                max_compute_time: Duration::try_seconds(5).unwrap(),
+            };
             tokio::task::spawn_blocking(move || {
                 logistics_planner::plan::run_planner(
                     &[logistics_ship],

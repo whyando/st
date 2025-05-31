@@ -1,10 +1,11 @@
 use crate::{
     database::DbClient,
-    models::{LogisticsScriptConfig, ShipFlightMode, SystemSymbol},
+    models::{LogisticsScriptConfig, PlanLength, PlannerConfig, ShipFlightMode, SystemSymbol},
     // ship_config::market_waypoints,
     ship_controller::ShipController,
     universe::pathfinding::EdgeType,
 };
+use chrono::Duration;
 use log::*;
 use pathfinding::directed::dijkstra::dijkstra;
 use serde::{Deserialize, Serialize};
@@ -44,6 +45,14 @@ pub async fn run_explorer(ship: ShipController, db: DbClient) {
         // let inner_market_waypoints = market_waypoints(&waypoints, Some(200));
         let config = LogisticsScriptConfig {
             use_planner: true,
+            planner_config: Some(PlannerConfig {
+                plan_length: PlanLength::Ramping(
+                    Duration::seconds(30),
+                    Duration::minutes(10),
+                    1.85,
+                ),
+                max_compute_time: Duration::seconds(5),
+            }),
             // waypoint_allowlist: Some(inner_market_waypoints.clone()),
             waypoint_allowlist: None,
             allow_shipbuying: false,
