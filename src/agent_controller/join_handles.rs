@@ -40,10 +40,17 @@ impl JoinHandles {
         let mut rx = self.rx.lock().unwrap();
 
         loop {
+            let next_handle = async {
+                if !handles.is_empty() {
+                    handles.next().await.unwrap()
+                } else {
+                    futures::future::pending().await
+                }
+            };
+
             tokio::select! {
-                hdl_ret = handles.next() => {
-                    let result = hdl_ret.unwrap();
-                    result.unwrap();
+                hdl_ret = next_handle => {
+                    hdl_ret.unwrap();
                     debug!("JoinHandles::wait_all: handle completed");
                 }
                 handle = rx.recv() => {
