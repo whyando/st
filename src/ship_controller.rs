@@ -858,7 +858,10 @@ impl ShipController {
 
     pub fn handle_ship_condition_events(&self, events: &Vec<ShipConditionEvent>) {
         for e in events {
-            self.debug(&format!("ENCOUNTERED SHIP EVENT: {:?}", e));
+            self.debug(&format!(
+                "Encountered ship event: {} ({})",
+                e.symbol, e.component
+            ));
         }
     }
 
