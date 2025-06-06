@@ -1,9 +1,9 @@
 pub mod db_models;
 
-use crate::logistics_planner::Task;
 use crate::models::Construction;
 use crate::models::KeyedSurvey;
 use crate::schema::*;
+use crate::tasks::TaskManagerState;
 use crate::{
     logistics_planner::ShipSchedule,
     models::{
@@ -11,7 +11,6 @@ use crate::{
         WithTimestamp,
     },
 };
-use chrono::DateTime;
 use chrono::Utc;
 use dashmap::DashMap;
 use diesel::sql_types::{Integer, Text};
@@ -26,7 +25,6 @@ use diesel_async::pooled_connection::deadpool::Pool;
 use diesel_async::pooled_connection::AsyncDieselConnectionManager;
 use diesel_async::AsyncPgConnection;
 use diesel_async::RunQueryDsl as _;
-use diesel_async::SimpleAsyncConnection as _;
 use log::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -336,15 +334,15 @@ impl DbClient {
     pub async fn save_task_manager_state(
         &self,
         system_symbol: &SystemSymbol,
-        status: &DashMap<String, (Task, String, DateTime<Utc>)>,
+        state: &TaskManagerState,
     ) {
         let key = format!("task_manager/{}", system_symbol);
-        self.set_value(&key, status).await
+        self.set_value(&key, state).await
     }
     pub async fn load_task_manager_state(
         &self,
         system_symbol: &SystemSymbol,
-    ) -> Option<DashMap<String, (Task, String, DateTime<Utc>)>> {
+    ) -> Option<TaskManagerState> {
         let key = format!("task_manager/{}", system_symbol);
         self.get_value(&key).await
     }

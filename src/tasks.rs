@@ -14,6 +14,7 @@ use crate::universe::{Universe, WaypointFilter};
 use chrono::{DateTime, Duration, Utc};
 use dashmap::DashMap;
 use log::*;
+use serde::{Deserialize, Serialize};
 use std::cmp::min;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, RwLock};
@@ -47,15 +48,19 @@ fn is_task_allowed(task: &Task, config: &LogisticsScriptConfig) -> bool {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TaskManagerState {
+    in_progress_tasks: DashMap<String, (Task, String, DateTime<Utc>)>,
+    planner_run_count: u64,
+}
+
 #[derive(Clone)]
 pub struct LogisticTaskManager {
     start_system: SystemSymbol,
     agent_controller: Arc<RwLock<Option<AgentController>>>,
     universe: Arc<Universe>,
     db_client: DbClient,
-
-    // task_id -> (task, ship_symbol, timestamp)
-    in_progress_tasks: Arc<DashMap<String, (Task, String, DateTime<Utc>)>>,
+    state: Arc<RwLock<TaskManagerState>>,
     take_tasks_mutex_guard: Arc<tokio::sync::Mutex<()>>,
 }
 
@@ -65,26 +70,38 @@ impl LogisticTaskManager {
         db_client: &DbClient,
         start_system: &SystemSymbol,
     ) -> Self {
-        let in_progress_tasks = db_client
+        let state = db_client
             .load_task_manager_state(start_system)
             .await
-            .unwrap_or_default();
+            .unwrap_or_else(|| TaskManagerState {
+                in_progress_tasks: DashMap::new(),
+                planner_run_count: 0,
+            });
         Self {
             start_system: start_system.clone(),
             universe: universe.clone(),
             db_client: db_client.clone(),
             agent_controller: Arc::new(RwLock::new(None)),
-            in_progress_tasks: Arc::new(in_progress_tasks),
+            state: Arc::new(RwLock::new(state)),
             take_tasks_mutex_guard: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
 
     pub fn in_progress_tasks(&self) -> Arc<DashMap<String, (Task, String, DateTime<Utc>)>> {
-        self.in_progress_tasks.clone()
+        Arc::new(self.state.read().unwrap().in_progress_tasks.clone())
     }
 
     pub fn get_assigned_task_status(&self, task_id: &str) -> Option<(Task, String, DateTime<Utc>)> {
-        self.in_progress_tasks.get(task_id).map(|v| v.clone())
+        self.state
+            .read()
+            .unwrap()
+            .in_progress_tasks
+            .get(task_id)
+            .map(|v| v.clone())
+    }
+
+    pub fn get_planner_run_count(&self) -> u64 {
+        self.state.read().unwrap().planner_run_count
     }
 
     pub fn set_agent_controller(&self, ac: &AgentController) {
@@ -549,6 +566,21 @@ impl LogisticTaskManager {
         }
     }
 
+    async fn update_state<F>(&self, f: F)
+    where
+        F: FnOnce(&mut TaskManagerState),
+    {
+        let state = {
+            let mut state = self.state.write().unwrap();
+            f(&mut state);
+            (*state).clone()
+        };
+        self.db_client
+            .save_task_manager_state(&self.start_system, &state)
+            .await;
+        *self.state.write().unwrap() = state;
+    }
+
     // Provide a set of tasks for a single ship
     pub async fn take_tasks(
         &self,
@@ -564,7 +596,11 @@ impl LogisticTaskManager {
         assert_eq!(&start_waypoint.system(), system_symbol);
 
         // Cleanup in_progress_tasks for this ship
-        self.in_progress_tasks.retain(|_k, v| v.1 != ship_symbol);
+        self.update_state(|state| {
+            state.in_progress_tasks.retain(|_k, v| v.1 != ship_symbol);
+        })
+        .await;
+
         let all_tasks = self
             .generate_task_list(system_symbol, cargo_capacity, true, config.min_profit)
             .await;
@@ -576,7 +612,14 @@ impl LogisticTaskManager {
         // Also filter tasks outlawed by the config for this ship
         let available_tasks = all_tasks
             .into_iter()
-            .filter(|task| !self.in_progress_tasks.contains_key(&task.id))
+            .filter(|task| {
+                !self
+                    .state
+                    .read()
+                    .unwrap()
+                    .in_progress_tasks
+                    .contains_key(&task.id)
+            })
             .filter(|task| is_task_allowed(&task, config))
             .collect::<Vec<_>>();
 
@@ -601,10 +644,26 @@ impl LogisticTaskManager {
         let available_tasks_clone = available_tasks.clone();
         let (mut task_assignments, schedules) = if config.use_planner {
             let planner_config = config.planner_config.as_ref().unwrap();
+            let run_count = self.get_planner_run_count();
             let plan_length = match &planner_config.plan_length {
                 PlanLength::Fixed(duration) => *duration,
-                PlanLength::Ramping(min, max, f) => *min, // @@
+                PlanLength::Ramping(min, max, ramp_factor) => {
+                    // Safety check: if run_count is high enough that min * ramp_factor^run_count would overflow,
+                    // just return max duration
+                    if run_count >= 10 {
+                        *max
+                    } else {
+                        let duration =
+                            min.num_seconds() as f64 * (*ramp_factor).powf(run_count as f64);
+                        let duration = duration.min(max.num_seconds() as f64);
+                        Duration::try_seconds(duration as i64).unwrap()
+                    }
+                }
             };
+            debug!(
+                "Planner run count: {}, plan length: {:?}",
+                run_count, plan_length
+            );
             let contraints = PlannerConstraints {
                 plan_length: plan_length.num_seconds() as i64,
                 max_compute_time: Duration::try_seconds(5).unwrap(),
@@ -683,24 +742,34 @@ impl LogisticTaskManager {
             }
         }
 
-        for (task_id, ship_symbol) in task_assignments {
-            let task = available_tasks.iter().find(|t| t.id == task_id).unwrap();
-            debug!("Assigned task {} to ship {}", task_id, ship_symbol);
-            self.in_progress_tasks
-                .insert(task_id, (task.clone(), ship_symbol.clone(), Utc::now()));
-        }
-        self.db_client
-            .save_task_manager_state(&self.start_system, &self.in_progress_tasks)
+        if config.use_planner {
+            self.update_state(|state| {
+                state.planner_run_count += 1;
+            })
             .await;
+        }
+
+        if !task_assignments.is_empty() {
+            self.update_state(|state| {
+                for (task_id, ship_symbol) in task_assignments {
+                    let task = available_tasks.iter().find(|t| t.id == task_id).unwrap();
+                    debug!("Assigned task {} to ship {}", task_id, ship_symbol);
+                    state
+                        .in_progress_tasks
+                        .insert(task_id, (task.clone(), ship_symbol.clone(), Utc::now()));
+                }
+            })
+            .await;
+        }
 
         schedule
     }
 
     pub async fn set_task_completed(&self, task_id: &str) {
-        self.in_progress_tasks.remove(task_id);
-        self.db_client
-            .save_task_manager_state(&self.start_system, &self.in_progress_tasks)
-            .await;
+        self.update_state(|state| {
+            state.in_progress_tasks.remove(task_id);
+        })
+        .await;
         debug!("Marking task {} as completed", task_id);
     }
 }
