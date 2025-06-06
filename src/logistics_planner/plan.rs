@@ -23,7 +23,8 @@ struct Planner<'a> {
 struct Activity {
     waypoint: WaypointSymbol,
     action: Action,
-    completes_task_id: Option<String>,
+    task_id: String,
+    completes_task: bool,
 }
 
 impl<'a> Planner<'a> {
@@ -49,7 +50,8 @@ impl<'a> Planner<'a> {
                         Activity {
                             waypoint: waypoint.clone(),
                             action: action.clone(),
-                            completes_task_id: Some(task.id.clone()),
+                            task_id: task.id.clone(),
+                            completes_task: true,
                         },
                     );
                     let job = SingleBuilder::default()
@@ -120,7 +122,8 @@ impl<'a> Planner<'a> {
                         Activity {
                             waypoint: src.clone(),
                             action: src_action.clone(),
-                            completes_task_id: None,
+                            task_id: task.id.clone(),
+                            completes_task: false,
                         },
                     );
                     job_id_map.insert(
@@ -128,7 +131,8 @@ impl<'a> Planner<'a> {
                         Activity {
                             waypoint: dest.clone(),
                             action: dest_action.clone(),
-                            completes_task_id: Some(task.id.clone()),
+                            task_id: task.id.clone(),
+                            completes_task: true,
                         },
                     );
                     job
@@ -212,7 +216,7 @@ pub fn run_planner(
     duration_matrix: &[Vec<f64>],
     distance_matrix: &[Vec<f64>],
     constraints: &PlannerConstraints,
-) -> (BTreeMap<String, String>, Vec<ShipSchedule>) {
+) -> Vec<ShipSchedule> {
     let planner = Planner {
         ships,
         tasks,
@@ -233,7 +237,6 @@ pub fn run_planner(
 
     let solution = Solver::new(problem.clone(), config).solve().unwrap();
 
-    let mut task_result = BTreeMap::<String, String>::new();
     let ship_schedules = ships
         .iter()
         .map(|ship| {
@@ -264,11 +267,9 @@ pub fn run_planner(
                         waypoint: activity.waypoint.clone(),
                         action: activity.action.clone(),
                         timestamp: arrival,
-                        completes_task_id: activity.completes_task_id.clone(),
+                        task_id: activity.task_id.clone(),
+                        completes_task: activity.completes_task,
                     });
-                    if let Some(task_id) = &activity.completes_task_id {
-                        task_result.insert(task_id.clone(), ship.symbol.clone());
-                    }
                 }
             }
             ShipSchedule {
@@ -277,7 +278,7 @@ pub fn run_planner(
             }
         })
         .collect();
-    (task_result, ship_schedules)
+    ship_schedules
 }
 
 #[cfg(test)]
@@ -344,7 +345,7 @@ mod test {
         ];
         let duration_matrix = vec![vec![0.0, 100.0], vec![100.0, 0.0]];
         let distance_matrix = vec![vec![0.0, 100.0], vec![100.0, 0.0]];
-        let (assignments, schedule) = run_planner(
+        let schedule = run_planner(
             &ships,
             &tasks,
             &market_waypoints,
@@ -352,9 +353,7 @@ mod test {
             &distance_matrix,
             &constraints,
         );
-        println!("assignments: {:?}", assignments);
         println!("schedule: {:?}", schedule);
         assert_eq!(schedule.len(), 2);
-        assert_eq!(assignments.len(), 3);
     }
 }

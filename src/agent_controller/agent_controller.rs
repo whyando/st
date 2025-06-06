@@ -940,11 +940,10 @@ impl AgentController {
                         })
                     }
                     ShipBehaviour::Logistics(config) => {
-                        let db = self.db.clone();
                         let task_manager = self.task_manager.clone();
                         let config = config.clone();
                         tokio::spawn(async move {
-                            ship_scripts::logistics::run(ship_controller, db, task_manager, config)
+                            ship_scripts::logistics::run(ship_controller, task_manager, config)
                                 .await;
                         })
                     }

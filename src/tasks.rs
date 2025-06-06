@@ -16,7 +16,7 @@ use dashmap::DashMap;
 use log::*;
 use serde::{Deserialize, Serialize};
 use std::cmp::min;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::{Arc, RwLock};
 
 fn is_task_allowed(task: &Task, config: &LogisticsScriptConfig) -> bool {
@@ -49,8 +49,19 @@ fn is_task_allowed(task: &Task, config: &LogisticsScriptConfig) -> bool {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LogisticsShip {
+    pub system_symbol: SystemSymbol,
+    pub config: LogisticsScriptConfig,
+    pub cargo_capacity: i64,
+    pub engine_speed: i64,
+    pub fuel_capacity: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TaskManagerState {
     in_progress_tasks: DashMap<String, (Task, String, DateTime<Utc>)>,
+    ship_tasks: DashMap<String, VecDeque<ScheduledAction>>,
+    logistics_ships: DashMap<String, LogisticsShip>,
     planner_run_count: u64,
 }
 
@@ -75,6 +86,8 @@ impl LogisticTaskManager {
             .await
             .unwrap_or_else(|| TaskManagerState {
                 in_progress_tasks: DashMap::new(),
+                ship_tasks: DashMap::new(),
+                logistics_ships: DashMap::new(),
                 planner_run_count: 0,
             });
         Self {
@@ -85,19 +98,6 @@ impl LogisticTaskManager {
             state: Arc::new(RwLock::new(state)),
             take_tasks_mutex_guard: Arc::new(tokio::sync::Mutex::new(())),
         }
-    }
-
-    pub fn in_progress_tasks(&self) -> Arc<DashMap<String, (Task, String, DateTime<Utc>)>> {
-        Arc::new(self.state.read().unwrap().in_progress_tasks.clone())
-    }
-
-    pub fn get_assigned_task_status(&self, task_id: &str) -> Option<(Task, String, DateTime<Utc>)> {
-        self.state
-            .read()
-            .unwrap()
-            .in_progress_tasks
-            .get(task_id)
-            .map(|v| v.clone())
     }
 
     pub fn get_planner_run_count(&self) -> u64 {
@@ -137,15 +137,10 @@ impl LogisticTaskManager {
     ) -> Vec<Task> {
         let now = chrono::Utc::now();
         let waypoints: Vec<WaypointDetailed> =
-            self.universe.get_system_waypoints(system_symbol).await;
+            self.universe.get_system_waypoints(&system_symbol).await;
 
         let mut tasks = Vec::new();
-
-        let system_prefix = if system_symbol == &self.start_system {
-            "".to_string()
-        } else {
-            format!("{}/", system_symbol)
-        };
+        let system_prefix = format!("{}/", system_symbol);
 
         // !! one day recalculate ship config here perhaps
 
@@ -166,7 +161,7 @@ impl LogisticTaskManager {
             self.agent_controller()._spawn_run_ship(ship_symbol).await;
         }
         if let Some(waypoint) = shipyard_task_waypoint {
-            if &waypoint.system() == system_symbol {
+            if waypoint.system() == *system_symbol {
                 tasks.push(Task {
                     id: format!("{}buyships_{}", system_prefix, waypoint),
                     actions: TaskActions::VisitLocation {
@@ -179,8 +174,8 @@ impl LogisticTaskManager {
         }
 
         // load markets
-        let markets = self.universe.get_system_markets(system_symbol).await;
-        let shipyards = self.universe.get_system_shipyards(system_symbol).await;
+        let markets = self.universe.get_system_markets(&system_symbol).await;
+        let shipyards = self.universe.get_system_shipyards(&system_symbol).await;
 
         // unique list of goods
         let mut goods = BTreeSet::new();
@@ -566,7 +561,7 @@ impl LogisticTaskManager {
         }
     }
 
-    async fn update_state<F>(&self, f: F)
+    pub async fn update_state<F>(&self, f: F)
     where
         F: FnOnce(&mut TaskManagerState),
     {
@@ -581,25 +576,52 @@ impl LogisticTaskManager {
         *self.state.write().unwrap() = state;
     }
 
-    // Provide a set of tasks for a single ship
+    fn assert_no_in_progress_tasks(&self, ship_symbol: &str) {
+        let state = self.state.read().unwrap();
+        assert!(
+            !state
+                .in_progress_tasks
+                .iter()
+                .any(|entry| entry.value().1 == ship_symbol),
+            "Ship {} already has an in-progress task",
+            ship_symbol
+        );
+    }
+
+    fn assert_no_queued_tasks(&self, ship_symbol: &str) {
+        let state = self.state.read().unwrap();
+        let ship_tasks = state.ship_tasks.get(ship_symbol);
+        assert!(
+            ship_tasks.map_or(true, |queue| queue.is_empty()),
+            "Ship {} already has scheduled tasks",
+            ship_symbol
+        );
+    }
+
     pub async fn take_tasks(
         &self,
         ship_symbol: &str,
-        system_symbol: &SystemSymbol,
-        config: &LogisticsScriptConfig,
-        cargo_capacity: i64,
-        engine_speed: i64,
-        fuel_capacity: i64,
         start_waypoint: &WaypointSymbol,
-    ) -> ShipSchedule {
+    ) -> Option<ScheduledAction> {
         let _guard = self.take_tasks_lock().await;
-        assert_eq!(&start_waypoint.system(), system_symbol);
+        let system_symbol = &self.start_system;
 
-        // Cleanup in_progress_tasks for this ship
-        self.update_state(|state| {
-            state.in_progress_tasks.retain(|_k, v| v.1 != ship_symbol);
-        })
-        .await;
+        // Assert there are no in progress tasks or scheduled tasks for this ship
+        self.assert_no_in_progress_tasks(ship_symbol);
+        self.assert_no_queued_tasks(ship_symbol);
+
+        let logistics_ship_config = self
+            .state
+            .read()
+            .unwrap()
+            .logistics_ships
+            .get(ship_symbol)?
+            .value()
+            .clone();
+        let cargo_capacity = logistics_ship_config.cargo_capacity;
+        let config = &logistics_ship_config.config;
+        let engine_speed = logistics_ship_config.engine_speed;
+        let fuel_capacity = logistics_ship_config.fuel_capacity;
 
         let all_tasks = self
             .generate_task_list(system_symbol, cargo_capacity, true, config.min_profit)
@@ -620,12 +642,17 @@ impl LogisticTaskManager {
                     .in_progress_tasks
                     .contains_key(&task.id)
             })
-            .filter(|task| is_task_allowed(&task, config))
+            .filter(|task| is_task_allowed(&task, &config))
             .collect::<Vec<_>>();
 
+        if available_tasks.is_empty() {
+            return None;
+        }
+
+        // Run planner
         let market_waypoints = self
             .universe
-            .get_system_waypoints(system_symbol)
+            .get_system_waypoints(&system_symbol)
             .await
             .into_iter()
             .filter(|w| w.is_market())
@@ -639,10 +666,8 @@ impl LogisticTaskManager {
             capacity: cargo_capacity,
             speed: engine_speed,
             start_waypoint: start_waypoint.clone(),
-            // available_from: Duration::seconds(0), // if we need to account for in-progress task(s)
         };
-        let available_tasks_clone = available_tasks.clone();
-        let (mut task_assignments, schedules) = if config.use_planner {
+        let schedules = if config.use_planner {
             let planner_config = config.planner_config.as_ref().unwrap();
             let run_count = self.get_planner_run_count();
             let plan_length = match &planner_config.plan_length {
@@ -660,14 +685,11 @@ impl LogisticTaskManager {
                     }
                 }
             };
-            debug!(
-                "Planner run count: {}, plan length: {:?}",
-                run_count, plan_length
-            );
             let contraints = PlannerConstraints {
                 plan_length: plan_length.num_seconds() as i64,
                 max_compute_time: Duration::try_seconds(5).unwrap(),
             };
+            let available_tasks_clone = available_tasks.clone();
             tokio::task::spawn_blocking(move || {
                 logistics_planner::plan::run_planner(
                     &[logistics_ship],
@@ -684,17 +706,16 @@ impl LogisticTaskManager {
             .await
             .unwrap()
         } else {
-            let ship_schedule = ShipSchedule {
+            vec![ShipSchedule {
                 ship: logistics_ship,
                 actions: vec![],
-            };
-            (BTreeMap::new(), vec![ship_schedule])
+            }]
         };
         assert_eq!(schedules.len(), 1);
-        let mut schedule = schedules.into_iter().next().unwrap();
+        let mut actions = schedules.into_iter().next().unwrap().actions;
 
         // If 0 tasks were assigned, instead force assign the highest value task
-        if schedule.actions.len() == 0 {
+        if actions.len() == 0 {
             let mut highest_value_task = None;
             let mut highest_value = 0;
             for task in &available_tasks {
@@ -711,11 +732,12 @@ impl LogisticTaskManager {
                 // add actions for the task
                 match &task.actions {
                     TaskActions::VisitLocation { waypoint, action } => {
-                        schedule.actions.push(ScheduledAction {
+                        actions.push(ScheduledAction {
                             timestamp: 0.0,
                             waypoint: waypoint.clone(),
                             action: action.clone(),
-                            completes_task_id: Some(task.id.clone()),
+                            task_id: task.id.clone(),
+                            completes_task: true,
                         });
                     }
                     TaskActions::TransportCargo {
@@ -724,53 +746,114 @@ impl LogisticTaskManager {
                         src_action,
                         dest_action,
                     } => {
-                        schedule.actions.push(ScheduledAction {
+                        actions.push(ScheduledAction {
                             timestamp: 0.0,
                             waypoint: src.clone(),
                             action: src_action.clone(),
-                            completes_task_id: None,
+                            task_id: task.id.clone(),
+                            completes_task: false,
                         });
-                        schedule.actions.push(ScheduledAction {
+                        actions.push(ScheduledAction {
                             timestamp: 0.0,
                             waypoint: dest.clone(),
                             action: dest_action.clone(),
-                            completes_task_id: Some(task.id.clone()),
+                            task_id: task.id.clone(),
+                            completes_task: true,
                         });
                     }
                 };
-                task_assignments.insert(task.id.clone(), ship_symbol.to_string());
             }
         }
 
-        if config.use_planner {
-            self.update_state(|state| {
-                state.planner_run_count += 1;
-            })
-            .await;
-        }
-
-        if !task_assignments.is_empty() {
-            self.update_state(|state| {
-                for (task_id, ship_symbol) in task_assignments {
-                    let task = available_tasks.iter().find(|t| t.id == task_id).unwrap();
-                    debug!("Assigned task {} to ship {}", task_id, ship_symbol);
-                    state
-                        .in_progress_tasks
-                        .insert(task_id, (task.clone(), ship_symbol.clone(), Utc::now()));
-                }
-            })
-            .await;
-        }
-
-        schedule
-    }
-
-    pub async fn set_task_completed(&self, task_id: &str) {
+        // Store the task in the ship's queue, and also update in_progress_tasks
         self.update_state(|state| {
-            state.in_progress_tasks.remove(task_id);
+            for action in &actions {
+                if action.completes_task {
+                    let task = available_tasks
+                        .iter()
+                        .find(|t| t.id == action.task_id)
+                        .unwrap();
+                    state.in_progress_tasks.insert(
+                        action.task_id.clone(),
+                        (task.clone(), ship_symbol.to_string(), Utc::now()),
+                    );
+                }
+            }
+            let queue = VecDeque::from(actions);
+            state.ship_tasks.insert(ship_symbol.to_string(), queue);
         })
         .await;
-        debug!("Marking task {} as completed", task_id);
+
+        // Return the first action
+        self.state
+            .read()
+            .unwrap()
+            .ship_tasks
+            .get(ship_symbol)
+            .and_then(|queue| queue.front().cloned())
+    }
+
+    pub fn get_next_action(&self, ship_symbol: &str) -> Option<ScheduledAction> {
+        self.state
+            .read()
+            .unwrap()
+            .ship_tasks
+            .get(ship_symbol)
+            .and_then(|queue| queue.front().cloned())
+    }
+
+    pub async fn complete_action(&self, ship_symbol: &str, action: &ScheduledAction) {
+        self.update_state(|state| {
+            // 1. Remove action from ship's queue
+            let mut ship_tasks = state.ship_tasks.get_mut(ship_symbol).unwrap();
+            let front: &ScheduledAction = ship_tasks.front().unwrap();
+            assert_eq!(front, action);
+            ship_tasks.pop_front();
+
+            // 2. If the action completes a task, remove the task from in_progress_tasks
+            if action.completes_task {
+                state.in_progress_tasks.remove(&action.task_id);
+            }
+        })
+        .await;
+    }
+
+    pub async fn register_ship(
+        &self,
+        ship_symbol: &str,
+        system_symbol: &SystemSymbol,
+        config: &LogisticsScriptConfig,
+        cargo_capacity: i64,
+        engine_speed: i64,
+        fuel_capacity: i64,
+    ) {
+        self.update_state(|state| {
+            state.logistics_ships.insert(
+                ship_symbol.to_string(),
+                LogisticsShip {
+                    system_symbol: system_symbol.clone(),
+                    config: config.clone(),
+                    cargo_capacity,
+                    engine_speed,
+                    fuel_capacity,
+                },
+            );
+        })
+        .await;
+    }
+
+    pub async fn get_next_task(
+        &self,
+        ship_symbol: &str,
+        start_waypoint: &WaypointSymbol,
+    ) -> Option<ScheduledAction> {
+        // First try to get the next action from an existing task
+        if let Some(action) = self.get_next_action(ship_symbol) {
+            return Some(action);
+        }
+
+        // If no existing task, try to take a new one
+        self.take_tasks(ship_symbol, start_waypoint).await
     }
 }
 

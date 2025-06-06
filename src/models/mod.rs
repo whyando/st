@@ -82,7 +82,7 @@ pub struct WithTimestamp<T> {
     pub data: T,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PlanLength {
     // Fixed plan size
     Fixed(Duration),
@@ -90,13 +90,13 @@ pub enum PlanLength {
     Ramping(Duration, Duration, f64), // min, max, ramp_factor
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlannerConfig {
     pub plan_length: PlanLength,
     pub max_compute_time: Duration,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogisticsScriptConfig {
     pub use_planner: bool,
     pub planner_config: Option<PlannerConfig>,

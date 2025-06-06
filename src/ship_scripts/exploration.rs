@@ -19,7 +19,7 @@ enum ExplorerState {
     Exit,
 }
 
-pub async fn run_explorer(ship: ShipController, db: DbClient) {
+pub async fn run_explorer(ship: ShipController, _db: DbClient) {
     info!("Starting script explorer for {}", ship.symbol());
     ship.wait_for_transit().await;
 
@@ -60,7 +60,7 @@ pub async fn run_explorer(ship: ShipController, db: DbClient) {
             allow_construction: false,
             min_profit: 5000,
         };
-        crate::ship_scripts::logistics::run(ship.clone(), db, task_manager, config).await;
+        crate::ship_scripts::logistics::run(ship.clone(), task_manager, config).await;
     }
 }
 

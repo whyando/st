@@ -70,12 +70,13 @@ pub struct PlannerConstraints {
     pub max_compute_time: chrono::Duration,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ScheduledAction {
     pub timestamp: f64,
     pub waypoint: WaypointSymbol,
     pub action: Action,
-    pub completes_task_id: Option<String>,
+    pub task_id: String,
+    pub completes_task: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
