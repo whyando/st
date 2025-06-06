@@ -59,8 +59,8 @@ pub struct Universe {
     systems: DashMap<SystemSymbol, System>,
     constructions: DashMap<WaypointSymbol, Arc<WithTimestamp<Option<Construction>>>>,
     remote_markets: DashMap<WaypointSymbol, MarketRemoteView>,
-    markets: DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Market>>>>,
     remote_shipyards: DashMap<WaypointSymbol, ShipyardRemoteView>,
+    markets: DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Market>>>>,
     shipyards: DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Shipyard>>>>,
     factions: DashMap<String, Faction>,
     jumpgates: DashMap<WaypointSymbol, JumpGateInfo>,
@@ -70,137 +70,29 @@ pub struct Universe {
 }
 
 impl Universe {
-    pub fn new(api_client: &ApiClient, db: &DbClient) -> Self {
+    pub async fn new(api_client: &ApiClient, db: &DbClient) -> Self {
+        let db = db.clone();
+        let systems = load_systems(&db).await;
+        let jumpgates = load_jumpgates(&db).await;
+        let factions = load_factions(&db, api_client).await;
+        let remote_markets = load_remote_markets(&db).await;
+        let remote_shipyards = load_remote_shipyards(&db).await;
+        let markets = load_markets(&db).await;
+        let shipyards = load_shipyards(&db).await;
         Self {
             api_client: api_client.clone(),
             db: db.clone(),
-            systems: DashMap::new(),
+
+            systems: DashMap::from_iter(systems.into_iter()),
             constructions: DashMap::new(),
-            remote_markets: DashMap::new(),
-            markets: DashMap::new(),
-            remote_shipyards: DashMap::new(),
-            shipyards: DashMap::new(),
-            factions: DashMap::new(),
-            jumpgates: DashMap::new(),
+            remote_markets: DashMap::from_iter(remote_markets.into_iter()),
+            remote_shipyards: DashMap::from_iter(remote_shipyards.into_iter()),
+            markets: DashMap::from_iter(markets.into_iter()),
+            shipyards: DashMap::from_iter(shipyards.into_iter()),
+            factions: DashMap::from_iter(factions.into_iter()),
+            jumpgates: DashMap::from_iter(jumpgates.into_iter()),
+
             warp_jump_graph: Cache::new(1),
-        }
-    }
-
-    pub async fn init(&self) {
-        self.init_systems().await;
-        self.init_jumpgates().await;
-    }
-
-    async fn init_systems(&self) {
-        let status = self.api_client.status().await.1.unwrap();
-        let query_start = std::time::Instant::now();
-        let systems: Vec<db_models::System> = systems::table
-            .select(db_models::System::as_select())
-            .load(&mut self.db.conn().await)
-            .await
-            .expect("DB Query error");
-        let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
-        info!("Loaded {} systems in {:.3}s", systems.len(), duration);
-
-        let query_start = std::time::Instant::now();
-        let waypoints = db_models::Waypoint::belonging_to(&systems)
-            .select(db_models::Waypoint::as_select())
-            .load(&mut self.db.conn().await)
-            .await
-            .expect("DB Query error");
-        let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
-        info!("Loaded {} waypoints in {:.3}s", waypoints.len(), duration);
-
-        let query_start = std::time::Instant::now();
-        let waypoint_details = db_models::WaypointDetails::belonging_to(&waypoints)
-            .select(db_models::WaypointDetails::as_select())
-            .load(&mut self.db.conn().await)
-            .await
-            .expect("DB Query error");
-        let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
-        info!(
-            "Loaded {} waypoint details in {:.3}s",
-            waypoint_details.len(),
-            duration
-        );
-
-        let num_systems = systems.len() as i64;
-        let grouped_details = waypoint_details.grouped_by(&waypoints);
-        let waypoints = waypoints
-            .into_iter()
-            .zip(grouped_details)
-            .grouped_by(&systems);
-
-        let system_iter = std::iter::zip(systems, waypoints);
-        if num_systems == status.stats.systems {
-            for (system, waypoints) in system_iter {
-                let waypoints = waypoints
-                    .into_iter()
-                    .map(|(waypoint, details)| {
-                        let details = match details.len() {
-                            0 => None,
-                            1 => {
-                                let details = details.into_iter().next().unwrap();
-                                Some(WaypointDetails {
-                                    is_under_construction: details.is_under_construction,
-                                    is_market: details.is_market,
-                                    is_shipyard: details.is_shipyard,
-                                    is_uncharted: details.is_uncharted,
-                                })
-                            }
-                            _ => panic!("Multiple details for waypoint"),
-                        };
-                        Waypoint {
-                            id: waypoint.id,
-                            symbol: WaypointSymbol::new(&waypoint.symbol),
-                            waypoint_type: waypoint.type_,
-                            x: waypoint.x as i64,
-                            y: waypoint.y as i64,
-                            details,
-                        }
-                    })
-                    .collect();
-                self.systems.insert(
-                    SystemSymbol::new(&system.symbol),
-                    System {
-                        symbol: SystemSymbol::new(&system.symbol),
-                        system_type: system.type_,
-                        x: system.x as i64,
-                        y: system.y as i64,
-                        waypoints,
-                    },
-                );
-            }
-        } else {
-            warn!(
-                "Only {} systems loaded out of {}",
-                num_systems, status.stats.systems
-            );
-        }
-    }
-
-    async fn init_jumpgates(&self) {
-        let query_start = std::time::Instant::now();
-        let jumpgates: Vec<db_models::JumpGateConnections> = jumpgate_connections::table
-            .select(db_models::JumpGateConnections::as_select())
-            .load(&mut self.db.conn().await)
-            .await
-            .expect("DB Query error");
-        let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
-        info!("Loaded {} jumpgates in {:.3}s", jumpgates.len(), duration);
-
-        for jumpgate in jumpgates {
-            self.jumpgates.insert(
-                WaypointSymbol::new(&jumpgate.waypoint_symbol),
-                JumpGateInfo {
-                    is_constructed: !jumpgate.is_under_construction,
-                    connections: jumpgate
-                        .edges
-                        .iter()
-                        .map(|symbol| WaypointSymbol::new(symbol))
-                        .collect(),
-                },
-            );
         }
     }
 
@@ -344,6 +236,14 @@ impl Universe {
             .expect("System not found")
             .value()
             .clone()
+    }
+
+    pub fn get_faction(&self, faction: &str) -> Faction {
+        self.factions.get(faction).unwrap().clone()
+    }
+
+    pub fn get_factions(&self) -> Vec<Faction> {
+        self.factions.iter().map(|x| x.value().clone()).collect()
     }
 
     pub async fn ensure_system_loaded(&self, symbol: &SystemSymbol) {
@@ -578,12 +478,7 @@ impl Universe {
         if let Some(market) = &self.remote_markets.get(symbol) {
             return market.value().clone();
         }
-        // Layer 2 - check db
-        if let Some(market) = self.db.get_market_remote(symbol).await {
-            self.remote_markets.insert(symbol.clone(), market.clone());
-            return market;
-        }
-        // Layer 3 - fetch from api
+        // Layer 2 - fetch from api and save
         let market = self.api_client.get_market_remote(symbol).await;
         self.db.save_market_remote(symbol, &market).await;
         self.remote_markets.insert(symbol.clone(), market.clone());
@@ -595,13 +490,7 @@ impl Universe {
         if let Some(shipyard) = &self.remote_shipyards.get(symbol) {
             return shipyard.value().clone();
         }
-        // Layer 2 - check db
-        if let Some(shipyard) = self.db.get_shipyard_remote(symbol).await {
-            self.remote_shipyards
-                .insert(symbol.clone(), shipyard.clone());
-            return shipyard;
-        }
-        // Layer 3 - fetch from api
+        // Layer 2 - fetch from api and save
         let shipyard = self.api_client.get_shipyard_remote(symbol).await;
         self.db.save_shipyard_remote(symbol, &shipyard).await;
         self.remote_shipyards
@@ -704,35 +593,6 @@ impl Universe {
         let waypoints = self.get_system_waypoints(&system_symbol).await;
         let pathfinding = Pathfinding::new(waypoints);
         pathfinding.get_route(src, dest, speed, start_fuel, fuel_capacity)
-    }
-
-    // make sure factions loaded
-    pub async fn load_factions(&self) {
-        let db_faction_key = "factions";
-        if self.factions.len() > 0 {
-            return;
-        }
-
-        // Layer - check db
-        let factions: Option<Vec<Faction>> = self.db.get_value(db_faction_key).await;
-        if let Some(factions) = factions {
-            for faction in factions {
-                self.factions
-                    .insert(faction.symbol.clone(), faction.clone());
-            }
-        }
-        // Layer - fetch from api
-        let factions: Vec<Faction> = self.api_client.get_all_pages("/factions").await;
-        self.db.set_value(db_faction_key, &factions).await;
-        for faction in factions {
-            self.factions
-                .insert(faction.symbol.clone(), faction.clone());
-        }
-    }
-
-    pub async fn get_faction(&self, faction: &str) -> Faction {
-        self.load_factions().await;
-        self.factions.get(faction).unwrap().clone()
     }
 
     pub async fn get_jumpgate_opt(&self, symbol: &SystemSymbol) -> Option<WaypointSymbol> {
@@ -883,4 +743,199 @@ impl Universe {
         }
         (durations, distances)
     }
+}
+
+// Load all rows from `systems`, `waypoints` and `waypoint_details` tables
+async fn load_systems(db: &DbClient) -> BTreeMap<SystemSymbol, System> {
+    let query_start = std::time::Instant::now();
+    let systems: Vec<db_models::System> = systems::table
+        .select(db_models::System::as_select())
+        .load(&mut db.conn().await)
+        .await
+        .expect("DB Query error");
+    let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
+    info!("Loaded {} systems in {:.3}s", systems.len(), duration);
+
+    let query_start = std::time::Instant::now();
+    let waypoints = db_models::Waypoint::belonging_to(&systems)
+        .select(db_models::Waypoint::as_select())
+        .load(&mut db.conn().await)
+        .await
+        .expect("DB Query error");
+    let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
+    info!("Loaded {} waypoints in {:.3}s", waypoints.len(), duration);
+
+    let query_start = std::time::Instant::now();
+    let waypoint_details = db_models::WaypointDetails::belonging_to(&waypoints)
+        .select(db_models::WaypointDetails::as_select())
+        .load(&mut db.conn().await)
+        .await
+        .expect("DB Query error");
+    let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
+    info!(
+        "Loaded {} waypoint details in {:.3}s",
+        waypoint_details.len(),
+        duration
+    );
+
+    let grouped_details = waypoint_details.grouped_by(&waypoints);
+    let waypoints = waypoints
+        .into_iter()
+        .zip(grouped_details)
+        .grouped_by(&systems);
+
+    let mut result = BTreeMap::new();
+    let system_iter = std::iter::zip(systems, waypoints);
+    for (system, waypoints) in system_iter {
+        let waypoints = waypoints
+            .into_iter()
+            .map(|(waypoint, details)| {
+                let details = match details.len() {
+                    0 => None,
+                    1 => {
+                        let details = details.into_iter().next().unwrap();
+                        Some(WaypointDetails {
+                            is_under_construction: details.is_under_construction,
+                            is_market: details.is_market,
+                            is_shipyard: details.is_shipyard,
+                            is_uncharted: details.is_uncharted,
+                        })
+                    }
+                    _ => panic!("Multiple details for waypoint"),
+                };
+                Waypoint {
+                    id: waypoint.id,
+                    symbol: WaypointSymbol::new(&waypoint.symbol),
+                    waypoint_type: waypoint.type_,
+                    x: waypoint.x as i64,
+                    y: waypoint.y as i64,
+                    details,
+                }
+            })
+            .collect();
+        result.insert(
+            SystemSymbol::new(&system.symbol),
+            System {
+                symbol: SystemSymbol::new(&system.symbol),
+                system_type: system.type_,
+                x: system.x as i64,
+                y: system.y as i64,
+                waypoints,
+            },
+        );
+    }
+    result
+}
+
+// Load all rows from `jumpgate_connections` table
+async fn load_jumpgates(db: &DbClient) -> BTreeMap<WaypointSymbol, JumpGateInfo> {
+    let query_start = std::time::Instant::now();
+    let jumpgates: Vec<db_models::JumpGateConnections> = jumpgate_connections::table
+        .select(db_models::JumpGateConnections::as_select())
+        .load(&mut db.conn().await)
+        .await
+        .expect("DB Query error");
+    let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
+    info!("Loaded {} jumpgates in {:.3}s", jumpgates.len(), duration);
+
+    let mut result = BTreeMap::new();
+    for jumpgate in jumpgates {
+        result.insert(
+            WaypointSymbol::new(&jumpgate.waypoint_symbol),
+            JumpGateInfo {
+                is_constructed: !jumpgate.is_under_construction,
+                connections: jumpgate
+                    .edges
+                    .iter()
+                    .map(|symbol| WaypointSymbol::new(symbol))
+                    .collect(),
+            },
+        );
+    }
+    result
+}
+
+// Load factions from db, or fetch from api
+async fn load_factions(db: &DbClient, api_client: &ApiClient) -> BTreeMap<String, Faction> {
+    match db.get_factions().await {
+        Some(factions) => factions
+            .into_iter()
+            .map(|faction| (faction.symbol.clone(), faction))
+            .collect(),
+        None => {
+            // Layer - fetch from api
+            let factions: Vec<Faction> = api_client.get_all_pages("/factions").await;
+            db.set_factions(&factions).await;
+            factions
+                .into_iter()
+                .map(|faction| (faction.symbol.clone(), faction))
+                .collect()
+        }
+    }
+}
+
+// Load all rows from `remote_markets` table
+async fn load_remote_markets(db: &DbClient) -> BTreeMap<WaypointSymbol, MarketRemoteView> {
+    let query_start = std::time::Instant::now();
+    let markets: Vec<db_models::RemoteMarket> = remote_markets::table
+        .select(db_models::RemoteMarket::as_select())
+        .load(&mut db.conn().await)
+        .await
+        .expect("DB Query error");
+    let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
+    info!(
+        "Loaded {} remote markets in {:.3}s",
+        markets.len(),
+        duration
+    );
+
+    let mut result = BTreeMap::new();
+    for market in markets {
+        let market_data: MarketRemoteView =
+            serde_json::from_value(market.market_data).expect("Invalid market data");
+        result.insert(market_data.symbol.clone(), market_data);
+    }
+    result
+}
+
+// Load all rows from `remote_shipyards` table
+async fn load_remote_shipyards(db: &DbClient) -> BTreeMap<WaypointSymbol, ShipyardRemoteView> {
+    let query_start = std::time::Instant::now();
+    let shipyards: Vec<db_models::RemoteShipyard> = remote_shipyards::table
+        .select(db_models::RemoteShipyard::as_select())
+        .load(&mut db.conn().await)
+        .await
+        .expect("DB Query error");
+    let duration = query_start.elapsed().as_millis() as f64 / 1000.0;
+    info!(
+        "Loaded {} remote shipyards in {:.3}s",
+        shipyards.len(),
+        duration
+    );
+
+    let mut result = BTreeMap::new();
+    for shipyard in shipyards {
+        let shipyard_data: ShipyardRemoteView =
+            serde_json::from_value(shipyard.shipyard_data).expect("Invalid shipyard data");
+        result.insert(shipyard_data.symbol.clone(), shipyard_data);
+    }
+    result
+}
+
+async fn load_markets(db: &DbClient) -> Vec<(WaypointSymbol, Option<Arc<WithTimestamp<Market>>>)> {
+    let markets = db.get_all_markets().await;
+    markets
+        .into_iter()
+        .map(|(symbol, market)| (symbol, Some(Arc::new(market))))
+        .collect()
+}
+
+async fn load_shipyards(
+    db: &DbClient,
+) -> Vec<(WaypointSymbol, Option<Arc<WithTimestamp<Shipyard>>>)> {
+    let shipyards = db.get_all_shipyards().await;
+    shipyards
+        .into_iter()
+        .map(|(symbol, shipyard)| (symbol, Some(Arc::new(shipyard))))
+        .collect()
 }

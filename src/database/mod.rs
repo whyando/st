@@ -26,6 +26,7 @@ use diesel_async::pooled_connection::deadpool::Pool;
 use diesel_async::pooled_connection::AsyncDieselConnectionManager;
 use diesel_async::AsyncPgConnection;
 use diesel_async::RunQueryDsl as _;
+use diesel_async::SimpleAsyncConnection as _;
 use log::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -38,9 +39,10 @@ pub struct DbClient {
 }
 
 impl DbClient {
-    pub async fn new(spacetraders_env: &str, reset_date: &str) -> DbClient {
+    pub async fn new(reset_date: &str) -> DbClient {
         let database_url = std::env::var("POSTGRES_URI").expect("POSTGRES_URI must be set");
-        let schema_name = format!("{}_{}", spacetraders_env, reset_date.replace("-", ""));
+        let pg_schema = std::env::var("POSTGRES_SCHEMA").expect("POSTGRES_SCHEMA must be set");
+        let schema_name = pg_schema.replace("{RESET_DATE}", &reset_date.replace("-", ""));
         info!("Using schema: {}", schema_name);
         let db = {
             let database_url = format!(
@@ -144,17 +146,43 @@ impl DbClient {
     }
 
     pub async fn get_market_remote(&self, symbol: &WaypointSymbol) -> Option<MarketRemoteView> {
-        self.get_value(&format!("markets_remote/{}", symbol)).await
+        let market: Option<db_models::RemoteMarket> = remote_markets::table
+            .filter(remote_markets::waypoint_symbol.eq(symbol.to_string()))
+            .select(db_models::RemoteMarket::as_select())
+            .first(&mut self.conn().await)
+            .await
+            .optional()
+            .expect("DB Query error");
+        market.map(|m| serde_json::from_value(m.market_data).expect("Invalid market data"))
     }
 
     pub async fn save_market_remote(&self, symbol: &WaypointSymbol, market: &MarketRemoteView) {
-        let key = format!("markets_remote/{}", symbol);
-        self.set_value(&key, market).await
+        let market_data = serde_json::to_value(market).expect("Failed to serialize market");
+        diesel::insert_into(remote_markets::table)
+            .values((
+                remote_markets::waypoint_symbol.eq(symbol.to_string()),
+                remote_markets::market_data.eq(market_data),
+            ))
+            .on_conflict(remote_markets::waypoint_symbol)
+            .do_update()
+            .set((
+                remote_markets::market_data.eq(excluded(remote_markets::market_data)),
+                remote_markets::updated_at.eq(chrono::Utc::now()),
+            ))
+            .execute(&mut self.conn().await)
+            .await
+            .expect("DB Insert error");
     }
 
     pub async fn get_shipyard_remote(&self, symbol: &WaypointSymbol) -> Option<ShipyardRemoteView> {
-        let key = format!("shipyards_remote/{}", symbol);
-        self.get_value(&key).await
+        let shipyard: Option<db_models::RemoteShipyard> = remote_shipyards::table
+            .filter(remote_shipyards::waypoint_symbol.eq(symbol.to_string()))
+            .select(db_models::RemoteShipyard::as_select())
+            .first(&mut self.conn().await)
+            .await
+            .optional()
+            .expect("DB Query error");
+        shipyard.map(|s| serde_json::from_value(s.shipyard_data).expect("Invalid shipyard data"))
     }
 
     pub async fn save_shipyard_remote(
@@ -162,19 +190,58 @@ impl DbClient {
         symbol: &WaypointSymbol,
         shipyard: &ShipyardRemoteView,
     ) {
-        let key = format!("shipyards_remote/{}", symbol);
-        self.set_value(&key, shipyard).await
+        let shipyard_data = serde_json::to_value(shipyard).expect("Failed to serialize shipyard");
+        diesel::insert_into(remote_shipyards::table)
+            .values((
+                remote_shipyards::waypoint_symbol.eq(symbol.to_string()),
+                remote_shipyards::shipyard_data.eq(shipyard_data),
+            ))
+            .on_conflict(remote_shipyards::waypoint_symbol)
+            .do_update()
+            .set((
+                remote_shipyards::shipyard_data.eq(excluded(remote_shipyards::shipyard_data)),
+                remote_shipyards::updated_at.eq(chrono::Utc::now()),
+            ))
+            .execute(&mut self.conn().await)
+            .await
+            .expect("DB Insert error");
     }
 
     pub async fn get_market(&self, symbol: &WaypointSymbol) -> Option<WithTimestamp<Market>> {
-        let key = format!("markets/{}", symbol);
-        self.get_value(&key).await
+        let market: Option<db_models::Market> = markets::table
+            .filter(markets::waypoint_symbol.eq(symbol.to_string()))
+            .select(db_models::Market::as_select())
+            .first(&mut self.conn().await)
+            .await
+            .optional()
+            .expect("DB Query error");
+
+        market.map(|m| {
+            let market_data: Market =
+                serde_json::from_value(m.market_data).expect("Invalid market data");
+            WithTimestamp {
+                data: market_data,
+                timestamp: m.updated_at,
+            }
+        })
     }
 
     pub async fn save_market(&self, symbol: &WaypointSymbol, market: &WithTimestamp<Market>) {
-        // save to snapshot market view
-        let key = format!("markets/{}", symbol);
-        self.set_value(&key, &market).await;
+        let market_data = serde_json::to_value(&market.data).expect("Failed to serialize market");
+        diesel::insert_into(markets::table)
+            .values((
+                markets::waypoint_symbol.eq(symbol.to_string()),
+                markets::market_data.eq(market_data),
+            ))
+            .on_conflict(markets::waypoint_symbol)
+            .do_update()
+            .set((
+                markets::market_data.eq(excluded(markets::market_data)),
+                markets::updated_at.eq(chrono::Utc::now()),
+            ))
+            .execute(&mut self.conn().await)
+            .await
+            .expect("DB Insert error");
     }
 
     pub async fn insert_market_trades(&self, _market: &WithTimestamp<Market>) {
@@ -329,6 +396,14 @@ impl DbClient {
         self.set_value(&key, &reservations).await
     }
 
+    pub async fn get_factions(&self) -> Option<Vec<crate::models::Faction>> {
+        self.get_value("factions").await
+    }
+
+    pub async fn set_factions(&self, factions: &Vec<crate::models::Faction>) {
+        self.set_value("factions", factions).await
+    }
+
     pub async fn insert_surveys(&self, surveys: &Vec<KeyedSurvey>) {
         let now = Utc::now();
         let inserts = surveys
@@ -432,5 +507,53 @@ impl DbClient {
         }
         assert_eq!(waypoint_ids.len(), waypoints.len());
         waypoint_ids
+    }
+
+    pub async fn get_all_markets(&self) -> Vec<(WaypointSymbol, WithTimestamp<Market>)> {
+        let markets: Vec<db_models::Market> = markets::table
+            .select(db_models::Market::as_select())
+            .load(&mut self.conn().await)
+            .await
+            .expect("DB Query error");
+
+        markets
+            .into_iter()
+            .map(|m| {
+                let market_data: Market =
+                    serde_json::from_value(m.market_data).expect("Invalid market data");
+                let symbol = WaypointSymbol::new(&m.waypoint_symbol);
+                (
+                    symbol,
+                    WithTimestamp {
+                        data: market_data,
+                        timestamp: m.updated_at,
+                    },
+                )
+            })
+            .collect()
+    }
+
+    pub async fn get_all_shipyards(&self) -> Vec<(WaypointSymbol, WithTimestamp<Shipyard>)> {
+        let shipyards: Vec<db_models::Shipyard> = shipyards::table
+            .select(db_models::Shipyard::as_select())
+            .load(&mut self.conn().await)
+            .await
+            .expect("DB Query error");
+
+        shipyards
+            .into_iter()
+            .map(|s| {
+                let shipyard_data: Shipyard =
+                    serde_json::from_value(s.shipyard_data).expect("Invalid shipyard data");
+                let symbol = WaypointSymbol::new(&s.waypoint_symbol);
+                (
+                    symbol,
+                    WithTimestamp {
+                        data: shipyard_data,
+                        timestamp: s.updated_at,
+                    },
+                )
+            })
+            .collect()
     }
 }

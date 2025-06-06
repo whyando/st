@@ -86,3 +86,36 @@ CREATE TABLE IF NOT EXISTS ___SCHEMA___.waypoint_details (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS waypoint_details_waypoint_idx ON ___SCHEMA___.waypoint_details USING btree (waypoint_id);
 
+-- remote_markets
+CREATE TABLE IF NOT EXISTS ___SCHEMA___.remote_markets (
+    waypoint_symbol text NOT NULL,
+    market_data json NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    PRIMARY KEY (waypoint_symbol)
+);
+
+-- remote_shipyards
+CREATE TABLE IF NOT EXISTS ___SCHEMA___.remote_shipyards (
+    waypoint_symbol text NOT NULL,
+    shipyard_data json NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    PRIMARY KEY (waypoint_symbol)
+);
+
+-- markets
+CREATE TABLE IF NOT EXISTS ___SCHEMA___.markets (
+    waypoint_symbol TEXT PRIMARY KEY,
+    market_data JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- shipyards
+CREATE TABLE IF NOT EXISTS ___SCHEMA___.shipyards (
+    waypoint_symbol TEXT PRIMARY KEY,
+    shipyard_data JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);

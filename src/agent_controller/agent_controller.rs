@@ -283,7 +283,6 @@ impl AgentController {
             db: db.clone(),
             universe: universe.clone(),
             listeners: Arc::new(Mutex::new(Vec::new())),
-            // ship_futs: Arc::new(Mutex::new(VecDeque::new())),
             hdls: Arc::new(JoinHandles::new()),
             ship_config: Arc::new(Mutex::new(vec![])),
             job_assignments: Arc::new(job_assignments),
@@ -346,7 +345,7 @@ impl AgentController {
     }
     pub async fn faction_capital(&self) -> SystemSymbol {
         let faction_symbol = self.starting_faction();
-        let faction = self.universe.get_faction(&faction_symbol).await;
+        let faction = self.universe.get_faction(&faction_symbol);
         faction.headquarters.unwrap()
     }
     pub async fn update_era(&self, era: AgentEra) {

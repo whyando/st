@@ -35,6 +35,42 @@ diesel::table! {
 }
 
 diesel::table! {
+    markets (waypoint_symbol) {
+        waypoint_symbol -> Text,
+        market_data -> Jsonb,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    remote_markets (waypoint_symbol) {
+        waypoint_symbol -> Text,
+        market_data -> Json,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    remote_shipyards (waypoint_symbol) {
+        waypoint_symbol -> Text,
+        shipyard_data -> Json,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    shipyards (waypoint_symbol) {
+        waypoint_symbol -> Text,
+        shipyard_data -> Jsonb,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     surveys (uuid) {
         uuid -> Uuid,
         survey -> Json,
@@ -87,6 +123,10 @@ diesel::allow_tables_to_appear_in_same_query!(
     generic_lookup,
     jumpgate_connections,
     market_transaction_log,
+    markets,
+    remote_markets,
+    remote_shipyards,
+    shipyards,
     surveys,
     systems,
     waypoint_details,

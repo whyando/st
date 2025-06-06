@@ -1,4 +1,5 @@
 use std::fmt::{self, Display, Formatter};
+use strum::EnumString;
 
 use super::{
     ShipEngine, ShipFrame, ShipModule, ShipMount, ShipReactor, SymbolNameDescr, WaypointSymbol,
@@ -39,13 +40,12 @@ pub struct MarketTradeGood {
     pub sell_price: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, EnumString)]
+#[strum(serialize_all = "UPPERCASE")]
+#[serde(rename_all = "UPPERCASE")]
 pub enum MarketType {
-    #[serde(rename = "IMPORT")]
     Import,
-    #[serde(rename = "EXPORT")]
     Export,
-    #[serde(rename = "EXCHANGE")]
     Exchange,
 }
 
@@ -55,17 +55,14 @@ impl Display for MarketType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, EnumString)]
+#[strum(serialize_all = "UPPERCASE")]
+#[serde(rename_all = "UPPERCASE")]
 pub enum MarketSupply {
-    #[serde(rename = "SCARCE")]
     Scarce,
-    #[serde(rename = "LIMITED")]
     Limited,
-    #[serde(rename = "MODERATE")]
     Moderate,
-    #[serde(rename = "HIGH")]
     High,
-    #[serde(rename = "ABUNDANT")]
     Abundant,
 }
 
@@ -75,15 +72,13 @@ impl Display for MarketSupply {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, EnumString)]
+#[strum(serialize_all = "UPPERCASE")]
+#[serde(rename_all = "UPPERCASE")]
 pub enum MarketActivity {
-    #[serde(rename = "WEAK")]
     Weak,
-    #[serde(rename = "GROWING")]
     Growing,
-    #[serde(rename = "STRONG")]
     Strong,
-    #[serde(rename = "RESTRICTED")]
     Restricted,
 }
 

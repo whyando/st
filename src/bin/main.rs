@@ -14,7 +14,6 @@ async fn main() {
     dotenvy::dotenv().ok();
     pretty_env_logger::init_timed();
 
-    let spacetraders_env = env::var("SPACETRADERS_ENV").unwrap();
     let faction = env::var("AGENT_FACTION").unwrap_or("".to_string());
     let callsign = env::var("AGENT_CALLSIGN")
         .expect("AGENT_CALLSIGN env var not set")
@@ -40,14 +39,12 @@ async fn main() {
         }
     };
 
-    info!("Spacetraders env: {:?}", spacetraders_env);
     info!("Reset date: {:?}", status.reset_date);
 
     // Use the reset date on the status response as a unique identifier to partition data between resets
-    let db = DbClient::new(&spacetraders_env, &status.reset_date).await;
+    let db = DbClient::new(&status.reset_date).await;
 
-    let universe = Arc::new(Universe::new(&api_client, &db));
-    universe.init().await;
+    let universe = Arc::new(Universe::new(&api_client, &db).await);
 
     // Startup Phase: register if not already registered, and load agent token
     let agent_token = match db.get_agent_token(&callsign).await {
@@ -56,9 +53,11 @@ async fn main() {
             let faction = match faction.as_str() {
                 "" => {
                     // Pick a random faction
-                    let factions: Vec<Faction> = api_client.get_all_pages("/factions").await;
-                    let factions: Vec<Faction> =
-                        factions.into_iter().filter(|f| f.is_recruiting).collect();
+                    let factions: Vec<Faction> = universe
+                        .get_factions()
+                        .into_iter()
+                        .filter(|f| f.is_recruiting)
+                        .collect();
                     use rand::prelude::IndexedRandom as _;
                     let faction = factions.choose(&mut rand::rng()).unwrap();
                     info!("Picked faction {}", faction.symbol);

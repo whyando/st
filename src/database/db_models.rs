@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use diesel::{
     associations::Associations, Identifiable, Insertable, Queryable, QueryableByName, Selectable,
 };
+use serde_json::Value;
 
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = crate::schema::systems)]
@@ -91,4 +92,44 @@ pub struct JumpGateConnections {
     pub waypoint_symbol: String,
     pub is_under_construction: bool,
     pub edges: Vec<String>,
+}
+
+#[derive(Debug, Clone, Queryable, QueryableByName, Selectable)]
+#[diesel(table_name = crate::schema::remote_markets)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct RemoteMarket {
+    pub waypoint_symbol: String,
+    pub market_data: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Queryable, QueryableByName, Selectable)]
+#[diesel(table_name = crate::schema::remote_shipyards)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct RemoteShipyard {
+    pub waypoint_symbol: String,
+    pub shipyard_data: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Queryable, QueryableByName, Selectable)]
+#[diesel(table_name = crate::schema::markets)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Market {
+    pub waypoint_symbol: String,
+    pub market_data: Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Queryable, Selectable)]
+#[diesel(table_name = crate::schema::shipyards)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Shipyard {
+    pub waypoint_symbol: String,
+    pub shipyard_data: Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
