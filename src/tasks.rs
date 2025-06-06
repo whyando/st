@@ -690,6 +690,13 @@ impl LogisticTaskManager {
                 max_compute_time: Duration::try_seconds(5).unwrap(),
             };
             let available_tasks_clone = available_tasks.clone();
+            info!(
+                "Planning tasks for ship {}, tasks: {}, length: {}s",
+                ship_symbol,
+                available_tasks_clone.len(),
+                plan_length.num_seconds()
+            );
+            debug!("Available tasks: {:?}", available_tasks_clone);
             tokio::task::spawn_blocking(move || {
                 logistics_planner::plan::run_planner(
                     &[logistics_ship],
@@ -713,6 +720,7 @@ impl LogisticTaskManager {
         };
         assert_eq!(schedules.len(), 1);
         let mut actions = schedules.into_iter().next().unwrap().actions;
+        info!("Planner returned {} actions", actions.len());
 
         // If 0 tasks were assigned, instead force assign the highest value task
         if actions.len() == 0 {
@@ -777,10 +785,12 @@ impl LogisticTaskManager {
                         action.task_id.clone(),
                         (task.clone(), ship_symbol.to_string(), Utc::now()),
                     );
+                    debug!("Assigned task {} to ship {}", action.task_id, ship_symbol);
                 }
             }
             let queue = VecDeque::from(actions);
             state.ship_tasks.insert(ship_symbol.to_string(), queue);
+            state.planner_run_count += 1;
         })
         .await;
 
