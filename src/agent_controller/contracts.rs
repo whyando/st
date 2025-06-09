@@ -70,6 +70,18 @@ impl AgentController {
                         // Check trades
                         let good = &deliver.trade_symbol;
                         let markets = self.universe.get_system_markets(&system_symbol).await;
+
+                        // First check if there is a non-import trade for this good
+                        let non_import_trade_exists =
+                            markets.iter().any(|(market_remote, _market_opt)| {
+                                if market_remote.exports.iter().any(|g| g.symbol == *good) {
+                                    return true;
+                                } else if market_remote.exchange.iter().any(|g| g.symbol == *good) {
+                                    return true;
+                                }
+                                false
+                            });
+
                         let trades = markets
                             .iter()
                             .filter_map(|(_, market_opt)| match market_opt {
@@ -82,8 +94,18 @@ impl AgentController {
                                 None => None,
                             })
                             .collect::<Vec<_>>();
-                        let buy_trade_good =
-                            trades.iter().min_by_key(|(_, trade)| trade.purchase_price);
+                        let buy_trade_good = trades
+                            .iter()
+                            .filter(|(_, trade)| {
+                                // If exchange/export trade exists then filter out import trades
+                                // (even if it delays the contract completion until probes reach the market)
+                                if non_import_trade_exists {
+                                    trade._type != MarketType::Import
+                                } else {
+                                    true
+                                }
+                            })
+                            .min_by_key(|(_, trade)| trade.purchase_price);
 
                         return match buy_trade_good {
                             Some((market_symbol, trade)) => {
