@@ -145,7 +145,10 @@ impl AgentController {
                                     )
                                 }
                             }
-                            None => ContractStatus::WillNotFulfill("no buy location"),
+                            None => {
+                                debug!("contract: no buy location for {}", good);
+                                ContractStatus::WillNotFulfill("no buy location")
+                            }
                         };
                     }
                 }
