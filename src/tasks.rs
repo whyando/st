@@ -826,7 +826,10 @@ impl LogisticTaskManager {
                         action.task_id.clone(),
                         (task.clone(), ship_symbol.to_string(), Utc::now()),
                     );
-                    debug!("Assigned task {} to ship {}", action.task_id, ship_symbol);
+                    debug!(
+                        "[{}]\tAssigned task {} to ship {}",
+                        task.value, action.task_id, ship_symbol
+                    );
                 }
             }
             let queue = VecDeque::from(actions);
