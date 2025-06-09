@@ -908,7 +908,11 @@ impl AgentController {
     async fn controller_tick(&self) {
         debug!("controller_tick");
         self.check_era_advance().await;
-        self.try_buy_ships(None).await;
+        let (bought, _shipyard_task_waypoint) = self.try_buy_ships(None).await;
+        for ship_symbol in bought {
+            debug!("Controller tick bought ship {}", ship_symbol);
+            self.spawn_run_ship(ship_symbol).await;
+        }
         self.contract_tick(true).await;
     }
 
