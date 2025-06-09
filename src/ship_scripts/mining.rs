@@ -16,7 +16,7 @@ async fn sell_location(ship: &ShipController, cargo_symbol: &str) -> Option<Wayp
     for waypoint in &waypoints {
         if waypoint.is_market() {
             let market_remote = ship.universe.get_market_remote(&waypoint.symbol).await;
-            let market_opt = ship.universe.get_market(&waypoint.symbol).await;
+            let market_opt = ship.universe.get_market(&waypoint.symbol);
             markets.push((market_remote, market_opt));
         }
     }
@@ -160,8 +160,7 @@ pub async fn run_shuttle(ship: ShipController, db: DbClient) {
                                 ship.refresh_market().await;
                                 while ship.cargo_good_count(&cargo.symbol) != 0 {
                                     let holding = ship.cargo_good_count(&cargo.symbol);
-                                    let market =
-                                        ship.universe.get_market(&sell_location).await.unwrap();
+                                    let market = ship.universe.get_market(&sell_location).unwrap();
                                     let market_good = market
                                         .data
                                         .trade_goods

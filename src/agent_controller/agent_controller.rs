@@ -79,14 +79,15 @@ impl Default for AgentState {
 
 #[derive(Clone)]
 pub struct AgentController {
-    universe: Arc<Universe>,
-    api_client: ApiClient,
-    db: DbClient,
+    pub(super) universe: Arc<Universe>,
+    pub(super) api_client: ApiClient,
+    pub(super) db: DbClient,
 
-    callsign: String,
-    state: Arc<Mutex<AgentState>>,
-    agent: Arc<Mutex<Agent>>,
-    ships: Arc<DashMap<String, Arc<Mutex<Ship>>>>,
+    pub(super) callsign: String,
+    pub(super) state: Arc<Mutex<AgentState>>,
+    pub(super) agent: Arc<Mutex<Agent>>,
+    pub(super) ships: Arc<DashMap<String, Arc<Mutex<Ship>>>>,
+    pub(super) contract: Arc<Mutex<Option<Contract>>>,
 
     ship_config: Arc<Mutex<Vec<ShipConfig>>>,
     job_assignments: Arc<DashMap<String, String>>,
@@ -95,7 +96,7 @@ pub struct AgentController {
     probe_jumpgate_reservations: Arc<DashMap<String, WaypointSymbol>>,
     explorer_reservations: Arc<DashMap<String, SystemSymbol>>,
 
-    hdls: Arc<JoinHandles>,
+    pub(super) hdls: Arc<JoinHandles>,
     pub task_manager: Arc<LogisticTaskManager>,
     pub survey_manager: Arc<SurveyManager>,
     pub cargo_broker: Arc<CargoBroker>,
@@ -104,6 +105,7 @@ pub struct AgentController {
     try_buy_ships_mutex_guard: Arc<tokio::sync::Mutex<()>>,
     probe_reserve_mutex_guard: Arc<tokio::sync::Mutex<()>>,
     explorer_reserve_mutex_guard: Arc<tokio::sync::Mutex<()>>,
+    pub(super) contract_tick_mutex_guard: Arc<tokio::sync::Mutex<u64>>,
 }
 
 impl TransferActor for AgentController {
@@ -155,7 +157,7 @@ impl AgentController {
             .collect()
     }
 
-    pub async fn emit_event(&self, _event: &Event) {
+    pub fn emit_event(&self, _event: &Event) {
         // Empty
     }
 
@@ -201,9 +203,62 @@ impl AgentController {
             dest_ship.cargo = target_cargo;
             (src_ship.clone(), dest_ship.clone())
         };
-        self.emit_event(&Event::ShipUpdate(src_ship)).await;
-        self.emit_event(&Event::ShipUpdate(dest_ship)).await;
+        self.emit_event(&Event::ShipUpdate(src_ship));
+        self.emit_event(&Event::ShipUpdate(dest_ship));
         debug!("agent_controller::transfer_cargo done");
+    }
+
+    async fn contract_inner(&self, path: &str) {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct ContractActionResponse {
+            agent: Agent,
+            contract: Contract,
+        }
+
+        let contract_id = self.get_current_contract_id().await.expect("no contract");
+
+        self.debug(&format!("{} contract {}", path, contract_id));
+        let uri = format!("/my/contracts/{}/{}", contract_id, path);
+        let body = json!({});
+        let ContractActionResponse { agent, contract } = self
+            .api_client
+            .post::<Data<ContractActionResponse>, _>(&uri, &body)
+            .await
+            .data;
+
+        assert_eq!(contract.id, contract_id);
+        match path {
+            "accept" => assert!(contract.accepted),
+            "fulfill" => assert!(contract.fulfilled),
+            _ => panic!("invalid contract action: {}", path),
+        }
+
+        self.update_contract(contract);
+        self.update_agent(agent);
+    }
+
+    pub async fn accept_contract(&self) {
+        self.contract_inner("accept").await;
+    }
+
+    pub async fn fulfill_contract(&self) {
+        self.contract_inner("fulfill").await;
+    }
+
+    pub async fn negotiate_contract(&self, ship_symbol: &str) {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct Response {
+            contract: Contract,
+        }
+        self.debug(&format!("Negotiating contract with {}", ship_symbol));
+        let uri = format!("/my/ships/{}/negotiate/contract", ship_symbol);
+        let body = json!({});
+        let Response { contract } = self
+            .api_client
+            .post::<Data<Response>, _>(&uri, &body)
+            .await
+            .data;
+        self.update_contract(contract);
     }
 
     pub async fn new(
@@ -226,6 +281,7 @@ impl AgentController {
             }
             ships
         };
+        let contract: Option<Contract> = api_client.get_contract().await;
 
         let system_symbol = agent.lock().unwrap().headquarters.system();
         universe.ensure_system_loaded(&system_symbol).await;
@@ -260,6 +316,7 @@ impl AgentController {
             state: Arc::new(Mutex::new(state)),
             agent,
             ships,
+            contract: Arc::new(Mutex::new(contract)),
             api_client: api_client.clone(),
             db: db.clone(),
             universe: universe.clone(),
@@ -276,6 +333,7 @@ impl AgentController {
             try_buy_ships_mutex_guard: Arc::new(tokio::sync::Mutex::new(())),
             probe_reserve_mutex_guard: Arc::new(tokio::sync::Mutex::new(())),
             explorer_reserve_mutex_guard: Arc::new(tokio::sync::Mutex::new(())),
+            contract_tick_mutex_guard: Arc::new(tokio::sync::Mutex::new(0)),
             ledger: Arc::new(ledger),
         };
         agent_controller
@@ -313,12 +371,14 @@ impl AgentController {
         let mut ship_config = self.ship_config.lock().unwrap();
         *ship_config = config;
     }
-    pub async fn update_agent(&self, agent_upd: Agent) {
-        self.emit_event(&Event::AgentUpdate(agent_upd.clone()))
-            .await;
+    pub fn update_agent(&self, agent_upd: Agent) {
+        self.emit_event(&Event::AgentUpdate(agent_upd.clone()));
         let mut agent = self.agent.lock().unwrap();
         *agent = agent_upd;
         self.ledger.set_credits(agent.credits);
+    }
+    pub fn update_contract(&self, contract: Contract) {
+        self.contract.lock().unwrap().replace(contract);
     }
     fn debug(&self, msg: &str) {
         debug!("[{}] {}", self.callsign, msg);
@@ -470,7 +530,7 @@ impl AgentController {
             "Successfully bought ship {} for ${}",
             ship_symbol, transaction.price
         ));
-        self.update_agent(agent).await;
+        self.update_agent(agent);
         self.ships
             .insert(ship_symbol.clone(), Arc::new(Mutex::new(ship)));
         ship_symbol
@@ -798,20 +858,29 @@ impl AgentController {
     pub async fn run(&self) {
         let self_clone = self.clone();
         // Spawn initial tasks - cargo broker
-        self.hdls.push(tokio::spawn(async move {
-            let broker = self_clone.cargo_broker.clone();
-            broker.run(Box::new(self_clone)).await;
-        }));
+        self.hdls.push(
+            "cargo broker",
+            tokio::spawn(async move {
+                let broker = self_clone.cargo_broker.clone();
+                broker.run(Box::new(self_clone)).await;
+            }),
+        );
         // Spawn initial tasks - agent
         let self_clone = self.clone();
-        self.hdls.push(tokio::spawn(async move {
-            self_clone.run_agent().await;
-        }));
+        self.hdls.push(
+            "agent startup",
+            tokio::spawn(async move {
+                self_clone.run_agent().await;
+            }),
+        );
         // Spawn controller main loop
         let self_clone = self.clone();
-        self.hdls.push(tokio::spawn(async move {
-            self_clone.controller_loop().await;
-        }));
+        self.hdls.push(
+            "controller loop",
+            tokio::spawn(async move {
+                self_clone.controller_loop().await;
+            }),
+        );
         // Wait on JoinHandles to complete/error
         self.hdls.start().await;
     }
@@ -837,8 +906,10 @@ impl AgentController {
     }
 
     async fn controller_tick(&self) {
+        debug!("controller_tick");
         self.check_era_advance().await;
         self.try_buy_ships(None).await;
+        self.contract_tick(true).await;
     }
 
     pub async fn try_assign_ship(&self, ship_symbol: &str) -> bool {
@@ -893,7 +964,8 @@ impl AgentController {
             let join_hdl = tokio::spawn(async move {
                 ship_scripts::scrap::run(ship_controller).await;
             });
-            self.hdls.push(join_hdl);
+            let name = format!("{}:scrap", ship_symbol);
+            self.hdls.push(&name, join_hdl);
             return;
         }
 
@@ -987,10 +1059,8 @@ impl AgentController {
                         })
                     }
                 };
-                debug!("spawn_run_ship try push join_hdl");
-                self.hdls.push(join_hdl);
-                // self.ship_futs.lock().unwrap().push_back(join_hdl);
-                debug!("spawn_run_ship pushed join_hdl");
+                let name = format!("{}:{}", ship_symbol, job_spec.id);
+                self.hdls.push(&name, join_hdl);
             }
             None => {
                 debug!("Warning. No job assigned to ship {}", ship_symbol);

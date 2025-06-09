@@ -10,6 +10,8 @@ use serde_json::json;
 use std::sync::{Arc, Mutex, RwLock};
 use tokio::time::Instant;
 
+const API_MAX_PAGE_SIZE: usize = 20;
+
 #[derive(Debug, Clone)]
 pub struct ApiClient {
     base_url: String,
@@ -109,6 +111,10 @@ impl ApiClient {
         self.get_all_pages("/my/ships").await
     }
 
+    pub async fn get_contract(&self) -> Option<Contract> {
+        self.get_final_paginated_entry("/my/contracts").await
+    }
+
     pub async fn get_system(&self, system_symbol: &SystemSymbol) -> api_models::System {
         let system: Data<api_models::System> =
             self.get(&format!("/systems/{}", system_symbol)).await;
@@ -189,21 +195,44 @@ impl ApiClient {
     where
         T: serde::de::DeserializeOwned,
     {
-        #[allow(non_snake_case)]
-        let PAGE_SIZE = 20;
         let mut page = 1;
         let mut vec = Vec::new();
         loop {
             let response: PaginatedList<T> = self
-                .get(&format!("{}?page={}&limit={}", path, page, PAGE_SIZE))
+                .get(&format!(
+                    "{}?page={}&limit={}",
+                    path, page, API_MAX_PAGE_SIZE
+                ))
                 .await;
             vec.extend(response.data);
-            if response.meta.page * PAGE_SIZE >= response.meta.total {
+            if response.meta.page * API_MAX_PAGE_SIZE >= response.meta.total {
                 break;
             }
             page += 1;
         }
         vec
+    }
+
+    pub async fn get_final_paginated_entry<T>(&self, path: &str) -> Option<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        // 1. Get first page with max page size
+        let mut response: PaginatedList<T> = self
+            .get(&format!("{}?page=1&limit={}", path, API_MAX_PAGE_SIZE))
+            .await;
+        let num_items = response.meta.total;
+        if response.meta.total <= API_MAX_PAGE_SIZE {
+            response.data.pop()
+        } else {
+            // 2. Get final page
+            let mut response: PaginatedList<T> = self
+                .get(&format!("{}?page={}&limit=1", path, num_items))
+                .await;
+            assert_eq!(response.meta.total, num_items);
+            assert_eq!(response.data.len(), 1);
+            response.data.pop()
+        }
     }
 }
 

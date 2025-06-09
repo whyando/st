@@ -1,4 +1,4 @@
-use crate::agent_controller::AgentController;
+use crate::agent_controller::{AgentController, ContractStatus};
 use crate::api_client::api_models::WaypointDetailed;
 use crate::config::CONFIG;
 use crate::database::DbClient;
@@ -20,6 +20,13 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::{Arc, RwLock};
 
 fn is_task_allowed(task: &Task, config: &LogisticsScriptConfig) -> bool {
+    if let TaskActions::TransportCargo { dest_action, .. } = &task.actions {
+        if let Action::DeliverContract(_, _) = dest_action {
+            // Allow contract delivery to bypass the normal waypoint allowlist
+            return true;
+        }
+    }
+
     if let Some(waypoint_allowlist) = &config.waypoint_allowlist {
         match &task.actions {
             TaskActions::VisitLocation { waypoint, .. } => {
@@ -142,11 +149,6 @@ impl LogisticTaskManager {
         let mut tasks = Vec::new();
         let system_prefix = format!("{}/", system_symbol);
 
-        // !! one day recalculate ship config here perhaps
-
-        // execute contract actions + generate tasks
-        // (todo)
-
         // execute ship_buy actions + generate tasks
         let (bought, shipyard_task_waypoint) = match buy_ships {
             true => self.agent_controller().try_buy_ships(None).await,
@@ -172,6 +174,17 @@ impl LogisticTaskManager {
                 });
             }
         }
+
+        // Contract tasks
+        let contract = match self.agent_controller().contract_tick(false).await {
+            ContractStatus::RequiresLogisticsTask(src_market, dst_market, trade, units) => {
+                Some((src_market, dst_market, trade, units))
+            }
+            _ => None,
+        };
+        let contract_good = contract
+            .as_ref()
+            .map(|(_, _, trade, _)| trade.symbol.clone());
 
         // load markets
         let markets = self.universe.get_system_markets(&system_symbol).await;
@@ -501,42 +514,70 @@ impl LogisticTaskManager {
                     None => true,
                 })
                 .max_by_key(|(_, trade)| trade.sell_price);
-            let (buy_trade_good, sell_trade_good) = match (buy_trade_good, sell_trade_good) {
-                (Some(buy), Some(sell)) => (buy, sell),
-                _ => continue,
-            };
-            let units = min(
-                min(
-                    buy_trade_good.1.trade_volume,
-                    sell_trade_good.1.trade_volume,
-                ),
-                capacity_cap,
-            );
-            let profit =
-                (sell_trade_good.1.sell_price - buy_trade_good.1.purchase_price) * (units as i64);
-            let can_afford = true; // logistic ships reserve their credits beforehand
-            if profit >= min_profit && can_afford {
+
+            // Contract task
+            if !CONFIG.disable_contract_tasks && contract_good.as_ref() == Some(&good) {
+                let (src_market, dst_market, trade, missing) = match &contract {
+                    Some(contract) => contract,
+                    None => continue,
+                };
+                let units = min(*missing, capacity_cap);
                 debug!(
-                    "{}: buy {} @ {} for ${}, sell @ {} for ${}, profit: ${}",
-                    good,
-                    units,
-                    buy_trade_good.0,
-                    buy_trade_good.1.purchase_price,
-                    sell_trade_good.0,
-                    sell_trade_good.1.sell_price,
-                    profit
+                    "Contract task: buy {} {} @ {} for ${}",
+                    units, good, src_market, trade.purchase_price
                 );
                 tasks.push(Task {
-                    // full exclusivity seems a bit broad right now, but it's a start
-                    id: format!("{}trade_{}", system_prefix, good),
+                    id: format!("{}contract_{}", system_prefix, good),
                     actions: TaskActions::TransportCargo {
-                        src: buy_trade_good.0.clone(),
-                        dest: sell_trade_good.0.clone(),
+                        src: src_market.clone(),
+                        dest: dst_market.clone(),
                         src_action: Action::BuyGoods(good.clone(), units),
-                        dest_action: Action::SellGoods(good.clone(), units),
+                        dest_action: Action::DeliverContract(good.clone(), units),
                     },
-                    value: profit,
+                    value: 50_000, // Very high priority
                 });
+                continue; // Don't add a trading task for the same good
+            }
+
+            // Trading task
+            if !CONFIG.disable_trading_tasks {
+                let (buy_trade_good, sell_trade_good) = match (buy_trade_good, sell_trade_good) {
+                    (Some(buy), Some(sell)) => (buy, sell),
+                    _ => continue,
+                };
+                let units = min(
+                    min(
+                        buy_trade_good.1.trade_volume,
+                        sell_trade_good.1.trade_volume,
+                    ),
+                    capacity_cap,
+                );
+                let profit = (sell_trade_good.1.sell_price - buy_trade_good.1.purchase_price)
+                    * (units as i64);
+                let can_afford = true; // logistic ships reserve their credits beforehand
+                if profit >= min_profit && can_afford {
+                    debug!(
+                        "{}: buy {} @ {} for ${}, sell @ {} for ${}, profit: ${}",
+                        good,
+                        units,
+                        buy_trade_good.0,
+                        buy_trade_good.1.purchase_price,
+                        sell_trade_good.0,
+                        sell_trade_good.1.sell_price,
+                        profit
+                    );
+                    tasks.push(Task {
+                        // full exclusivity seems a bit broad right now, but it's a start
+                        id: format!("{}trade_{}", system_prefix, good),
+                        actions: TaskActions::TransportCargo {
+                            src: buy_trade_good.0.clone(),
+                            dest: sell_trade_good.0.clone(),
+                            src_action: Action::BuyGoods(good.clone(), units),
+                            dest_action: Action::SellGoods(good.clone(), units),
+                        },
+                        value: profit,
+                    });
+                }
             }
         }
         tasks
@@ -696,7 +737,7 @@ impl LogisticTaskManager {
                 available_tasks_clone.len(),
                 plan_length.num_seconds()
             );
-            debug!("Available tasks: {:?}", available_tasks_clone);
+            // debug!("Available tasks: {:?}", available_tasks_clone);
             tokio::task::spawn_blocking(move || {
                 logistics_planner::plan::run_planner(
                     &[logistics_ship],

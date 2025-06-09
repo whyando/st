@@ -10,31 +10,33 @@
 //! however it doesn't actually allow you to handle the result of the tasks.
 //!
 
+use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
-use log::debug;
+use log::{debug, info};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
+use tokio::task::{JoinError, JoinHandle};
 
 #[derive(Debug)]
 pub struct JoinHandles {
-    handles: Arc<Mutex<FuturesUnordered<JoinHandle<()>>>>,
-    rx: Arc<Mutex<mpsc::UnboundedReceiver<JoinHandle<()>>>>,
-    tx: mpsc::UnboundedSender<JoinHandle<()>>,
+    handles: Arc<Mutex<FuturesUnordered<BoxFuture<'static, (String, Result<(), JoinError>)>>>>,
+    rx: Arc<Mutex<mpsc::UnboundedReceiver<(String, JoinHandle<()>)>>>,
+    tx: mpsc::UnboundedSender<(String, JoinHandle<()>)>,
 }
 impl JoinHandles {
     pub fn new() -> Self {
-        let (tx, rx) = mpsc::unbounded_channel::<JoinHandle<()>>();
+        let (tx, rx) = mpsc::unbounded_channel::<(String, JoinHandle<()>)>();
         Self {
             handles: Arc::new(Mutex::new(FuturesUnordered::new())),
             rx: Arc::new(Mutex::new(rx)),
             tx,
         }
     }
-    pub fn push(&self, handle: JoinHandle<()>) {
-        self.tx.send(handle).unwrap();
+    pub fn push(&self, name: &str, handle: JoinHandle<()>) {
+        self.tx.send((name.to_string(), handle)).unwrap();
     }
     pub async fn start(&self) {
+        info!("join handles started");
         use futures::StreamExt as _;
         let mut handles = self.handles.lock().unwrap();
         let mut rx = self.rx.lock().unwrap();
@@ -49,15 +51,28 @@ impl JoinHandles {
             };
 
             tokio::select! {
-                hdl_ret = next_handle => {
+                result = next_handle => {
+                    let (name, hdl_ret) = result;
+                    let result = match &hdl_ret {
+                        Ok(_) => "completed",
+                        Err(_e) => "failed",
+                    };
+                    debug!("handle '{}' {}", name, result);
                     hdl_ret.unwrap();
-                    debug!("JoinHandles::wait_all: handle completed");
                 }
                 handle = rx.recv() => {
-                    debug!("JoinHandles::wait_all: adding new handle");
-                    handles.push(handle.unwrap());
+                    let (name, handle) = handle.unwrap();
+                    debug!("adding new handle '{}'", name);
+                    handles.push(wait_handle(name, handle));
                 }
             }
         }
     }
+}
+
+fn wait_handle(
+    name: String,
+    handle: JoinHandle<()>,
+) -> BoxFuture<'static, (String, Result<(), JoinError>)> {
+    Box::pin(async move { (name, handle.await) })
 }

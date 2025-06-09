@@ -126,7 +126,7 @@ async fn tick(
                     "ADVANCED_CIRCUITRY" => 1_000_000,
                     _ => panic!("Unknown construction good: {}", mat.trade_symbol),
                 };
-                let market = ship.universe.get_market(&market_symbol).await;
+                let market = ship.universe.get_market(&market_symbol);
                 if let Some(market) = market {
                     let good = market
                         .data

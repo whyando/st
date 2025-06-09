@@ -128,7 +128,7 @@ pub async fn probe_single_location(ship_controller: ShipController, config: &Pro
         let now = chrono::Utc::now();
         let mut next: DateTime<Utc> = now + Duration::try_minutes(15).unwrap();
         if waypoint.is_market() {
-            let market = ship_controller.universe.get_market(waypoint_symbol).await;
+            let market = ship_controller.universe.get_market(waypoint_symbol);
             let next_refresh = match market {
                 Some(market) => market.timestamp.add(*MARKET_REFRESH_INTERVAL),
                 None => now,
@@ -141,7 +141,7 @@ pub async fn probe_single_location(ship_controller: ShipController, config: &Pro
         }
 
         if waypoint.is_shipyard() {
-            let shipyard = ship_controller.universe.get_shipyard(waypoint_symbol).await;
+            let shipyard = ship_controller.universe.get_shipyard(waypoint_symbol);
             let next_refresh = match shipyard {
                 Some(market) => market.timestamp + *SHIPYARD_REFRESH_INTERVAL,
                 None => now,

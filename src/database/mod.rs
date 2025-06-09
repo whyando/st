@@ -205,24 +205,25 @@ impl DbClient {
             .expect("DB Insert error");
     }
 
-    pub async fn get_market(&self, symbol: &WaypointSymbol) -> Option<WithTimestamp<Market>> {
-        let market: Option<db_models::Market> = markets::table
-            .filter(markets::waypoint_symbol.eq(symbol.to_string()))
-            .select(db_models::Market::as_select())
-            .first(&mut self.conn().await)
-            .await
-            .optional()
-            .expect("DB Query error");
+    // Shouldn't be needed, since we shouldn't be loading individual markets
+    // pub async fn get_market(&self, symbol: &WaypointSymbol) -> Option<WithTimestamp<Market>> {
+    //     let market: Option<db_models::Market> = markets::table
+    //         .filter(markets::waypoint_symbol.eq(symbol.to_string()))
+    //         .select(db_models::Market::as_select())
+    //         .first(&mut self.conn().await)
+    //         .await
+    //         .optional()
+    //         .expect("DB Query error");
 
-        market.map(|m| {
-            let market_data: Market =
-                serde_json::from_value(m.market_data).expect("Invalid market data");
-            WithTimestamp {
-                data: market_data,
-                timestamp: m.updated_at,
-            }
-        })
-    }
+    //     market.map(|m| {
+    //         let market_data: Market =
+    //             serde_json::from_value(m.market_data).expect("Invalid market data");
+    //         WithTimestamp {
+    //             data: market_data,
+    //             timestamp: m.updated_at,
+    //         }
+    //     })
+    // }
 
     pub async fn save_market(&self, symbol: &WaypointSymbol, market: &WithTimestamp<Market>) {
         let market_data = serde_json::to_value(&market.data).expect("Failed to serialize market");
@@ -300,14 +301,43 @@ impl DbClient {
             .expect("DB Query error");
     }
 
-    pub async fn get_shipyard(&self, symbol: &WaypointSymbol) -> Option<WithTimestamp<Shipyard>> {
-        let key = format!("shipyards/{}", symbol);
-        self.get_value(&key).await
-    }
+    // Shouldn't be needed, since we shouldn't be loading individual shipyards
+    // pub async fn get_shipyard(&self, symbol: &WaypointSymbol) -> Option<WithTimestamp<Shipyard>> {
+    //     let shipyard: Option<db_models::Shipyard> = shipyards::table
+    //         .filter(shipyards::waypoint_symbol.eq(symbol.to_string()))
+    //         .select(db_models::Shipyard::as_select())
+    //         .first(&mut self.conn().await)
+    //         .await
+    //         .optional()
+    //         .expect("DB Query error");
+
+    //     shipyard.map(|s| {
+    //         let shipyard_data: Shipyard =
+    //             serde_json::from_value(s.shipyard_data).expect("Invalid shipyard data");
+    //         WithTimestamp {
+    //             data: shipyard_data,
+    //             timestamp: s.updated_at,
+    //         }
+    //     })
+    // }
 
     pub async fn save_shipyard(&self, symbol: &WaypointSymbol, shipyard: &WithTimestamp<Shipyard>) {
-        let key = format!("shipyards/{}", symbol);
-        self.set_value(&key, &shipyard).await;
+        let shipyard_data =
+            serde_json::to_value(&shipyard.data).expect("Failed to serialize shipyard");
+        diesel::insert_into(shipyards::table)
+            .values((
+                shipyards::waypoint_symbol.eq(symbol.to_string()),
+                shipyards::shipyard_data.eq(shipyard_data),
+            ))
+            .on_conflict(shipyards::waypoint_symbol)
+            .do_update()
+            .set((
+                shipyards::shipyard_data.eq(excluded(shipyards::shipyard_data)),
+                shipyards::updated_at.eq(chrono::Utc::now()),
+            ))
+            .execute(&mut self.conn().await)
+            .await
+            .expect("DB Insert error");
     }
 
     pub async fn load_schedule(&self, ship_symbol: &str) -> Option<ShipSchedule> {

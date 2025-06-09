@@ -11,6 +11,8 @@ pub struct Config {
     pub scrap_all_ships: bool,
     pub scrap_unassigned: bool,
     pub no_gate_mode: bool,
+    pub disable_trading_tasks: bool,
+    pub disable_contract_tasks: bool,
     pub era_override: Option<AgentEra>,
 }
 
@@ -42,6 +44,12 @@ lazy_static! {
         let no_gate_mode = std::env::var("NO_GATE_MODE")
             .map(|val| val == "1")
             .unwrap_or(false);
+        let disable_trading_tasks = std::env::var("DEBUG_DISABLE_TRADING_TASKS")
+            .map(|val| val == "1")
+            .unwrap_or(false);
+        let disable_contract_tasks = std::env::var("DEBUG_DISABLE_CONTRACT_TASKS")
+            .map(|val| val == "1")
+            .unwrap_or(false);
         let era_override = match std::env::var("ERA_OVERRIDE") {
             Ok(val) if val.is_empty() => None,
             Ok(val) => Some(val.parse().expect("Invalid ERA_OVERRIDE")),
@@ -55,6 +63,8 @@ lazy_static! {
             scrap_unassigned,
             era_override,
             no_gate_mode,
+            disable_trading_tasks,
+            disable_contract_tasks,
         }
     };
 }

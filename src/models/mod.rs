@@ -54,9 +54,9 @@ pub struct PaginatedList<T> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Meta {
-    pub page: u32,
-    pub limit: u32,
-    pub total: u32,
+    pub page: usize,
+    pub limit: usize,
+    pub total: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

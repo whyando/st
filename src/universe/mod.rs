@@ -60,8 +60,8 @@ pub struct Universe {
     constructions: DashMap<WaypointSymbol, Arc<WithTimestamp<Option<Construction>>>>,
     remote_markets: DashMap<WaypointSymbol, MarketRemoteView>,
     remote_shipyards: DashMap<WaypointSymbol, ShipyardRemoteView>,
-    markets: DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Market>>>>,
-    shipyards: DashMap<WaypointSymbol, Option<Arc<WithTimestamp<Shipyard>>>>,
+    markets: DashMap<WaypointSymbol, Arc<WithTimestamp<Market>>>,
+    shipyards: DashMap<WaypointSymbol, Arc<WithTimestamp<Shipyard>>>,
     factions: DashMap<String, Faction>,
     jumpgates: DashMap<WaypointSymbol, JumpGateInfo>,
 
@@ -128,22 +128,11 @@ impl Universe {
             .clone()
     }
 
-    pub async fn get_market(
+    pub fn get_market(
         &self,
         waypoint_symbol: &WaypointSymbol,
     ) -> Option<Arc<WithTimestamp<Market>>> {
-        match self.markets.get(waypoint_symbol) {
-            Some(market) => market.clone(),
-            None => {
-                let market = self
-                    .db
-                    .get_market(waypoint_symbol)
-                    .await
-                    .map(|market| Arc::new(market));
-                self.markets.insert(waypoint_symbol.clone(), market.clone());
-                market
-            }
-        }
+        self.markets.get(waypoint_symbol).map(|x| x.value().clone())
     }
 
     pub async fn save_market(
@@ -152,29 +141,19 @@ impl Universe {
         market: WithTimestamp<Market>,
     ) {
         self.markets
-            .insert(waypoint_symbol.clone(), Some(Arc::new(market.clone())));
+            .insert(waypoint_symbol.clone(), Arc::new(market.clone()));
         self.db.save_market(waypoint_symbol, &market).await;
         self.db.insert_market_trades(&market).await;
         self.db.upsert_market_transactions(&market).await;
     }
 
-    pub async fn get_shipyard(
+    pub fn get_shipyard(
         &self,
         waypoint_symbol: &WaypointSymbol,
     ) -> Option<Arc<WithTimestamp<Shipyard>>> {
-        match self.shipyards.get(waypoint_symbol) {
-            Some(shipyard) => shipyard.clone(),
-            None => {
-                let shipyard = self
-                    .db
-                    .get_shipyard(waypoint_symbol)
-                    .await
-                    .map(|x| Arc::new(x));
-                self.shipyards
-                    .insert(waypoint_symbol.clone(), shipyard.clone());
-                shipyard
-            }
-        }
+        self.shipyards
+            .get(waypoint_symbol)
+            .map(|x| x.value().clone())
     }
 
     pub async fn save_shipyard(
@@ -183,7 +162,7 @@ impl Universe {
         shipyard: WithTimestamp<Shipyard>,
     ) {
         self.shipyards
-            .insert(waypoint_symbol.clone(), Some(Arc::new(shipyard.clone())));
+            .insert(waypoint_symbol.clone(), Arc::new(shipyard.clone()));
         self.db.save_shipyard(waypoint_symbol, &shipyard).await;
     }
 
@@ -415,7 +394,7 @@ impl Universe {
         for waypoint in &waypoints {
             if waypoint.is_market() {
                 let market_remote = self.get_market_remote(&waypoint.symbol).await;
-                let market_opt = self.get_market(&waypoint.symbol).await;
+                let market_opt = self.get_market(&waypoint.symbol);
                 markets.push((market_remote, market_opt));
             }
         }
@@ -431,7 +410,7 @@ impl Universe {
         for waypoint in &waypoints {
             if waypoint.is_shipyard() {
                 let shipyard_remote = self.get_shipyard_remote(&waypoint.symbol).await;
-                let shipyard_opt = self.get_shipyard(&waypoint.symbol).await;
+                let shipyard_opt = self.get_shipyard(&waypoint.symbol);
                 shipyards.push((shipyard_remote, shipyard_opt));
             }
         }
@@ -509,7 +488,7 @@ impl Universe {
             if !waypoint.is_shipyard() {
                 continue;
             }
-            if let Some(shipyard) = self.get_shipyard(&waypoint.symbol).await {
+            if let Some(shipyard) = self.get_shipyard(&waypoint.symbol) {
                 if let Some(ship) = shipyard
                     .data
                     .ships
@@ -922,20 +901,18 @@ async fn load_remote_shipyards(db: &DbClient) -> BTreeMap<WaypointSymbol, Shipya
     result
 }
 
-async fn load_markets(db: &DbClient) -> Vec<(WaypointSymbol, Option<Arc<WithTimestamp<Market>>>)> {
+async fn load_markets(db: &DbClient) -> Vec<(WaypointSymbol, Arc<WithTimestamp<Market>>)> {
     let markets = db.get_all_markets().await;
     markets
         .into_iter()
-        .map(|(symbol, market)| (symbol, Some(Arc::new(market))))
+        .map(|(symbol, market)| (symbol, Arc::new(market)))
         .collect()
 }
 
-async fn load_shipyards(
-    db: &DbClient,
-) -> Vec<(WaypointSymbol, Option<Arc<WithTimestamp<Shipyard>>>)> {
+async fn load_shipyards(db: &DbClient) -> Vec<(WaypointSymbol, Arc<WithTimestamp<Shipyard>>)> {
     let shipyards = db.get_all_shipyards().await;
     shipyards
         .into_iter()
-        .map(|(symbol, shipyard)| (symbol, Some(Arc::new(shipyard))))
+        .map(|(symbol, shipyard)| (symbol, Arc::new(shipyard)))
         .collect()
 }

@@ -28,7 +28,7 @@ async fn main() -> io::Result<()> {
     let mut markets = Vec::new();
     for waypoint in &waypoints {
         if waypoint.is_market() {
-            if let Some(market) = universe.get_market(&waypoint.symbol).await {
+            if let Some(market) = universe.get_market(&waypoint.symbol) {
                 markets.push(market);
             }
         }
