@@ -158,7 +158,7 @@ impl LogisticTaskManager {
         );
         for ship_symbol in bought {
             debug!("Task controller bought ship {}", ship_symbol);
-            self.agent_controller()._spawn_run_ship(ship_symbol).await;
+            self.agent_controller().spawn_run_ship(ship_symbol).await;
         }
         if let Some(waypoint) = shipyard_task_waypoint {
             if waypoint.system() == *system_symbol {

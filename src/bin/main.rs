@@ -74,5 +74,5 @@ async fn main() {
     api_client.set_agent_token(&agent_token);
 
     let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
-    agent_controller.run_ships().await;
+    agent_controller.run().await;
 }

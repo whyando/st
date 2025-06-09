@@ -29,7 +29,7 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use strum::EnumString;
-use tokio::sync::mpsc::Sender;
+use tokio::time::MissedTickBehavior;
 
 #[derive(Clone, Debug)]
 pub enum Event {
@@ -83,7 +83,6 @@ pub struct AgentController {
     api_client: ApiClient,
     db: DbClient,
 
-    listeners: Arc<Mutex<Vec<Sender<Event>>>>,
     callsign: String,
     state: Arc<Mutex<AgentState>>,
     agent: Arc<Mutex<Agent>>,
@@ -156,26 +155,8 @@ impl AgentController {
             .collect()
     }
 
-    pub fn add_event_listener(&self, listener: Sender<Event>) {
-        let mut listeners = self.listeners.lock().unwrap();
-        listeners.push(listener);
-        info!("Added event listener");
-        // web api should only require one listener, although we could support multiple
-        assert!(listeners.len() <= 1);
-    }
-
-    // definitely causing issues
-    // pub fn emit_event_blocking(&self, event: &Event) {
-    //     let listeners = { self.listeners.lock().unwrap().clone() };
-    //     for listener in listeners.iter() {
-    //         listener.blocking_send(event.clone()).unwrap();
-    //     }
-    // }
-    pub async fn emit_event(&self, event: &Event) {
-        let listeners = { self.listeners.lock().unwrap().clone() };
-        for listener in listeners.iter() {
-            listener.send(event.clone()).await.unwrap();
-        }
+    pub async fn emit_event(&self, _event: &Event) {
+        // Empty
     }
 
     pub async fn transfer_cargo(
@@ -282,7 +263,6 @@ impl AgentController {
             api_client: api_client.clone(),
             db: db.clone(),
             universe: universe.clone(),
-            listeners: Arc::new(Mutex::new(Vec::new())),
             hdls: Arc::new(JoinHandles::new()),
             ship_config: Arc::new(Mutex::new(vec![])),
             job_assignments: Arc::new(job_assignments),
@@ -343,7 +323,7 @@ impl AgentController {
     fn debug(&self, msg: &str) {
         debug!("[{}] {}", self.callsign, msg);
     }
-    pub async fn faction_capital(&self) -> SystemSymbol {
+    pub fn faction_capital(&self) -> SystemSymbol {
         let faction_symbol = self.starting_faction();
         let faction = self.universe.get_faction(&faction_symbol);
         faction.headquarters.unwrap()
@@ -622,7 +602,6 @@ impl AgentController {
     ) -> (Vec<String>, Option<WaypointSymbol>) {
         let _guard = self.try_buy_ships_lock().await;
 
-        self.check_era_advance().await;
         self.refresh_ship_config().await;
 
         if CONFIG.scrap_all_ships {
@@ -682,7 +661,7 @@ impl AgentController {
         let era = self.state().era;
 
         if era == AgentEra::InterSystem2 {
-            let capital = self.faction_capital().await;
+            let capital = self.faction_capital();
             let waypoints: Vec<WaypointDetailed> =
                 self.universe.get_system_waypoints(&capital).await;
             panic!("Late game not supported");
@@ -722,7 +701,7 @@ impl AgentController {
         ));
 
         if era == AgentEra::InterSystem1 {
-            let capital = self.faction_capital().await;
+            let capital = self.faction_capital();
             let waypoints: Vec<WaypointDetailed> =
                 self.universe.get_system_waypoints(&capital).await;
             let markets = self.universe.get_system_markets_remote(&capital).await;
@@ -816,27 +795,50 @@ impl AgentController {
         }
     }
 
-    pub async fn run_ships(&self) {
+    pub async fn run(&self) {
         let self_clone = self.clone();
-        {
-            let join_hdl = tokio::spawn(async move {
-                let broker = self_clone.cargo_broker.clone();
-                broker.run(Box::new(self_clone)).await;
-            });
-            debug!("spawn_broker try push join_hdl");
-            self.hdls.push(join_hdl);
-            debug!("spawn_broker pushed join_hdl");
-        }
+        // Spawn initial tasks - cargo broker
+        self.hdls.push(tokio::spawn(async move {
+            let broker = self_clone.cargo_broker.clone();
+            broker.run(Box::new(self_clone)).await;
+        }));
+        // Spawn initial tasks - agent
+        let self_clone = self.clone();
+        self.hdls.push(tokio::spawn(async move {
+            self_clone.run_agent().await;
+        }));
+        // Spawn controller main loop
+        let self_clone = self.clone();
+        self.hdls.push(tokio::spawn(async move {
+            self_clone.controller_loop().await;
+        }));
+        // Wait on JoinHandles to complete/error
+        self.hdls.start().await;
+    }
 
+    async fn run_agent(&self) {
         // Generate ship config, purchase + assign ships
         // purchased ships are assigned, but not yet started
         let (_bought, _tasks) = self.try_buy_ships(None).await;
-
         for ship in self.ships.iter() {
             let ship_symbol = ship.key().clone();
             self.spawn_run_ship(ship_symbol).await;
         }
-        self.hdls.start().await;
+    }
+
+    // Run controller_tick every minute
+    async fn controller_loop(&self) {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            self.controller_tick().await;
+        }
+    }
+
+    async fn controller_tick(&self) {
+        self.check_era_advance().await;
+        self.try_buy_ships(None).await;
     }
 
     pub async fn try_assign_ship(&self, ship_symbol: &str) -> bool {
@@ -876,11 +878,12 @@ impl AgentController {
         }
     }
 
-    pub fn _spawn_run_ship(&self, ship_symbol: String) -> BoxFuture<()> {
-        Box::pin(self.spawn_run_ship(ship_symbol))
+    // Wrapper to allow for async fn recursion
+    pub fn spawn_run_ship(&self, ship_symbol: String) -> BoxFuture<()> {
+        Box::pin(self._spawn_run_ship(ship_symbol))
     }
 
-    pub async fn spawn_run_ship(&self, ship_symbol: String) {
+    async fn _spawn_run_ship(&self, ship_symbol: String) {
         debug!("Spawning task for {}", ship_symbol);
 
         let job_id_opt = self.job_assignments_rev.get(&ship_symbol);

@@ -74,7 +74,7 @@ pub async fn probe_multiple_locations(ship: ShipController, config: &ProbeScript
                 // info!("Routine buy task resulted in {} ships bought", bought.len());
                 // for ship_symbol in bought {
                 //     debug!("{} Bought ship {}", ship.ship_symbol, ship_symbol);
-                //     ship.agent_controller._spawn_run_ship(ship_symbol).await;
+                //     ship.agent_controller.spawn_run_ship(ship_symbol).await;
                 // }
             }
         }

@@ -691,7 +691,7 @@ impl ShipController {
                 info!("Buy task resulted in {} ships bought", bought.len());
                 for ship_symbol in bought {
                     self.debug(&format!("{} Bought ship {}", self.ship_symbol, ship_symbol));
-                    self.agent_controller._spawn_run_ship(ship_symbol).await;
+                    self.agent_controller.spawn_run_ship(ship_symbol).await;
                 }
             }
             Action::DeliverConstruction(good, units) => {

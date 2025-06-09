@@ -1,7 +1,7 @@
+use prettytable::{format, row, Table};
 use st::api_client::api_models::WaypointDetailed;
 use st::api_client::ApiClient;
 use st::database::DbClient;
-use prettytable::{Table, row, format};
 
 use st::universe::Universe;
 use std::env;
@@ -45,7 +45,7 @@ async fn main() -> io::Result<()> {
 
     for market in markets {
         writeln!(&mut f, "Market: {}", market.data.symbol)?;
-        
+
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
         table.add_row(row![

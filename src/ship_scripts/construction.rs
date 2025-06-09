@@ -38,7 +38,7 @@ pub async fn get_jump_gate(ship: &ShipController) -> WaypointSymbol {
 }
 
 pub async fn get_probe_shipyard(ship: &ShipController) -> WaypointSymbol {
-    let system = ship.agent_controller.faction_capital().await;
+    let system = ship.agent_controller.faction_capital();
     let shipyards = ship.universe.get_system_shipyards_remote(&system).await;
     let filtered = shipyards
         .iter()
