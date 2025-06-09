@@ -9,6 +9,7 @@ use super::value_feature::JobValueDimension as _;
 use vrp_core::models::common::*;
 use vrp_core::models::problem::*;
 use vrp_core::prelude::*;
+use vrp_core::rosomaxa::prelude::TelemetryMode;
 
 struct Planner<'a> {
     ships: &'a [LogisticShip],
@@ -228,6 +229,7 @@ pub fn run_planner(
     let (problem, job_id_map) = planner.translate_problem();
 
     let config = VrpConfigBuilder::new(problem.clone())
+        .set_telemetry_mode(TelemetryMode::None)
         .prebuild()
         .unwrap()
         .with_max_time(Some(constraints.max_compute_time.num_seconds() as usize))
