@@ -18,9 +18,6 @@ lazy_static! {
         let kafka_url = std::env::var("KAFKA_URL").expect("KAFKA_URL must be set");
         let kafka_username = std::env::var("KAFKA_USERNAME").expect("KAFKA_USERNAME must be set");
         let kafka_password = std::env::var("KAFKA_PASSWORD").expect("KAFKA_PASSWORD must be set");
-        debug!("Kafka URL: '{}'", kafka_url);
-        debug!("Kafka username: '{}'", kafka_username);
-        debug!("Kafka password: '{}'", kafka_password);
         let mut config = ClientConfig::new();
         config
             .set("bootstrap.servers", kafka_url)
