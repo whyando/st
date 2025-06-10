@@ -882,7 +882,7 @@ impl AgentController {
             }),
         );
         // Wait on JoinHandles to complete/error
-        self.hdls.start().await;
+        self.hdls.join().await;
     }
 
     async fn run_agent(&self) {

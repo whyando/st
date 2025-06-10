@@ -1,5 +1,8 @@
 pub mod api_models;
+pub mod interceptor;
+pub mod kafka_interceptor;
 
+use self::interceptor::ApiInterceptor;
 use crate::config::CONFIG;
 use crate::models::*;
 use core::panic;
@@ -12,22 +15,17 @@ use tokio::time::Instant;
 
 const API_MAX_PAGE_SIZE: usize = 20;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ApiClient {
     base_url: String,
     client: reqwest::Client,
     agent_token: Arc<RwLock<Option<String>>>,
     next_request_ts: Arc<Mutex<Option<Instant>>>,
-}
-
-impl Default for ApiClient {
-    fn default() -> Self {
-        Self::new()
-    }
+    interceptors: Arc<Vec<Arc<dyn ApiInterceptor + 'static>>>,
 }
 
 impl ApiClient {
-    pub fn new() -> ApiClient {
+    pub fn new(interceptors: Vec<Arc<dyn ApiInterceptor + 'static>>) -> ApiClient {
         let user_agent = format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
         let client = reqwest::ClientBuilder::new()
             .user_agent(user_agent)
@@ -42,6 +40,7 @@ impl ApiClient {
             base_url: CONFIG.api_base_url.to_string(),
             agent_token: Arc::new(RwLock::new(None)),
             next_request_ts: Arc::new(Mutex::new(None)),
+            interceptors: Arc::new(interceptors),
         }
     }
 
@@ -324,7 +323,6 @@ impl ApiClient {
     {
         self.wait_rate_limit().await;
         let url = format!("{}{}", self.base_url, path);
-        // debug!("!! {} {}", method, url);
         let mut request = self.client.request(method.clone(), &url);
         if let Some(body) = json_body {
             request = request.json(body);
@@ -341,6 +339,11 @@ impl ApiClient {
         let status = response.status();
         debug!("{} {} {}", status.as_u16(), method, path);
         let body = response.text().await.unwrap();
+
+        // Call after_response interceptor
+        for interceptor in self.interceptors.iter() {
+            interceptor.after_response(&method, path, status, &body);
+        }
 
         if status.is_success() {
             let content: T = serde_json::from_str(&body)

@@ -1,8 +1,6 @@
 use prettytable::{format, row, Table};
-use st::api_client::api_models::WaypointDetailed;
 use st::api_client::ApiClient;
 use st::database::DbClient;
-
 use st::universe::Universe;
 use std::env;
 use std::fs::File;
@@ -16,7 +14,7 @@ async fn main() -> io::Result<()> {
 
     let callsign = env::var("AGENT_CALLSIGN").expect("AGENT_CALLSIGN env var not set");
 
-    let api_client = ApiClient::new();
+    let api_client = ApiClient::new(vec![]);
     let status = api_client.status().await.1.unwrap();
     let db = DbClient::new(&status.reset_date).await;
     let universe = Arc::new(Universe::new(&api_client, &db).await);

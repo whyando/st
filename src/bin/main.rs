@@ -1,6 +1,7 @@
 use log::*;
 use reqwest::StatusCode;
 use st::agent_controller::AgentController;
+use st::api_client::kafka_interceptor::KafkaInterceptor;
 use st::api_client::ApiClient;
 use st::config::CONFIG;
 use st::database::DbClient;
@@ -22,7 +23,9 @@ async fn main() {
     info!("Starting agent {} for faction {}", callsign, faction);
     info!("Loaded config: {:?}", *CONFIG);
 
-    let api_client = ApiClient::new();
+    let kafka_interceptor = Arc::new(KafkaInterceptor::new().await);
+    let api_client = ApiClient::new(vec![kafka_interceptor.clone()]);
+
     let status = loop {
         let (status_code, status) = api_client.status().await;
         match status_code {
@@ -73,6 +76,13 @@ async fn main() {
     log::info!("Setting token {}", agent_token);
     api_client.set_agent_token(&agent_token);
 
-    let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
-    agent_controller.run().await;
+    let agent_hdl = tokio::spawn(async move {
+        let agent_controller = AgentController::new(&api_client, &db, &universe, &callsign).await;
+        agent_controller.run().await;
+    });
+    let kafka_interceptor_hdl = tokio::spawn(async move {
+        kafka_interceptor.join().await;
+    });
+
+    tokio::try_join!(kafka_interceptor_hdl, agent_hdl).unwrap();
 }
