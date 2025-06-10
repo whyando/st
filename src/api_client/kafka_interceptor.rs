@@ -1,7 +1,7 @@
 use crate::api_client::interceptor::ApiInterceptor;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
-use log::error;
+use log::*;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
@@ -18,11 +18,16 @@ lazy_static! {
         let kafka_url = std::env::var("KAFKA_URL").expect("KAFKA_URL must be set");
         let kafka_username = std::env::var("KAFKA_USERNAME").expect("KAFKA_USERNAME must be set");
         let kafka_password = std::env::var("KAFKA_PASSWORD").expect("KAFKA_PASSWORD must be set");
+        debug!("Kafka URL: '{}'", kafka_url);
+        debug!("Kafka username: '{}'", kafka_username);
+        debug!("Kafka password: '{}'", kafka_password);
         let mut config = ClientConfig::new();
         config
             .set("bootstrap.servers", kafka_url)
             .set("security.protocol", "SASL_PLAINTEXT")
-            .set("sasl.mechanism", "SCRAM-SHA-256")
+            .set("sasl.mechanism", "PLAIN")
+            // jpa note: use PLAIN for now, seems like SCRAM is broken atm in the rdkafka crate (perhaps since kafka 4.0.0)
+            // .set("sasl.mechanism", "SCRAM-SHA-256")
             .set("sasl.username", kafka_username)
             .set("sasl.password", kafka_password);
         config
@@ -43,11 +48,12 @@ pub async fn init_kafka_topic() {
     .set("retention.bytes", "1000000000") // 1GB
     .set("retention.ms", "86400000"); // 24 hours
 
+    info!("Creating topic {}", *KAFKA_TOPIC);
     let create_topic_result = admin_client
         .create_topics(&[new_topic], &AdminOptions::new())
         .await;
     match create_topic_result {
-        Ok(_) => log::info!("Successfully configured topic {}", *KAFKA_TOPIC),
+        Ok(_) => info!("Successfully configured topic {}", *KAFKA_TOPIC),
         Err(e) => {
             panic!("Failed to configure topic {}: {}", *KAFKA_TOPIC, e);
         }
@@ -55,16 +61,18 @@ pub async fn init_kafka_topic() {
 }
 
 #[derive(Clone, Serialize)]
-struct ResponseData {
+struct ApiRequest {
     timestamp: DateTime<Utc>,
+    request_id: u64,
     method: String,
     path: String,
     status: u16,
-    body: String,
+    request_body: String,
+    response_body: String,
 }
 
 enum KafkaMessage {
-    Response(ResponseData),
+    ApiRequest(ApiRequest),
 }
 
 #[derive(Debug)]
@@ -76,7 +84,7 @@ pub struct KafkaInterceptor {
 impl KafkaInterceptor {
     pub async fn new() -> Self {
         init_kafka_topic().await;
-        let (sender, mut receiver) = mpsc::channel::<KafkaMessage>(1000);
+        let (sender, mut receiver) = mpsc::channel::<KafkaMessage>(10);
 
         let producer: FutureProducer = KAFKA_CONFIG
             .create()
@@ -86,7 +94,7 @@ impl KafkaInterceptor {
         let hdl = tokio::spawn(async move {
             while let Some(message) = receiver.recv().await {
                 match message {
-                    KafkaMessage::Response(data) => {
+                    KafkaMessage::ApiRequest(data) => {
                         let producer = producer.clone();
                         if let Err(e) = producer
                             .send(
@@ -117,16 +125,28 @@ impl KafkaInterceptor {
 }
 
 impl ApiInterceptor for KafkaInterceptor {
-    fn after_response(&self, method: &Method, path: &str, status: StatusCode, body: &str) {
-        let message = KafkaMessage::Response(ResponseData {
+    fn after_response(
+        &self,
+        req_id: u64,
+        method: &Method,
+        path: &str,
+        status: StatusCode,
+        request_body: &str,
+        response_body: &str,
+    ) {
+        let message = KafkaMessage::ApiRequest(ApiRequest {
             timestamp: Utc::now(),
+            request_id: req_id,
             method: method.to_string(),
             path: path.to_string(),
             status: status.as_u16(),
-            body: body.to_string(),
+            request_body: request_body.to_string(),
+            response_body: response_body.to_string(),
         });
 
-        // Non-blocking send - if channel is full, drop the message
-        let _ = self.sender.try_send(message);
+        // Non-blocking send - if channel is full or disconnected, drop the message
+        if let Err(e) = self.sender.try_send(message) {
+            warn!("Failed to send to channel: {:?}", e);
+        }
     }
 }

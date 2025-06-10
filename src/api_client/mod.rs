@@ -10,7 +10,10 @@ use log::*;
 use reqwest::{self, Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, Mutex, RwLock,
+};
 use tokio::time::Instant;
 
 const API_MAX_PAGE_SIZE: usize = 20;
@@ -19,6 +22,7 @@ const API_MAX_PAGE_SIZE: usize = 20;
 pub struct ApiClient {
     base_url: String,
     client: reqwest::Client,
+    req_id: Arc<AtomicU64>,
     agent_token: Arc<RwLock<Option<String>>>,
     next_request_ts: Arc<Mutex<Option<Instant>>>,
     interceptors: Arc<Vec<Arc<dyn ApiInterceptor + 'static>>>,
@@ -38,6 +42,7 @@ impl ApiClient {
         ApiClient {
             client,
             base_url: CONFIG.api_base_url.to_string(),
+            req_id: Arc::new(AtomicU64::new(0)),
             agent_token: Arc::new(RwLock::new(None)),
             next_request_ts: Arc::new(Mutex::new(None)),
             interceptors: Arc::new(interceptors),
@@ -322,11 +327,16 @@ impl ApiClient {
         U: Serialize,
     {
         self.wait_rate_limit().await;
+        let req_id = self.req_id.fetch_add(1, Ordering::Relaxed);
         let url = format!("{}{}", self.base_url, path);
         let mut request = self.client.request(method.clone(), &url);
         if let Some(body) = json_body {
             request = request.json(body);
         }
+        let request_body = match json_body {
+            Some(body) => serde_json::to_string(body).unwrap(),
+            None => String::new(),
+        };
         // override auth type for /register
         if path == "/register" {
             let account_token = std::env::var("SPACETRADERS_ACCOUNT_TOKEN")
@@ -338,23 +348,33 @@ impl ApiClient {
         let response = request.send().await.expect("Failed to send request");
         let status = response.status();
         debug!("{} {} {}", status.as_u16(), method, path);
-        let body = response.text().await.unwrap();
+        let response_body = response.text().await.unwrap();
 
         // Call after_response interceptor
         for interceptor in self.interceptors.iter() {
-            interceptor.after_response(&method, path, status, &body);
+            interceptor.after_response(
+                req_id,
+                &method,
+                path,
+                status,
+                &request_body,
+                &response_body,
+            );
         }
 
         if status.is_success() {
-            let content: T = serde_json::from_str(&body)
+            let content: T = serde_json::from_str(&response_body)
                 .map_err(|e| {
-                    error!("Unable to parse response as json: {}\nbody: {}", e, body);
+                    error!(
+                        "Unable to parse response as json: {}\nbody: {}",
+                        e, response_body
+                    );
                     panic!("Deserialisation failed");
                 })
                 .unwrap();
             (status, Ok(content))
         } else {
-            (status, Err(body))
+            (status, Err(response_body))
         }
     }
 }
