@@ -36,7 +36,6 @@ impl ApiClient {
             .timeout(std::time::Duration::from_secs(10))
             .redirect(reqwest::redirect::Policy::none())
             .https_only(true)
-            .http1_only()
             .build()
             .unwrap();
         ApiClient {
