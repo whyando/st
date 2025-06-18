@@ -191,26 +191,27 @@ async fn tick(
             None
         }
         Completed => {
-            // After completing the gate, navigate through the gate to the capital system
-            let shipyard = get_probe_shipyard(ship).await;
-            ship.debug(&format!(
-                "Jumpgate is completed. Navigating to shipyard {}",
-                shipyard
-            ));
-            if ship.system() != shipyard.system() {
-                // Assume we can do a single jump to the correct system
-                // nav to jumpgate
-                let jumpgate_src = ship.universe.get_jumpgate(&ship.system()).await;
-                let jumpgate_dest = ship.universe.get_jumpgate(&shipyard.system()).await;
-                ship.goto_waypoint(&jumpgate_src).await;
-                // jump to correct system
-                ship.jump(&jumpgate_dest).await;
-            }
-            ship.goto_waypoint(&shipyard).await;
-            ship.refresh_shipyard().await;
-            ship.debug(
-                "Jumpgate is completed + navigating to shipyard complete. Entering terminal state.",
-            );
+            // Disable this logic, no direct jump to capital system
+            // // After completing the gate, navigate through the gate to the capital system
+            // let shipyard = get_probe_shipyard(ship).await;
+            // ship.debug(&format!(
+            //     "Jumpgate is completed. Navigating to shipyard {}",
+            //     shipyard
+            // ));
+            // if ship.system() != shipyard.system() {
+            //     // Assume we can do a single jump to the correct system
+            //     // nav to jumpgate
+            //     let jumpgate_src = ship.universe.get_jumpgate(&ship.system()).await;
+            //     let jumpgate_dest = ship.universe.get_jumpgate(&shipyard.system()).await;
+            //     ship.goto_waypoint(&jumpgate_src).await;
+            //     // jump to correct system
+            //     ship.jump(&jumpgate_dest).await;
+            // }
+            // ship.goto_waypoint(&shipyard).await;
+            // ship.refresh_shipyard().await;
+            // ship.debug(
+            //     "Jumpgate is completed + navigating to shipyard complete. Entering terminal state.",
+            // );
             return Some(TerminalState);
         }
         TerminalState => {
