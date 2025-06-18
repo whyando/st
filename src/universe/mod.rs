@@ -209,14 +209,6 @@ impl Universe {
         self.db.save_construction(symbol, &construction).await;
     }
 
-    pub async fn get_system(&self, symbol: &SystemSymbol) -> System {
-        self.systems
-            .get(symbol)
-            .expect("System not found")
-            .value()
-            .clone()
-    }
-
     pub fn get_faction(&self, faction: &str) -> Faction {
         self.factions.get(faction).unwrap().clone()
     }
@@ -291,7 +283,7 @@ impl Universe {
     }
 
     pub async fn get_system_waypoints(&self, symbol: &SystemSymbol) -> Vec<WaypointDetailed> {
-        let system = self.get_system(symbol).await;
+        let system = self.system(symbol);
         // Collect Vec<Option<_>> to Option<Vec<_>>
         let waypoints: Option<Vec<WaypointDetailed>> = system
             .waypoints
