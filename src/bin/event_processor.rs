@@ -44,14 +44,18 @@ struct Worker {
 
 impl Worker {
     pub async fn new() -> Self {
-        Self { scylla: ScyllaClient::new().await }
+        Self {
+            scylla: ScyllaClient::new().await,
+        }
     }
 
     pub async fn process_api_request(&self, req: ApiRequest) {
-        info!("Received api request: {} {} {} {}", req.request_id, req.status, req.method, req.path);
+        info!(
+            "Received api request: {} {} {} {}",
+            req.request_id, req.status, req.method, req.path
+        );
         let log_id = "test-log";
         let seq_num = self.scylla.get_next_seq_num(log_id).await;
         info!("Next seq num: {}", seq_num);
     }
 }
-
