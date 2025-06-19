@@ -5,6 +5,7 @@ pub mod agent_controller;
 pub mod api_client;
 pub mod database;
 pub mod universe;
+pub mod scylla_client;
 
 pub mod broker;
 pub mod config;

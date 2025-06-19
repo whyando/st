@@ -19,34 +19,40 @@ use serde::{Deserialize, Serialize};
 use std::cmp::min;
 use ConstructionHaulerState::*;
 
-pub async fn get_export_market(ship: &ShipController, good: &str) -> WaypointSymbol {
+async fn get_export_market(ship: &ShipController, good: &str) -> WaypointSymbol {
     let filters = vec![WaypointFilter::Exports(good.to_string())];
     let system = ship.agent_controller.starting_system();
     let waypoints = ship.universe.search_waypoints(&system, &filters).await;
-    assert!(waypoints.len() == 1);
+    assert_eq!(
+        waypoints.len(),
+        1,
+        "Expected 1 export market for {}, got {}",
+        good,
+        waypoints.len()
+    );
     waypoints[0].symbol.clone()
 }
 
-pub async fn get_jump_gate(ship: &ShipController) -> WaypointSymbol {
+async fn get_jump_gate(ship: &ShipController) -> WaypointSymbol {
     let system = ship.agent_controller.starting_system();
     let waypoints = ship
         .universe
         .search_waypoints(&system, &vec![WaypointFilter::JumpGate])
         .await;
-    assert!(waypoints.len() == 1);
+    assert_eq!(waypoints.len(), 1,);
     waypoints[0].symbol.clone()
 }
 
-pub async fn get_probe_shipyard(ship: &ShipController) -> WaypointSymbol {
-    let system = ship.agent_controller.faction_capital();
-    let shipyards = ship.universe.get_system_shipyards_remote(&system).await;
-    let filtered = shipyards
-        .iter()
-        .filter(|sy| sy.ship_types.iter().any(|st| st.ship_type == "SHIP_PROBE"))
-        .collect::<Vec<_>>();
-    assert!(filtered.len() >= 1);
-    filtered[0].symbol.clone()
-}
+// pub async fn get_probe_shipyard(ship: &ShipController) -> WaypointSymbol {
+//     let system = ship.agent_controller.faction_capital();
+//     let shipyards = ship.universe.get_system_shipyards_remote(&system).await;
+//     let filtered = shipyards
+//         .iter()
+//         .filter(|sy| sy.ship_types.iter().any(|st| st.ship_type == "SHIP_PROBE"))
+//         .collect::<Vec<_>>();
+//     assert!(filtered.len() >= 1);
+//     filtered[0].symbol.clone()
+// }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 enum ConstructionHaulerState {

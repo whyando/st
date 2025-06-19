@@ -1,4 +1,5 @@
 use crate::api_client::interceptor::ApiInterceptor;
+use crate::config::{KAFKA_CONFIG, KAFKA_TOPIC};
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use log::*;
@@ -6,30 +7,11 @@ use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use reqwest::{Method, StatusCode};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
-
-lazy_static! {
-    pub static ref KAFKA_TOPIC: &'static str = "api-responses";
-    pub static ref KAFKA_CONFIG: ClientConfig = {
-        let kafka_url = std::env::var("KAFKA_URL").expect("KAFKA_URL must be set");
-        let kafka_username = std::env::var("KAFKA_USERNAME").expect("KAFKA_USERNAME must be set");
-        let kafka_password = std::env::var("KAFKA_PASSWORD").expect("KAFKA_PASSWORD must be set");
-        let mut config = ClientConfig::new();
-        config
-            .set("bootstrap.servers", kafka_url)
-            .set("security.protocol", "SASL_PLAINTEXT")
-            .set("sasl.mechanism", "PLAIN")
-            // jpa note: use PLAIN for now, seems like SCRAM is broken atm in the rdkafka crate (perhaps since kafka 4.0.0)
-            // .set("sasl.mechanism", "SCRAM-SHA-256")
-            .set("sasl.username", kafka_username)
-            .set("sasl.password", kafka_password);
-        config
-    };
-}
 
 pub async fn init_kafka_topic() {
     let admin_client: AdminClient<_> = KAFKA_CONFIG
@@ -50,24 +32,27 @@ pub async fn init_kafka_topic() {
         .create_topics(&[new_topic], &AdminOptions::new())
         .await;
     match create_topic_result {
-        Ok(_) => info!("Successfully configured topic {}", *KAFKA_TOPIC),
+        Ok(r) => {
+            info!("Successfully configured topic {}: {:?}", *KAFKA_TOPIC, r);
+        }
         Err(e) => {
             panic!("Failed to configure topic {}: {}", *KAFKA_TOPIC, e);
         }
     }
 }
 
-#[derive(Clone, Serialize)]
-struct ApiRequest {
-    timestamp: DateTime<Utc>,
-    request_id: u64,
-    method: String,
-    path: String,
-    status: u16,
-    request_body: String,
-    response_body: String,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiRequest {
+    pub timestamp: DateTime<Utc>,
+    pub request_id: u64,
+    pub method: String,
+    pub path: String,
+    pub status: u16,
+    pub request_body: String,
+    pub response_body: String,
 }
 
+#[derive(Debug)]
 enum KafkaMessage {
     ApiRequest(ApiRequest),
 }
