@@ -1,21 +1,16 @@
 use chrono::{DateTime, Utc};
-use scylla::deserialize::row::ColumnIterator;
-use scylla::deserialize::row::DeserializeRow;
 use scylla::{
     client::{session::Session, session_builder::SessionBuilder},
-    response::query_result::QueryRowsResult,
     statement::Statement,
-    value::{CqlTimestamp, CqlValue, Row},
     DeserializeRow, SerializeRow,
 };
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
-use tokio::sync::OnceCell;
+use std::sync::Arc;
 
-#[derive(Debug, DeserializeRow)]
+#[derive(Debug, DeserializeRow, SerializeRow)]
 pub struct CurrentState {
     pub event_log_id: String,
     pub entity_id: String,
+    pub entity_type: String,
     pub state_data: String,
     pub last_updated: DateTime<Utc>,
     pub seq_num: i64,
@@ -23,7 +18,7 @@ pub struct CurrentState {
     pub last_snapshot_entity_seq_num: i64,
 }
 
-#[derive(Debug, DeserializeRow)]
+#[derive(Debug, DeserializeRow, SerializeRow)]
 pub struct Event {
     pub event_log_id: String,
     pub seq_num: i64,             // Primary ordering mechanism within event log
@@ -33,13 +28,15 @@ pub struct Event {
     pub event_data: String,
 }
 
-#[derive(Debug, DeserializeRow)]
+#[derive(Debug, DeserializeRow, SerializeRow)]
 pub struct Snapshot {
     pub event_log_id: String,
     pub entity_id: String,
-    pub timestamp: DateTime<Utc>, // When snapshot was taken
+    pub entity_type: String,
     pub state_data: String,
-    pub seq_num: i64, // Event sequence number when this snapshot was taken
+    pub last_updated: DateTime<Utc>,
+    pub seq_num: i64,
+    pub entity_seq_num: i64,
 }
 
 #[derive(Debug, DeserializeRow, SerializeRow)]
@@ -66,34 +63,22 @@ impl ScyllaClient {
         }
     }
 
-    /// Get the current global event sequence number for a log
-    pub async fn get_seq_num(&self, log_id: &str) -> i64 {
+    pub async fn get_event_log(&self, log_id: &str) -> Option<EventLog> {
         let query = Statement::new("SELECT event_log_id, last_seq_num, last_updated FROM spacetraders.event_logs WHERE event_log_id = ? LIMIT 1");
         let result = self.session.query_unpaged(query, &(log_id,)).await.unwrap();
         let result = result.into_rows_result().unwrap();
-
-        if let Some(row) = result.rows::<EventLog>().unwrap().next() {
-            let event_log = row.unwrap();
-            event_log.last_seq_num
-        } else {
-            0 // Return 0 if no sequence exists for this log
-        }
+        result
+            .rows::<EventLog>()
+            .unwrap()
+            .next()
+            .map(|row| row.unwrap())
     }
 
-    /// Update the sequence number for a log
-    pub async fn update_seq_num(&self, log_id: &str, seq_num: i64) {
+    pub async fn upsert_event_log(&self, log: &EventLog) {
         let update_query = Statement::new(
             "INSERT INTO spacetraders.event_logs (event_log_id, last_seq_num, last_updated) VALUES (?, ?, ?)",
         );
-        let upsert = EventLog {
-            event_log_id: log_id.to_string(),
-            last_seq_num: seq_num,
-            last_updated: Utc::now(),
-        };
-        self.session
-            .query_unpaged(update_query, &upsert)
-            .await
-            .unwrap();
+        self.session.query_unpaged(update_query, log).await.unwrap();
     }
 
     // Current State Operations
@@ -112,54 +97,21 @@ impl ScyllaClient {
             .map(|row| row.unwrap())
     }
 
-    pub async fn upsert_entity(&self, current_state: CurrentState) {
+    pub async fn upsert_entity(&self, current_state: &CurrentState) {
         let query = Statement::new("INSERT INTO spacetraders.current_state (event_log_id, entity_id, state_data, last_updated, seq_num, entity_seq_num, last_snapshot_entity_seq_num) VALUES (?, ?, ?, ?, ?, ?, ?)");
         self.session
-            .query_unpaged(
-                query,
-                &(
-                    current_state.event_log_id.to_string(),
-                    current_state.entity_id.to_string(),
-                    current_state.state_data.to_string(),
-                    current_state.last_updated,
-                    current_state.seq_num,
-                    current_state.entity_seq_num,
-                    current_state.last_snapshot_entity_seq_num,
-                ),
-            )
+            .query_unpaged(query, current_state)
             .await
             .unwrap();
     }
 
     // Event Operations - Main table for consecutive event retrieval
-    pub async fn insert_event(
-        &self,
-        seq_num: i64,
-        event_log_id: &str,
-        entity_id: &str,
-        event_type: &str,
-        event_data: &str,
-    ) {
-        let timestamp = Utc::now();
-
+    pub async fn insert_event(&self, event: &Event) {
         // Insert into main events table
         let query = Statement::new(
             "INSERT INTO spacetraders.events (event_log_id, seq_num, timestamp, entity_id, event_type, event_data) VALUES (?, ?, ?, ?, ?, ?)",
         );
-        self.session
-            .query_unpaged(
-                query,
-                &(
-                    event_log_id.to_string(),
-                    seq_num,
-                    timestamp,
-                    entity_id.to_string(),
-                    event_type.to_string(),
-                    event_data.to_string(),
-                ),
-            )
-            .await
-            .unwrap();
+        self.session.query_unpaged(query, event).await.unwrap();
     }
 
     /// Get consecutive events across all entities for a specific event log
@@ -274,29 +226,11 @@ impl ScyllaClient {
     }
 
     // Snapshot Operations
-    pub async fn insert_snapshot(
-        &self,
-        event_log_id: &str,
-        entity_id: &str,
-        state_data: &str,
-        seq_num: i64,
-    ) {
+    pub async fn insert_snapshot(&self, snapshot: &Snapshot) {
         let query = Statement::new(
-            "INSERT INTO spacetraders.snapshots (event_log_id, entity_id, timestamp, state_data, seq_num) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO spacetraders.snapshots (event_log_id, entity_id, last_updated, seq_num, entity_seq_num, state_data) VALUES (?, ?, ?, ?, ?, ?)",
         );
-        self.session
-            .query_unpaged(
-                query,
-                &(
-                    event_log_id.to_string(),
-                    entity_id.to_string(),
-                    Utc::now(),
-                    state_data.to_string(),
-                    seq_num,
-                ),
-            )
-            .await
-            .unwrap();
+        self.session.query_unpaged(query, snapshot).await.unwrap();
     }
 
     pub async fn get_latest_snapshot(

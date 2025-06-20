@@ -1,9 +1,9 @@
+//! Simple event processor. Process events produced by the agent and insert a condensed form into scylla db.
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use chrono::Utc;
 use lazy_static::lazy_static;
-/// Simple event processor. Process events produced by the agent and insert a condensed form into scylla db.
 use log::*;
 use rdkafka::consumer::Consumer as _;
 use rdkafka::consumer::StreamConsumer;
@@ -23,7 +23,10 @@ use st::models::ShipFuel;
 use st::models::ShipNav;
 use st::models::ShipNavStatus;
 use st::scylla_client::CurrentState;
+use st::scylla_client::Event;
+use st::scylla_client::EventLog;
 use st::scylla_client::ScyllaClient;
+use st::scylla_client::Snapshot;
 
 #[tokio::main]
 async fn main() {
@@ -138,14 +141,8 @@ impl Worker {
             )
             .await;
         }
-
-        // 4. for each new event:
-        //    - insert into the event log
-        //    - update the current state of the entity(s)
-        //    - (conditionally) insert a snapshot of the entity(s)
-
-        // For now, just log that we processed this specific request
     }
+
     async fn process_ship_req(
         &self,
         log_id: &str,
@@ -156,8 +153,9 @@ impl Worker {
     ) {
         assert!(ship_update.is_some() || ship_nav_update.is_some() || ship_fuel_update.is_some());
         let current_state = self.scylla.get_entity(log_id, ship_symbol).await;
-        let ship_entity_prev: Option<ShipEntity> =
-            current_state.map(|state| serde_json::from_str(&state.state_data).unwrap());
+        let ship_entity_prev: Option<ShipEntity> = current_state
+            .as_ref()
+            .map(|state| serde_json::from_str(&state.state_data).unwrap());
 
         // Get the latest ship entity
         let ship_entity: ShipEntity = match ship_update {
@@ -190,21 +188,97 @@ impl Worker {
         }
         let prev = ship_entity_prev.unwrap_or_default();
         let update = get_ship_entity_update(&prev, &ship_entity);
-
         debug!("Ship {} entity update: {:?}", ship_symbol, update);
 
+        self.update_entity(
+            log_id,
+            current_state,
+            ship_symbol,
+            "ship",
+            &serde_json::to_string(&ship_entity).unwrap(),
+            &serde_json::to_string(&update).unwrap(),
+        )
+        .await;
+    }
+
+    async fn update_entity(
+        &self,
+        log_id: &str,
+        current_state: Option<CurrentState>,
+        entity_id: &str,
+        entity_type: &str,
+        state_data: &str,
+        event_data: &str,
+    ) {
+        // Update Query 1: get the current seq num for the event log `event_logs` table
+        let event_log = self.scylla.get_event_log(log_id).await;
+        let next_seq_num = event_log.map(|log| log.last_seq_num).unwrap_or(0) + 1;
+        let next_entity_seq_num = current_state
+            .as_ref()
+            .map(|state| state.entity_seq_num)
+            .unwrap_or(0)
+            + 1;
+        let last_snapshot_entity_seq_num = current_state
+            .as_ref()
+            .map(|state| state.last_snapshot_entity_seq_num)
+            .unwrap_or(0);
+        let should_snapshot = next_entity_seq_num - last_snapshot_entity_seq_num >= 20;
+        let ts = Utc::now();
+
+        // Update Query 1.1: increment seq num and upsert the event log `event_logs` table
+        let event_log = EventLog {
+            event_log_id: log_id.to_string(),
+            last_seq_num: next_seq_num,
+            last_updated: ts,
+        };
+        self.scylla.upsert_event_log(&event_log).await;
+
+        // Update Query 2: upsert to `current_state` table
+        let last_snapshot_entity_seq_num = if should_snapshot {
+            next_entity_seq_num
+        } else {
+            last_snapshot_entity_seq_num
+        };
         let state = CurrentState {
             event_log_id: log_id.to_string(),
-            entity_id: ship_symbol.to_string(),
-            state_data: serde_json::to_string(&ship_entity).unwrap(),
-            last_updated: Utc::now(),
-            // !! TODO: sort out event sequence numbers
-            seq_num: 0,
-            entity_seq_num: 0,
-            last_snapshot_entity_seq_num: 0,
+            entity_id: entity_id.to_string(),
+            entity_type: entity_type.to_string(),
+            state_data: state_data.to_string(),
+            last_updated: ts,
+            seq_num: next_seq_num,
+            entity_seq_num: next_entity_seq_num,
+            last_snapshot_entity_seq_num,
         };
-        // Insert the new ship entity into scylla
-        self.scylla.upsert_entity(state).await;
+        self.scylla.upsert_entity(&state).await;
+
+        // Update Query 2.1: conditionally, insert the ship entity update into `snapshots` table
+        if should_snapshot {
+            info!(
+                "Snapshotting ship {} at seq num {}",
+                entity_id, next_entity_seq_num
+            );
+            let snapshot = Snapshot {
+                event_log_id: log_id.to_string(),
+                entity_id: entity_id.to_string(),
+                entity_type: entity_type.to_string(),
+                state_data: state_data.to_string(),
+                last_updated: ts,
+                seq_num: next_seq_num,
+                entity_seq_num: next_entity_seq_num,
+            };
+            self.scylla.insert_snapshot(&snapshot).await;
+        }
+
+        // Update Query 3: insert the ship entity update into `events` table
+        let event = Event {
+            event_log_id: log_id.to_string(),
+            seq_num: next_seq_num,
+            timestamp: ts,
+            entity_id: entity_id.to_string(),
+            event_type: "ship_update".to_string(),
+            event_data: event_data.to_string(),
+        };
+        self.scylla.insert_event(&event).await;
     }
 }
 

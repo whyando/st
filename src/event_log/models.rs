@@ -35,7 +35,7 @@ pub struct ShipEntityUpdate {
 impl std::fmt::Debug for ShipEntityUpdate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut fields = Vec::new();
-        
+
         if let Some(symbol) = &self.symbol {
             fields.push(format!("symbol: {}", symbol));
         }
@@ -63,7 +63,7 @@ impl std::fmt::Debug for ShipEntityUpdate {
         if let Some(nav_departure_time) = &self.nav_departure_time {
             fields.push(format!("nav_departure_time: {}", nav_departure_time));
         }
-        
+
         write!(f, "ShipEntityUpdate {{ {} }}", fields.join(", "))
     }
 }

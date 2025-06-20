@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS event_logs (
 CREATE TABLE IF NOT EXISTS current_state (
     event_log_id text,          -- '2024-01-15' or 'log-1', 'log-2' etc.
     entity_id text,             -- unique identifier for the entity
+    entity_type text,
     state_data text,            -- JSON serialized state
     last_updated timestamp,     -- when this state was last updated
     seq_num bigint,             -- version number (matches event sequence)
@@ -44,9 +45,11 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE TABLE IF NOT EXISTS snapshots (
     event_log_id text,          -- '2024-01-15' or 'log-1', 'log-2' etc.
     entity_id text,             -- unique identifier for the entity
-    timestamp timestamp,        -- when the snapshot was taken
+    entity_type text,
+    last_updated timestamp,     -- when this snapshot was taken
     state_data text,            -- JSON serialized state at this snapshot
     seq_num bigint,             -- event sequence number when this snapshot was taken
+    entity_seq_num bigint,      -- entity-specific sequence number
     PRIMARY KEY ((event_log_id), entity_id, seq_num)
 ) WITH CLUSTERING ORDER BY (entity_id ASC, seq_num ASC);
 
