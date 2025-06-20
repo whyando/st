@@ -98,7 +98,7 @@ impl ScyllaClient {
     }
 
     pub async fn upsert_entity(&self, current_state: &CurrentState) {
-        let query = Statement::new("INSERT INTO spacetraders.current_state (event_log_id, entity_id, state_data, last_updated, seq_num, entity_seq_num, last_snapshot_entity_seq_num) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        let query = Statement::new("INSERT INTO spacetraders.current_state (event_log_id, entity_id, entity_type, state_data, last_updated, seq_num, entity_seq_num, last_snapshot_entity_seq_num) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         self.session
             .query_unpaged(query, current_state)
             .await
@@ -228,7 +228,7 @@ impl ScyllaClient {
     // Snapshot Operations
     pub async fn insert_snapshot(&self, snapshot: &Snapshot) {
         let query = Statement::new(
-            "INSERT INTO spacetraders.snapshots (event_log_id, entity_id, last_updated, seq_num, entity_seq_num, state_data) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO spacetraders.snapshots (event_log_id, entity_id, entity_type, last_updated, seq_num, entity_seq_num, state_data) VALUES (?, ?, ?, ?, ?, ?, ?)",
         );
         self.session.query_unpaged(query, snapshot).await.unwrap();
     }

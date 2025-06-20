@@ -1,10 +1,8 @@
 //! Simple event processor. Process events produced by the agent and insert a condensed form into scylla db.
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
-
 use chrono::Utc;
 use lazy_static::lazy_static;
 use log::*;
+use rdkafka::consumer::CommitMode;
 use rdkafka::consumer::Consumer as _;
 use rdkafka::consumer::StreamConsumer;
 use rdkafka::message::Message as _;
@@ -27,6 +25,8 @@ use st::scylla_client::Event;
 use st::scylla_client::EventLog;
 use st::scylla_client::ScyllaClient;
 use st::scylla_client::Snapshot;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 #[tokio::main]
 async fn main() {
@@ -35,15 +35,16 @@ async fn main() {
 
     let worker = Worker::new().await;
 
-    // Set a changing group id for testing purposes
-    let ts = Utc::now().timestamp();
-    let group_id = format!("event-processor-test-{}", ts);
-    let log_id = format!("ships-list-test-{}", ts);
+    // Set a group_id and log_id directly for testing purposes
+    // let id = Utc::now().timestamp();
+    let id = "tst4378-4";
+    let group_id = format!("event-processor-test-{}", id);
+    let log_id = format!("ships-list-test-{}", id);
 
     let consumer: StreamConsumer = KAFKA_CONFIG
         .clone()
         .set("group.id", group_id)
-        .set("enable.auto.commit", "true")
+        .set("enable.auto.commit", "false")
         .set("auto.offset.reset", "earliest")
         .create()
         .expect("Failed to create Kafka consumer");
@@ -61,6 +62,9 @@ async fn main() {
         } else {
             panic!("Unknown topic: {}", topic);
         }
+        consumer
+            .commit_message(&message, CommitMode::Async)
+            .unwrap();
     }
 }
 
