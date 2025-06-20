@@ -9,6 +9,7 @@ pub mod universe;
 
 pub mod broker;
 pub mod config;
+pub mod event_log;
 pub mod logistics_planner;
 pub mod pathfinding;
 pub mod prelude;

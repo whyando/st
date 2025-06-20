@@ -115,6 +115,13 @@ pub struct NavigateResponse {
     pub events: Vec<models::ShipConditionEvent>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuyShipResponse {
+    pub agent: models::Agent,
+    pub ship: models::Ship,
+    pub transaction: ShipPurchaseTransaction,
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

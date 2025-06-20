@@ -1,10 +1,8 @@
 use crate::api_client::interceptor::ApiInterceptor;
 use crate::config::{KAFKA_CONFIG, KAFKA_TOPIC};
 use chrono::{DateTime, Utc};
-use lazy_static::lazy_static;
 use log::*;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
-use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};

@@ -1,6 +1,6 @@
 use super::join_handles::JoinHandles;
 use super::ledger::Ledger;
-use crate::api_client::api_models::{ShipPurchaseTransaction, WaypointDetailed};
+use crate::api_client::api_models::{BuyShipResponse, WaypointDetailed};
 use crate::broker::{CargoBroker, TransferActor};
 use crate::config::CONFIG;
 use crate::models::{ShipNavStatus::*, *};
@@ -503,13 +503,6 @@ impl AgentController {
     }
 
     async fn buy_ship(&self, shipyard: &WaypointSymbol, ship_model: &str) -> String {
-        #[derive(Debug, Clone, Serialize, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct BuyShipResponse {
-            agent: Agent,
-            ship: Ship,
-            transaction: ShipPurchaseTransaction,
-        }
         self.debug(&format!("Buying {} at {}", &ship_model, &shipyard));
         let uri = "/my/ships";
         let body = json!({
@@ -722,7 +715,7 @@ impl AgentController {
 
         if era == AgentEra::InterSystem2 {
             let capital = self.faction_capital();
-            let waypoints: Vec<WaypointDetailed> =
+            let _waypoints: Vec<WaypointDetailed> =
                 self.universe.get_system_waypoints(&capital).await;
             panic!("Late game not supported");
             // return ship_config_lategame(&capital, &waypoints);
@@ -762,10 +755,10 @@ impl AgentController {
 
         if era == AgentEra::InterSystem1 {
             let capital = self.faction_capital();
-            let waypoints: Vec<WaypointDetailed> =
+            let _waypoints: Vec<WaypointDetailed> =
                 self.universe.get_system_waypoints(&capital).await;
-            let markets = self.universe.get_system_markets_remote(&capital).await;
-            let shipyards = self.universe.get_system_shipyards_remote(&capital).await;
+            let _markets = self.universe.get_system_markets_remote(&capital).await;
+            let _shipyards = self.universe.get_system_shipyards_remote(&capital).await;
             panic!("Capital system not supported");
             // ships.append(&mut ship_config_capital_system(
             //     &capital,
